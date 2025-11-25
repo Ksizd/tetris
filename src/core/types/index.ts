@@ -6,3 +6,4 @@ export * from './piece';
 export * from './orientation';
 export * from './rotation';
 export * from './activePiece';
+export * from './commands';
