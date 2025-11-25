@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+.cache/
+.parcel-cache/
+.vite/
+coverage/
+frames/
+target_result_video.mp4
