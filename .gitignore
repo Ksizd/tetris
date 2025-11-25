@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Tooling caches
+.cache/
+.parcel-cache/
+.vite/
+
+# Coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor settings
+.vscode/
+.idea/
+*.iml
+
+# Temp files
+*.swp
+*.swo
+.temp/
+tmp/
+
+# Env files
+.env
+.env.local
+.env.*.local
