@@ -1,6 +1,8 @@
-import { ActivePiece, GameStatus, PieceOrientation } from '../types';
+import { GameStatus, PieceOrientation } from '../types';
 import { canMove, canPlacePiece } from '../collision';
 import { GameState } from './gameState';
+import { lockCurrentPiece } from './lock';
+import { beginClearingPhase } from './clearing';
 
 export function tickGame(state: GameState, deltaTimeMs: number): GameState {
   if (state.gameStatus === GameStatus.GameOver || state.gameStatus === GameStatus.Paused) {
@@ -14,7 +16,6 @@ export function tickGame(state: GameState, deltaTimeMs: number): GameState {
     return nextState;
   }
 
-  // накопили достаточно времени — пробуем опустить фигуру
   const fallSteps = Math.floor(nextTiming.fallProgressMs / nextTiming.fallIntervalMs);
   nextTiming.fallProgressMs -= fallSteps * nextTiming.fallIntervalMs;
 
@@ -23,19 +24,16 @@ export function tickGame(state: GameState, deltaTimeMs: number): GameState {
     return nextState;
   }
 
-  const moved = tryMovePiece(nextState, { dx: 0, dy: -fallSteps });
-  if (moved) {
-    nextState = moved;
+  if (fallSteps <= 0) {
     return nextState;
   }
 
-  // не смогли опустить — в следующем шаге появится логика фиксации (этап 4.4)
-  return nextState;
+  return applyGravitySteps(nextState, fallSteps);
 }
 
 function spawnPiece(state: GameState): GameState {
   const pieceType = state.pieceQueue.getNextPiece();
-  const spawn: ActivePiece = {
+  const spawn = {
     type: pieceType,
     orientation: PieceOrientation.Deg0,
     position: getDefaultSpawnPosition(state),
@@ -60,21 +58,36 @@ function getDefaultSpawnPosition(state: GameState): { x: number; y: number } {
   return { x: spawnX, y: spawnY };
 }
 
-function tryMovePiece(state: GameState, move: { dx: number; dy: number }): GameState | null {
-  const piece = state.currentPiece;
+function applyGravitySteps(state: GameState, fallSteps: number): GameState {
+  let piece = state.currentPiece;
   if (!piece) {
-    return null;
+    return state;
   }
 
-  if (!canMove(state.board, piece, move.dx, move.dy)) {
-    return null;
-  }
+  for (let step = 0; step < fallSteps; step += 1) {
+    if (!canMove(state.board, piece, 0, -1)) {
+      const locked = lockCurrentPiece({
+        ...state,
+        currentPiece: piece,
+        timing: { ...state.timing, fallProgressMs: 0 },
+      });
+      return beginClearingPhase(locked);
+    }
 
-  return {
-    ...state,
-    currentPiece: {
+    piece = {
       ...piece,
-      position: { x: piece.position.x + move.dx, y: piece.position.y + move.dy },
-    },
-  };
+      position: { x: piece.position.x, y: piece.position.y - 1 },
+    };
+  }
+
+  const stateAfterFall = { ...state, currentPiece: piece };
+  if (!canMove(stateAfterFall.board, piece, 0, -1)) {
+    const locked = lockCurrentPiece({
+      ...stateAfterFall,
+      timing: { ...stateAfterFall.timing, fallProgressMs: 0 },
+    });
+    return beginClearingPhase(locked);
+  }
+
+  return stateAfterFall;
 }

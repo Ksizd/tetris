@@ -30,6 +30,14 @@ describe('tickGame', () => {
     expect(next.currentPiece?.position.y).toBe(1);
   });
 
+  it('locks the piece when gravity collides with the floor', () => {
+    const state = makeStateWithPiece(0);
+    const next = tickGame(state, 100);
+    expect(next.currentPiece).toBeNull();
+    expect(next.board.getCell({ x: 2, y: 0 })).toBe(CellContent.Block);
+    expect(next.clearingLayers.length).toBe(0);
+  });
+
   it('spawns a piece when none present and space is free', () => {
     const state = createInitialGameState({ seed: 2, fallIntervalMs: 100 });
     const next = tickGame(state, 200);
