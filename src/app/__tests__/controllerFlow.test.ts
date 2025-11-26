@@ -59,7 +59,16 @@ describe('Controller flow: command -> state -> events', () => {
     for (let x = 0; x < width; x += 1) {
       blockedBoard.setCell({ x, y: height - 1 }, CellContent.Block);
     }
-    const ctrl = new GameController({ ...base, board: blockedBoard, currentPiece: null });
+    const deterministicQueue = {
+      getNextPiece: () => PieceType.T,
+      peekNextPiece: () => PieceType.T,
+    };
+    const ctrl = new GameController({
+      ...base,
+      board: blockedBoard,
+      currentPiece: null,
+      pieceQueue: deterministicQueue as unknown as typeof base.pieceQueue,
+    });
     ctrl.update(1200);
 
     expect(ctrl.getSnapshot().gameStatus).toBe(GameStatus.GameOver);
