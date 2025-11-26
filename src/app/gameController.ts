@@ -4,10 +4,10 @@ import { GameState } from '../core/state/gameState';
 import { tickGame } from '../core/state/tick';
 import { createInitialGameState, GameConfig } from '../core/state/initialState';
 import { GameEvent, GameEventType } from './events';
+import { GameStatus } from '../core/types';
 
 /**
- * Application-layer controller: обрабатывает очередь команд и время,
- * отдаёт снэпшот состояния для рендера/ввода.
+ * Application-layer controller: orchestrates domain state updates, input commands and exposes snapshots.
  */
 export class GameController {
   private state: GameState;
@@ -40,8 +40,13 @@ export class GameController {
   }
 
   getSnapshot(): Readonly<GameState> {
-    // возвращаем копию, чтобы внешние мутации не портили внутреннее состояние
     return { ...this.state };
+  }
+
+  startNewGame(config?: Partial<GameConfig>): void {
+    const initial = createInitialGameState(config);
+    const timing = { ...initial.timing, fallProgressMs: initial.timing.fallIntervalMs };
+    this.state = { ...initial, timing, gameStatus: GameStatus.Running };
   }
 
   private flushCommands(): void {

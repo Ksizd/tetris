@@ -9,9 +9,10 @@ function makeStateWithPiece(y: number) {
   const state = createInitialGameState({ seed: 1, fallIntervalMs: 100 });
   return {
     ...state,
+    gameStatus: GameStatus.Running,
     currentPiece: {
       type: PieceType.I,
-      orientation: PieceOrientation.Deg90, // вертикально для удобного падения
+      orientation: PieceOrientation.Deg90, // vertical to simplify expectations
       position: { x: 0, y },
     },
   };
@@ -38,17 +39,23 @@ describe('tickGame', () => {
     expect(next.clearingLayers.length).toBe(0);
   });
 
-  it('spawns a piece when none present and space is free', () => {
-    const state = createInitialGameState({ seed: 2, fallIntervalMs: 100 });
+  it('spawns a piece when none present and space is free in running state', () => {
+    const state = { ...createInitialGameState({ seed: 2, fallIntervalMs: 100 }), gameStatus: GameStatus.Running };
     const next = tickGame(state, 200);
     expect(next.currentPiece).not.toBeNull();
     expect(next.gameStatus).toBe(GameStatus.Running);
   });
 
-  it('sets game over when spawn collides at the top', () => {
-    const state = createInitialGameState({ seed: 3, fallIntervalMs: 100 });
+  it('does nothing while idle before start is triggered', () => {
+    const state = createInitialGameState({ seed: 2, fallIntervalMs: 100 });
+    const next = tickGame(state, 200);
+    expect(next.gameStatus).toBe(GameStatus.Idle);
+    expect(next.currentPiece).toBeNull();
+  });
+
+  it('sets game over when spawn collides at the top (running state)', () => {
+    const state = { ...createInitialGameState({ seed: 3, fallIntervalMs: 100 }), gameStatus: GameStatus.Running };
     const { width, height } = state.board.getDimensions();
-    // заполним верхний ряд, чтобы спаун наткнулся
     const filledBoard = Board.createEmpty({ width, height });
     for (let x = 0; x < width; x += 1) {
       filledBoard.setCell({ x, y: height - 1 }, CellContent.Block);

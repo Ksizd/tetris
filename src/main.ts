@@ -1,10 +1,13 @@
 import { createRenderContext, resizeRenderer, renderScene } from './render';
 import { GameController } from './app/gameController';
 import { KeyboardInput } from './input/keyboardInput';
-import { HudView } from './ui/hud';
+import { HudView, mapGameStateToHudData } from './ui/hud';
+import { OverlayView } from './ui/overlay';
+import { mapGameStatusToUIState } from './ui/uiState';
 
 const canvas = document.getElementById('render-canvas') as HTMLCanvasElement | null;
 const hudContainer = document.getElementById('hud');
+const overlayContainer = document.getElementById('overlay');
 
 if (!canvas) {
   throw new Error('Render canvas element #render-canvas not found');
@@ -12,6 +15,10 @@ if (!canvas) {
 
 if (!hudContainer) {
   throw new Error('HUD container #hud not found');
+}
+
+if (!overlayContainer) {
+  throw new Error('Overlay container #overlay not found');
 }
 
 console.log('Tower Tetris 3D app initialized', { canvas, hudContainer });
@@ -23,6 +30,11 @@ const keyboard = new KeyboardInput({
 });
 keyboard.start();
 const hud = new HudView(hudContainer);
+const overlay = new OverlayView({
+  container: overlayContainer,
+  onStart: () => controller.startNewGame(),
+  onRestart: () => controller.startNewGame(),
+});
 
 let lastTimestamp = performance.now();
 
@@ -33,7 +45,8 @@ function loop(timestamp: number) {
   const snapshot = controller.update(deltaMs);
   renderScene(renderCtx, snapshot);
   renderCtx.renderer.render(renderCtx.scene, renderCtx.camera);
-  hud.render(snapshot);
+  hud.render(mapGameStateToHudData(snapshot));
+  overlay.render(mapGameStatusToUIState(snapshot.gameStatus));
 
   requestAnimationFrame(loop);
 }

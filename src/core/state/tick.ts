@@ -5,7 +5,11 @@ import { lockCurrentPiece } from './lock';
 import { beginClearingPhase } from './clearing';
 
 export function tickGame(state: GameState, deltaTimeMs: number): GameState {
-  if (state.gameStatus === GameStatus.GameOver || state.gameStatus === GameStatus.Paused) {
+  if (
+    state.gameStatus === GameStatus.GameOver ||
+    state.gameStatus === GameStatus.Paused ||
+    state.gameStatus === GameStatus.Idle
+  ) {
     return state;
   }
 

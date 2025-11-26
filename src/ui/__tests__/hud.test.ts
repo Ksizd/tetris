@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { HudView } from '../hud';
+import { HudView, mapGameStateToHudData } from '../hud';
 import { createInitialGameState } from '../../core/state/initialState';
 import { GameStatus } from '../../core/types';
 
@@ -14,7 +14,8 @@ describe('HudView', () => {
     const state = createInitialGameState({ initialLevel: 3 });
     const updated = { ...state, score: 1200, linesCleared: 4, gameStatus: GameStatus.Paused };
 
-    hud.render(updated);
+    const hudData = mapGameStateToHudData(updated);
+    hud.render(hudData);
 
     expect(container.textContent).toContain('1200');
     expect(container.textContent).toContain('3');

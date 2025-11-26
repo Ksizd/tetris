@@ -1,6 +1,13 @@
 import { GameState } from '../core/state/gameState';
 import { GameStatus } from '../core/types';
 
+export interface HudData {
+  score: number;
+  level: number;
+  linesCleared: number;
+  gameStatus: GameStatus;
+}
+
 interface HudElements {
   root: HTMLElement;
   score: HTMLElement;
@@ -16,8 +23,8 @@ export class HudView {
     this.elements = this.createElements(container);
   }
 
-  render(state: Readonly<GameState>): void {
-    const { score, level, linesCleared, gameStatus } = state;
+  render(data: HudData): void {
+    const { score, level, linesCleared, gameStatus } = data;
     this.elements.score.textContent = score.toString();
     this.elements.level.textContent = level.toString();
     this.elements.lines.textContent = linesCleared.toString();
@@ -26,19 +33,11 @@ export class HudView {
 
   private createElements(container: HTMLElement): HudElements {
     const root = document.createElement('div');
-    root.style.background = 'rgba(0, 0, 0, 0.55)';
-    root.style.padding = '12px 14px';
-    root.style.borderRadius = '8px';
-    root.style.minWidth = '140px';
-    root.style.fontFamily = 'Arial, sans-serif';
-    root.style.fontSize = '14px';
-    root.style.lineHeight = '1.4';
-    root.style.pointerEvents = 'none';
+    root.className = 'hud-card';
 
     const title = document.createElement('div');
     title.textContent = 'Tower Tetris';
-    title.style.fontWeight = 'bold';
-    title.style.marginBottom = '6px';
+    title.className = 'hud-title';
 
     const scoreRow = this.createRow('Score');
     const levelRow = this.createRow('Level');
@@ -59,17 +58,15 @@ export class HudView {
 
   private createRow(label: string): { row: HTMLElement; value: HTMLElement } {
     const row = document.createElement('div');
-    row.style.display = 'flex';
-    row.style.justifyContent = 'space-between';
-    row.style.gap = '8px';
+    row.className = 'hud-row';
 
     const labelEl = document.createElement('span');
     labelEl.textContent = label;
-    labelEl.style.opacity = '0.8';
+    labelEl.className = 'hud-label';
 
     const valueEl = document.createElement('span');
     valueEl.textContent = '0';
-    valueEl.style.fontWeight = 'bold';
+    valueEl.className = 'hud-value';
 
     row.append(labelEl, valueEl);
     return { row, value: valueEl };
@@ -90,4 +87,13 @@ function formatStatus(status: GameStatus): string {
     default:
       return 'Idle';
   }
+}
+
+export function mapGameStateToHudData(state: Readonly<GameState>): HudData {
+  return {
+    score: state.score,
+    level: state.level,
+    linesCleared: state.linesCleared,
+    gameStatus: state.gameStatus,
+  };
 }
