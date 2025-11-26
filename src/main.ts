@@ -1,6 +1,6 @@
 import { createRenderContext, resizeRenderer, renderScene } from './render';
 import { GameController } from './app/gameController';
-import { GameCommandType } from './core/types/commands';
+import { KeyboardInput } from './input/keyboardInput';
 
 const canvas = document.getElementById('render-canvas') as HTMLCanvasElement | null;
 const hudContainer = document.getElementById('hud');
@@ -17,6 +17,10 @@ console.log('Tower Tetris 3D app initialized', { canvas, hudContainer });
 
 const renderCtx = createRenderContext(canvas);
 const controller = new GameController();
+const keyboard = new KeyboardInput({
+  onCommand: (command) => controller.enqueueCommand(command),
+});
+keyboard.start();
 
 let lastTimestamp = performance.now();
 
@@ -32,31 +36,6 @@ function loop(timestamp: number) {
 }
 
 requestAnimationFrame(loop);
-
-window.addEventListener('keydown', (event) => {
-  switch (event.code) {
-    case 'ArrowLeft':
-      controller.enqueueCommand({ type: GameCommandType.MoveLeft });
-      break;
-    case 'ArrowRight':
-      controller.enqueueCommand({ type: GameCommandType.MoveRight });
-      break;
-    case 'ArrowUp':
-      controller.enqueueCommand({ type: GameCommandType.RotateCW });
-      break;
-    case 'ArrowDown':
-      controller.enqueueCommand({ type: GameCommandType.SoftDrop });
-      break;
-    case 'Space':
-      controller.enqueueCommand({ type: GameCommandType.HardDrop });
-      break;
-    case 'KeyP':
-      controller.enqueueCommand({ type: GameCommandType.TogglePause });
-      break;
-    default:
-      break;
-  }
-});
 
 window.addEventListener('resize', () => {
   resizeRenderer(renderCtx, canvas.clientWidth, canvas.clientHeight);
