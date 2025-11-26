@@ -1,6 +1,7 @@
 import { createRenderContext, resizeRenderer, renderScene } from './render';
 import { GameController } from './app/gameController';
 import { KeyboardInput } from './input/keyboardInput';
+import { HudView } from './ui/hud';
 
 const canvas = document.getElementById('render-canvas') as HTMLCanvasElement | null;
 const hudContainer = document.getElementById('hud');
@@ -21,6 +22,7 @@ const keyboard = new KeyboardInput({
   onCommand: (command) => controller.enqueueCommand(command),
 });
 keyboard.start();
+const hud = new HudView(hudContainer);
 
 let lastTimestamp = performance.now();
 
@@ -31,6 +33,7 @@ function loop(timestamp: number) {
   const snapshot = controller.update(deltaMs);
   renderScene(renderCtx, snapshot);
   renderCtx.renderer.render(renderCtx.scene, renderCtx.camera);
+  hud.render(snapshot);
 
   requestAnimationFrame(loop);
 }
