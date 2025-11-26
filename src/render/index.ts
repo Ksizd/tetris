@@ -5,3 +5,6 @@ export * from './boardPlaceholder';
 export * from './boardInstancedMesh';
 export * from './boardRenderer';
 export * from './cameraSetup';
+export * from './activePieceInstancedMesh';
+export * from './activePieceRenderer';
+export * from './sceneRenderer';

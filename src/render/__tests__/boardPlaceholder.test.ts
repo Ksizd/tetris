@@ -9,6 +9,7 @@ describe('createBoardPlaceholder', () => {
     const config = createBoardRenderConfig(dimensions, { blockSize: 2 });
     const { group, rails, baseRing } = createBoardPlaceholder(dimensions, config);
     const expectedHeight = (dimensions.height - 1) * config.verticalSpacing + config.blockSize;
+    const expectedRingY = config.blockSize * 0.25;
 
     expect(rails).toHaveLength(dimensions.width);
     rails.forEach((rail) => {
@@ -17,6 +18,6 @@ describe('createBoardPlaceholder', () => {
     });
 
     expect(group.children).toContain(baseRing);
-    expect(baseRing.position.y).toBeCloseTo(0);
+    expect(baseRing.position.y).toBeCloseTo(expectedRingY);
   });
 });

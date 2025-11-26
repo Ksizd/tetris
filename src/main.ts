@@ -1,4 +1,4 @@
-import { createRenderContext, resizeRenderer } from './render';
+import { createRenderContext, resizeRenderer, renderScene } from './render';
 import { GameController } from './app/gameController';
 import { GameCommandType } from './core/types/commands';
 
@@ -24,8 +24,8 @@ function loop(timestamp: number) {
   const deltaMs = timestamp - lastTimestamp;
   lastTimestamp = timestamp;
 
-  controller.update(deltaMs);
-  // TODO: renderScene(snapshot) — когда появится реальный рендер башни
+  const snapshot = controller.update(deltaMs);
+  renderScene(renderCtx, snapshot);
   renderCtx.renderer.render(renderCtx.scene, renderCtx.camera);
 
   requestAnimationFrame(loop);

@@ -21,6 +21,10 @@ export class BoardToWorldMapper {
     this.config = createBoardRenderConfig(dimensions, config);
   }
 
+  getDimensions(): BoardDimensions {
+    return { ...this.dimensions };
+  }
+
   cellToWorldPosition(x: number, y: number): THREE.Vector3 {
     this.ensureIntegerCoord(x, 'x');
     this.ensureIntegerCoord(y, 'y');

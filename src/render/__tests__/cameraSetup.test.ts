@@ -18,8 +18,15 @@ describe('cameraSetup', () => {
     expect(distanceXZ).toBeGreaterThan(config.towerRadius);
     expect(placement.target.x).toBeCloseTo(0);
     expect(placement.target.z).toBeCloseTo(0);
-    expect(placement.target.y).toBeCloseTo(
-      ((dimensions.height - 1) * config.verticalSpacing + config.blockSize) * 0.5
-    );
+    const towerHeight = (dimensions.height - 1) * config.verticalSpacing + config.blockSize;
+    expect(placement.target.y).toBeCloseTo(towerHeight * 0.5);
+
+    // Camera distance should be enough to cover half height with margin at current fov
+    const margin = config.blockSize * 2;
+    const halfHeightWithMargin = towerHeight / 2 + margin;
+    const fovRad = (45 * Math.PI) / 180;
+    const minDistance = halfHeightWithMargin / Math.tan(fovRad / 2);
+    const actualDistance = placement.position.length();
+    expect(actualDistance).toBeGreaterThan(minDistance * 0.9);
   });
 });

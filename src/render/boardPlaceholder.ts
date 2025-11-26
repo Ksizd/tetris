@@ -45,7 +45,7 @@ export function createBoardPlaceholder(
     rails.push(rail);
   }
 
-  const ringTubeRadius = railRadius * 0.66;
+  const ringTubeRadius = railRadius * 1.2;
   const ringGeometry = new THREE.TorusGeometry(
     resolvedConfig.towerRadius,
     ringTubeRadius,
@@ -54,14 +54,14 @@ export function createBoardPlaceholder(
   );
   const ringMaterial = new THREE.MeshStandardMaterial({
     color: 0x5fb7ff,
-    opacity: 0.15,
+    opacity: 0.35,
     transparent: true,
     metalness: 0,
     roughness: 0.5,
   });
   const baseRing = new THREE.Mesh(ringGeometry, ringMaterial);
   baseRing.rotation.x = Math.PI / 2;
-  baseRing.position.y = 0;
+  baseRing.position.y = resolvedConfig.blockSize * 0.25;
   baseRing.castShadow = false;
   baseRing.receiveShadow = false;
   group.add(baseRing);

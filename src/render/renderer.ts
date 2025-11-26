@@ -5,13 +5,17 @@ import { BoardToWorldMapper } from './boardToWorldMapper';
 import { createBoardPlaceholder } from './boardPlaceholder';
 import { createBoardInstancedMesh } from './boardInstancedMesh';
 import { computeCameraPlacement } from './cameraSetup';
+import { createActivePieceInstancedMesh } from './activePieceInstancedMesh';
+import { ActivePieceInstancedResources } from './activePieceInstancedMesh';
+import { BoardInstancedResources } from './boardInstancedMesh';
 
 export interface RenderContext {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
   boardPlaceholder: THREE.Group;
-  boardMesh: THREE.InstancedMesh;
+  board: BoardInstancedResources;
+  activePiece: ActivePieceInstancedResources;
   mapper: BoardToWorldMapper;
   renderConfig: ReturnType<typeof createBoardRenderConfig>;
 }
@@ -56,12 +60,16 @@ export function createRenderContext(canvas: HTMLCanvasElement): RenderContext {
   const boardInstanced = createBoardInstancedMesh(DEFAULT_BOARD_DIMENSIONS, renderConfig);
   scene.add(boardInstanced.mesh);
 
+  const activePieceInstanced = createActivePieceInstancedMesh(renderConfig);
+  scene.add(activePieceInstanced.mesh);
+
   return {
     scene,
     camera,
     renderer,
     boardPlaceholder: placeholder.group,
-    boardMesh: boardInstanced.mesh,
+    board: boardInstanced,
+    activePiece: activePieceInstanced,
     mapper,
     renderConfig,
   };

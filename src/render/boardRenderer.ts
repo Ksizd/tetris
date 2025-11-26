@@ -19,6 +19,7 @@ export function renderBoard({ board, instanced, mapper }: RenderBoardParams): vo
   const position = new THREE.Vector3();
   const scale = new THREE.Vector3(1, 1, 1);
   const rotation = new THREE.Quaternion(); // identity
+  const targetMesh = instanced.mesh;
 
   let instanceIndex = 0;
   for (let y = 0; y < dimensions.height; y += 1) {
@@ -28,11 +29,11 @@ export function renderBoard({ board, instanced, mapper }: RenderBoardParams): vo
       }
       position.copy(mapper.cellToWorldPosition(x, y));
       matrix.compose(position, rotation, scale);
-      instanced.mesh.setMatrixAt(instanceIndex, matrix);
+      targetMesh.setMatrixAt(instanceIndex, matrix);
       instanceIndex += 1;
     }
   }
 
-  instanced.mesh.count = instanceIndex;
-  instanced.mesh.instanceMatrix.needsUpdate = true;
+  targetMesh.count = instanceIndex;
+  targetMesh.instanceMatrix.needsUpdate = true;
 }
