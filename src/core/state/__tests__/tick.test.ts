@@ -40,7 +40,10 @@ describe('tickGame', () => {
   });
 
   it('spawns a piece when none present and space is free in running state', () => {
-    const state = { ...createInitialGameState({ seed: 2, fallIntervalMs: 100 }), gameStatus: GameStatus.Running };
+    const state = {
+      ...createInitialGameState({ seed: 2, fallIntervalMs: 100 }),
+      gameStatus: GameStatus.Running,
+    };
     const next = tickGame(state, 200);
     expect(next.currentPiece).not.toBeNull();
     expect(next.gameStatus).toBe(GameStatus.Running);
@@ -54,7 +57,10 @@ describe('tickGame', () => {
   });
 
   it('sets game over when spawn collides at the top (running state)', () => {
-    const state = { ...createInitialGameState({ seed: 3, fallIntervalMs: 100 }), gameStatus: GameStatus.Running };
+    const state = {
+      ...createInitialGameState({ seed: 3, fallIntervalMs: 100 }),
+      gameStatus: GameStatus.Running,
+    };
     const { width, height } = state.board.getDimensions();
     const filledBoard = Board.createEmpty({ width, height });
     for (let x = 0; x < width; x += 1) {

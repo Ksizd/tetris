@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { createBoardInstancedMesh } from '../boardInstancedMesh';
 import { createBoardRenderConfig } from '../boardConfig';
+import { applyUniformBoxUVs } from '../uv';
 
 describe('createBoardInstancedMesh', () => {
   const dimensions = { width: 4, height: 3 };
@@ -16,5 +17,18 @@ describe('createBoardInstancedMesh', () => {
     expect(mesh.geometry).toBe(geometry);
     expect(mesh.material).toBe(material);
     expect(mesh.frustumCulled).toBe(false);
+  });
+
+  it('applies a texture map to board material', () => {
+    const { material } = createBoardInstancedMesh(dimensions);
+    expect(material.map).toBeInstanceOf(THREE.Texture);
+  });
+
+  it('applies uniform box UVs (no mirroring)', () => {
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    applyUniformBoxUVs(geometry);
+    const uv = geometry.getAttribute('uv').array as Iterable<number>;
+    const firstFace = Array.from(uv).slice(0, 12);
+    expect(firstFace).toEqual([0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1]);
   });
 });

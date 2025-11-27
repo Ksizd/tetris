@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { GameController } from '../gameController';
-import { ActivePiece, GameCommandType, PieceOrientation, PieceType } from '../../core/types';
+import {
+  ActivePiece,
+  GameCommandType,
+  GameStatus,
+  PieceOrientation,
+  PieceType,
+} from '../../core/types';
 import { createInitialGameState } from '../../core/state/initialState';
 import { GameEventType } from '../events';
+import { GameState } from '../../core/state/gameState';
 
 describe('GameController', () => {
   it('processes queued commands on update', () => {
@@ -29,8 +36,11 @@ describe('GameController', () => {
   });
 
   it('emits events for spawn', () => {
-    const controller = new GameController(createInitialGameState());
-    controller.update(1200); // накопим прогресс для спауна
+    const controller = new GameController({
+      ...createInitialGameState(),
+      gameStatus: GameStatus.Running,
+    });
+    controller.update(1200); // accumulate fall interval to trigger spawn
     expect(controller.getEvents().some((e) => e.type === GameEventType.NewPieceSpawned)).toBe(true);
   });
 });

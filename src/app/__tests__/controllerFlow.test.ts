@@ -16,6 +16,7 @@ describe('Controller flow: command -> state -> events', () => {
         orientation: PieceOrientation.Deg90,
         position: { x: 0, y: 2 },
       },
+      gameStatus: GameStatus.Running,
     });
 
     ctrl.enqueueCommand({ type: GameCommandType.MoveRight });
@@ -31,7 +32,6 @@ describe('Controller flow: command -> state -> events', () => {
     const base = createInitialGameState();
     const board = Board.createEmpty(base.board.getDimensions());
     const width = board.getDimensions().width;
-    // fill bottom except x=2 to allow I vertical to clear
     for (let x = 0; x < width; x += 1) {
       if (x === 2) continue;
       board.setCell({ x, y: 0 }, CellContent.Block);
@@ -44,6 +44,7 @@ describe('Controller flow: command -> state -> events', () => {
         orientation: PieceOrientation.Deg90,
         position: { x: 0, y: 3 },
       },
+      gameStatus: GameStatus.Running,
     });
 
     ctrl.enqueueCommand({ type: GameCommandType.HardDrop });
@@ -68,6 +69,7 @@ describe('Controller flow: command -> state -> events', () => {
       board: blockedBoard,
       currentPiece: null,
       pieceQueue: deterministicQueue as unknown as typeof base.pieceQueue,
+      gameStatus: GameStatus.Running,
     });
     ctrl.update(1200);
 

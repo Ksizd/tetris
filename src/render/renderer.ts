@@ -42,17 +42,10 @@ export function createRenderContext(canvas: HTMLCanvasElement): RenderContext {
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = false;
 
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(
-    cameraPlacement.position.x * 0.1,
-    cameraPlacement.position.y,
-    cameraPlacement.position.z * 0.1
-  );
-  scene.add(light);
-
-  const ambient = new THREE.AmbientLight(0x404040);
-  scene.add(ambient);
+  addLighting(scene, cameraPlacement);
 
   const placeholder = createBoardPlaceholder(DEFAULT_BOARD_DIMENSIONS, renderConfig);
   scene.add(placeholder.group);
@@ -73,6 +66,27 @@ export function createRenderContext(canvas: HTMLCanvasElement): RenderContext {
     mapper,
     renderConfig,
   };
+}
+
+function addLighting(
+  scene: THREE.Scene,
+  cameraPlacement: ReturnType<typeof computeCameraPlacement>
+): void {
+  const hemi = new THREE.HemisphereLight(0xfff8e1, 0x2a1a0a, 0.55);
+  hemi.position.set(0, 1, 0);
+  scene.add(hemi);
+
+  const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+  scene.add(ambient);
+
+  const key = new THREE.DirectionalLight(0xfff3cc, 0.9);
+  key.position.set(
+    cameraPlacement.position.x * 0.4,
+    cameraPlacement.position.y * 0.8,
+    cameraPlacement.position.z * 0.4
+  );
+  key.castShadow = false;
+  scene.add(key);
 }
 
 export function resizeRenderer(ctx: RenderContext, width: number, height: number): void {

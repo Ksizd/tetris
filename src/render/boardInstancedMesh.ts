@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig, createBoardRenderConfig } from './boardConfig';
+import { createMahjongTileTexture } from './textures';
+import { applyUniformBoxUVs } from './uv';
 
 export interface BoardInstancedResources {
   mesh: THREE.InstancedMesh;
@@ -22,8 +24,11 @@ export function createBoardInstancedMesh(
     resolvedConfig.blockSize,
     resolvedConfig.blockSize
   );
+  applyUniformBoxUVs(geometry);
+  const tileTexture = createMahjongTileTexture();
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff,
+    map: tileTexture,
     roughness: 0.35,
     metalness: 0.15,
   });

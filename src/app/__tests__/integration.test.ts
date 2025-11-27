@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GameController } from '../gameController';
-import { GameCommandType, PieceOrientation, PieceType } from '../../core/types';
+import { GameCommandType, GameStatus, PieceOrientation, PieceType } from '../../core/types';
 import { createInitialGameState } from '../../core/state/initialState';
 import { Board } from '../../core/board';
 import { CellContent } from '../../core/types';
@@ -16,13 +16,12 @@ function controllerWithPiece(
     orientation,
     position: { x: piece.x, y: piece.y },
   };
-  return new GameController({ ...base, currentPiece: customPiece });
+  return new GameController({ ...base, currentPiece: customPiece, gameStatus: GameStatus.Running });
 }
 
 describe('Integration: controller + domain', () => {
   it('piece falls and locks on the floor', () => {
     const ctrl = controllerWithPiece({ x: 0, y: 1 });
-    // hard drop to force lock
     ctrl.enqueueCommand({ type: GameCommandType.HardDrop });
     ctrl.update(0);
     expect(ctrl.getSnapshot().currentPiece).toBeNull();
@@ -32,7 +31,6 @@ describe('Integration: controller + domain', () => {
   it('sequence clears a layer', () => {
     const base = createInitialGameState();
     const board = Board.createEmpty(base.board.getDimensions());
-    // fill bottom except x=2 to align with I vertical (orientation 90 => column at x=2)
     for (let x = 0; x < board.getDimensions().width; x += 1) {
       if (x === 2) continue;
       board.setCell({ x, y: 0 }, CellContent.Block);
@@ -45,11 +43,10 @@ describe('Integration: controller + domain', () => {
         orientation: PieceOrientation.Deg90,
         position: { x: 0, y: 3 },
       },
+      gameStatus: GameStatus.Running,
     });
     ctrl.enqueueCommand({ type: GameCommandType.HardDrop });
     ctrl.update(0);
-    // simulate animation completion: completeClearingPhase will be invoked externally later,
-    // здесь проверяем событие LinesCleared
     expect(ctrl.getEvents().some((e) => e.type === GameEventType.LinesCleared)).toBe(true);
   });
 
@@ -69,8 +66,9 @@ describe('Integration: controller + domain', () => {
       board: blockedBoard,
       currentPiece: null,
       pieceQueue: deterministicQueue as unknown as typeof base.pieceQueue,
+      gameStatus: GameStatus.Running,
     });
-    ctrl.update(1200); // force spawn attempt (>= fallInterval)
+    ctrl.update(1200);
     expect(ctrl.getSnapshot().gameStatus).toBe('game_over');
     expect(ctrl.getEvents().some((e) => e.type === GameEventType.GameOver)).toBe(true);
   });

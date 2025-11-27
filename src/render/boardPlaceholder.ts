@@ -7,6 +7,7 @@ export interface BoardPlaceholder {
   group: THREE.Group;
   rails: THREE.Mesh[];
   baseRing: THREE.Mesh;
+  innerLiner: THREE.Mesh;
 }
 
 /**
@@ -66,5 +67,28 @@ export function createBoardPlaceholder(
   baseRing.receiveShadow = false;
   group.add(baseRing);
 
-  return { group, rails, baseRing };
+  const linerHeight = height + resolvedConfig.blockSize * 2;
+  const linerGeometry = new THREE.CylinderGeometry(
+    resolvedConfig.towerRadius - resolvedConfig.blockSize * 0.05,
+    resolvedConfig.towerRadius - resolvedConfig.blockSize * 0.05,
+    linerHeight,
+    Math.max(24, dimensions.width * 2),
+    1,
+    true
+  );
+  const linerMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf5d36b,
+    emissive: 0x331a00,
+    emissiveIntensity: 0.08,
+    metalness: 0.15,
+    roughness: 0.4,
+    side: THREE.BackSide,
+  });
+  const innerLiner = new THREE.Mesh(linerGeometry, linerMaterial);
+  innerLiner.position.y = linerHeight / 2 - resolvedConfig.blockSize;
+  innerLiner.castShadow = false;
+  innerLiner.receiveShadow = false;
+  group.add(innerLiner);
+
+  return { group, rails, baseRing, innerLiner };
 }
