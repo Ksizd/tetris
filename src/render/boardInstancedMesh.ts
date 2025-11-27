@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig, createBoardRenderConfig } from './boardConfig';
 import { createMahjongTileTexture } from './textures';
-import { applyUniformBoxUVs } from './uv';
+import { applyMahjongUVLayout } from './uv';
+import { createBeveledBoxGeometry } from './beveledBoxGeometry';
 
 export interface BoardInstancedResources {
   mesh: THREE.InstancedMesh;
-  geometry: THREE.BoxGeometry;
+  geometry: THREE.BufferGeometry;
   material: THREE.MeshStandardMaterial;
   capacity: number;
 }
@@ -19,12 +20,14 @@ export function createBoardInstancedMesh(
   config?: Partial<BoardRenderConfig>
 ): BoardInstancedResources {
   const resolvedConfig = createBoardRenderConfig(dimensions, config);
-  const geometry = new THREE.BoxGeometry(
-    resolvedConfig.blockSize,
-    resolvedConfig.blockSize,
-    resolvedConfig.blockSize
-  );
-  applyUniformBoxUVs(geometry);
+  const geometry = createBeveledBoxGeometry({
+    width: resolvedConfig.blockSize,
+    height: resolvedConfig.blockSize,
+    depth: resolvedConfig.blockDepth,
+    radius: resolvedConfig.edgeRadius,
+    smoothness: 3,
+  });
+  applyMahjongUVLayout(geometry);
   const tileTexture = createMahjongTileTexture();
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff,

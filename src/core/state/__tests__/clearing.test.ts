@@ -21,6 +21,14 @@ describe('findFullLayers', () => {
     }
     expect(findFullLayers(board)).toEqual([1, 3]);
   });
+
+  it('handles large width boards without missing full layers', () => {
+    const board = Board.createEmpty({ width: 54, height: 3 });
+    for (let x = 0; x < 54; x += 1) {
+      board.setCell({ x, y: 0 }, CellContent.Block);
+    }
+    expect(findFullLayers(board)).toEqual([0]);
+  });
 });
 
 describe('beginClearingPhase', () => {

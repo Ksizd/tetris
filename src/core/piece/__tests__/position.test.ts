@@ -3,6 +3,7 @@ import { getWorldBlocks } from '../position';
 import { ActivePiece, PieceOrientation, PieceType } from '../../types';
 
 const boardDims = { width: 4, height: 10 };
+const wideBoardDims = { width: 54, height: 10 };
 
 function makePiece(overrides: Partial<ActivePiece>): ActivePiece {
   return {
@@ -42,5 +43,12 @@ describe('getWorldBlocks', () => {
       { x: 3, y: 3 },
       { x: 3, y: 4 },
     ]);
+  });
+
+  it('wraps correctly on a wide board with many columns', () => {
+    const piece = makePiece({ position: { x: wideBoardDims.width - 1, y: 0 } }); // I horizontal at edge
+    const blocks = getWorldBlocks(piece, wideBoardDims);
+    const xs = blocks.map((b) => b.x).sort((a, b) => a - b);
+    expect(xs).toEqual([0, 1, 2, wideBoardDims.width - 1]);
   });
 });

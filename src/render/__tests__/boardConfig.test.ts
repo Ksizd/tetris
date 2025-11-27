@@ -4,6 +4,8 @@ import {
   calculateTowerRadius,
   DEFAULT_BLOCK_SIZE,
   DEFAULT_VERTICAL_SPACING,
+  DEFAULT_CIRCUMFERENTIAL_GAP_RATIO,
+  DEFAULT_BLOCK_DEPTH_RATIO,
 } from '../boardConfig';
 
 describe('boardConfig', () => {
@@ -14,8 +16,16 @@ describe('boardConfig', () => {
 
     expect(config.blockSize).toBe(DEFAULT_BLOCK_SIZE);
     expect(config.verticalSpacing).toBe(DEFAULT_VERTICAL_SPACING);
+    expect(config.blockDepth).toBeCloseTo(DEFAULT_BLOCK_SIZE * DEFAULT_BLOCK_DEPTH_RATIO);
     expect(config.towerRadius).toBeCloseTo(
-      calculateTowerRadius(dimensions.width, DEFAULT_BLOCK_SIZE)
+      calculateTowerRadius(
+        dimensions.width,
+        DEFAULT_BLOCK_SIZE,
+        DEFAULT_BLOCK_SIZE * DEFAULT_CIRCUMFERENTIAL_GAP_RATIO
+      )
+    );
+    expect(config.circumferentialGap).toBeCloseTo(
+      DEFAULT_BLOCK_SIZE * DEFAULT_CIRCUMFERENTIAL_GAP_RATIO
     );
   });
 
@@ -23,20 +33,27 @@ describe('boardConfig', () => {
     const blockSize = 2;
     const verticalSpacing = 3;
     const towerRadius = 42;
+    const circumferentialGap = 0.05;
     const config = createBoardRenderConfig(dimensions, {
       blockSize,
       verticalSpacing,
       towerRadius,
+      circumferentialGap,
+      blockDepth: 1.1,
     });
 
     expect(config.blockSize).toBe(blockSize);
     expect(config.verticalSpacing).toBe(verticalSpacing);
     expect(config.towerRadius).toBe(towerRadius);
+    expect(config.circumferentialGap).toBe(circumferentialGap);
+    expect(config.blockDepth).toBeCloseTo(1.1);
   });
 
   it('validates positive values', () => {
     expect(() => createBoardRenderConfig(dimensions, { blockSize: 0 })).toThrow();
     expect(() => createBoardRenderConfig(dimensions, { verticalSpacing: -1 })).toThrow();
     expect(() => createBoardRenderConfig(dimensions, { towerRadius: 0 })).toThrow();
+    expect(() => createBoardRenderConfig(dimensions, { circumferentialGap: -0.1 })).toThrow();
+    expect(() => createBoardRenderConfig(dimensions, { blockDepth: 0 })).toThrow();
   });
 });

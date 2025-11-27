@@ -42,6 +42,7 @@ export function renderActivePiece({
     const worldPos = mapper.cellToWorldPosition(block.x, block.y);
     const shifted = worldPos.clone();
     shifted.y += offsetY;
+    mapper.getRadialOrientation(block.x, rotation);
     matrix.compose(shifted, rotation, scale);
     targetMesh.setMatrixAt(instanceIndex, matrix);
     instanceIndex += 1;

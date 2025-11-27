@@ -8,3 +8,5 @@ export * from './cameraSetup';
 export * from './activePieceInstancedMesh';
 export * from './activePieceRenderer';
 export * from './sceneRenderer';
+export * from './renderConfig';
+export * from './cameraMotion';

@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { BoardRenderConfig } from './boardConfig';
+import { createBeveledBoxGeometry } from './beveledBoxGeometry';
+import { applyMahjongUVLayout } from './uv';
 
 export interface ActivePieceInstancedResources {
   mesh: THREE.InstancedMesh;
-  geometry: THREE.BoxGeometry;
+  geometry: THREE.BufferGeometry;
   material: THREE.MeshStandardMaterial;
 }
 
@@ -16,7 +18,14 @@ const ACTIVE_PIECE_CAPACITY = 4;
 export function createActivePieceInstancedMesh(
   config: BoardRenderConfig
 ): ActivePieceInstancedResources {
-  const geometry = new THREE.BoxGeometry(config.blockSize, config.blockSize, config.blockSize);
+  const geometry = createBeveledBoxGeometry({
+    width: config.blockSize,
+    height: config.blockSize,
+    depth: config.blockDepth,
+    radius: config.edgeRadius,
+    smoothness: 3,
+  });
+  applyMahjongUVLayout(geometry);
   const material = new THREE.MeshStandardMaterial({
     color: 0xffcc66,
     roughness: 0.3,

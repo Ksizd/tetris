@@ -30,12 +30,27 @@ export class BoardToWorldMapper {
     this.ensureIntegerCoord(y, 'y');
     this.ensureValidY(y);
     const normalizedX = wrapX(x, this.dimensions.width);
-    const angle = (2 * Math.PI * normalizedX) / this.dimensions.width;
+    const angle = this.columnAngle(normalizedX);
     const worldX = Math.cos(angle) * this.config.towerRadius;
     const worldZ = Math.sin(angle) * this.config.towerRadius;
     const worldY = y * this.config.verticalSpacing;
 
     return new THREE.Vector3(worldX, worldY, worldZ);
+  }
+
+  /**
+   * Returns quaternion that orients a cube so that its +Z face looks outward from tower center.
+   */
+  getRadialOrientation(x: number, target = new THREE.Quaternion()): THREE.Quaternion {
+    this.ensureIntegerCoord(x, 'x');
+    const normalizedX = wrapX(x, this.dimensions.width);
+    const angle = this.columnAngle(normalizedX);
+    const rotationY = Math.PI / 2 - angle;
+    return target.setFromAxisAngle(AXIS_Y, rotationY);
+  }
+
+  private columnAngle(normalizedX: number): number {
+    return (2 * Math.PI * normalizedX) / this.dimensions.width;
   }
 
   private ensureValidY(y: number): void {
@@ -52,3 +67,5 @@ export class BoardToWorldMapper {
     }
   }
 }
+
+const AXIS_Y = new THREE.Vector3(0, 1, 0);

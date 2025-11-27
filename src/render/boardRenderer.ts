@@ -18,7 +18,7 @@ export function renderBoard({ board, instanced, mapper }: RenderBoardParams): vo
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const scale = new THREE.Vector3(1, 1, 1);
-  const rotation = new THREE.Quaternion(); // identity
+  const rotation = new THREE.Quaternion();
   const targetMesh = instanced.mesh;
 
   let instanceIndex = 0;
@@ -28,6 +28,7 @@ export function renderBoard({ board, instanced, mapper }: RenderBoardParams): vo
         continue;
       }
       position.copy(mapper.cellToWorldPosition(x, y));
+      mapper.getRadialOrientation(x, rotation);
       matrix.compose(position, rotation, scale);
       targetMesh.setMatrixAt(instanceIndex, matrix);
       instanceIndex += 1;

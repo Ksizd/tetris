@@ -1,13 +1,12 @@
 import * as THREE from 'three';
-import { DEFAULT_BOARD_DIMENSIONS } from '../core/constants';
-import { createBoardRenderConfig } from './boardConfig';
 import { BoardToWorldMapper } from './boardToWorldMapper';
 import { createBoardPlaceholder } from './boardPlaceholder';
 import { createBoardInstancedMesh } from './boardInstancedMesh';
-import { computeCameraPlacement } from './cameraSetup';
 import { createActivePieceInstancedMesh } from './activePieceInstancedMesh';
 import { ActivePieceInstancedResources } from './activePieceInstancedMesh';
 import { BoardInstancedResources } from './boardInstancedMesh';
+import { createRenderConfig, LightRigConfig, RenderConfig, RenderConfigOverrides } from './renderConfig';
+import { recomputeCameraPlacementForFrame } from './cameraSetup';
 
 export interface RenderContext {
   scene: THREE.Scene;
@@ -17,43 +16,46 @@ export interface RenderContext {
   board: BoardInstancedResources;
   activePiece: ActivePieceInstancedResources;
   mapper: BoardToWorldMapper;
-  renderConfig: ReturnType<typeof createBoardRenderConfig>;
+  renderConfig: RenderConfig;
+  cameraBasePlacement: { position: THREE.Vector3; target: THREE.Vector3 };
 }
 
 /**
  * D~D«D,¥+D,DøD¯D,DúD,¥?¥ŸDæ¥, DñDøDúD_Dý¥Ÿ¥Z 3D-¥?¥+DæD«¥Ÿ D«Dø D¨Dæ¥?DæD'DøD«D«D_D¬ canvas.
  */
-export function createRenderContext(canvas: HTMLCanvasElement): RenderContext {
+export function createRenderContext(
+  canvas: HTMLCanvasElement,
+  overrides?: RenderConfigOverrides
+): RenderContext {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x000000);
 
-  const renderConfig = createBoardRenderConfig(DEFAULT_BOARD_DIMENSIONS);
-  const mapper = new BoardToWorldMapper(DEFAULT_BOARD_DIMENSIONS, renderConfig);
+  const renderConfig = createRenderConfig(overrides);
+  const mapper = new BoardToWorldMapper(renderConfig.boardDimensions, renderConfig.board);
 
   const camera = new THREE.PerspectiveCamera(
-    45,
+    renderConfig.camera.fov,
     canvas.clientWidth / canvas.clientHeight,
     0.1,
     1000
   );
-  const cameraPlacement = computeCameraPlacement(DEFAULT_BOARD_DIMENSIONS, renderConfig);
-  camera.position.copy(cameraPlacement.position);
-  camera.lookAt(cameraPlacement.target);
+  camera.position.copy(renderConfig.camera.position);
+  camera.lookAt(renderConfig.camera.target);
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = false;
 
-  addLighting(scene, cameraPlacement);
+  addLighting(scene, renderConfig.lights);
 
-  const placeholder = createBoardPlaceholder(DEFAULT_BOARD_DIMENSIONS, renderConfig);
+  const placeholder = createBoardPlaceholder(renderConfig.boardDimensions, renderConfig.board);
   scene.add(placeholder.group);
 
-  const boardInstanced = createBoardInstancedMesh(DEFAULT_BOARD_DIMENSIONS, renderConfig);
+  const boardInstanced = createBoardInstancedMesh(renderConfig.boardDimensions, renderConfig.board);
   scene.add(boardInstanced.mesh);
 
-  const activePieceInstanced = createActivePieceInstancedMesh(renderConfig);
+  const activePieceInstanced = createActivePieceInstancedMesh(renderConfig.board);
   scene.add(activePieceInstanced.mesh);
 
   return {
@@ -65,27 +67,32 @@ export function createRenderContext(canvas: HTMLCanvasElement): RenderContext {
     activePiece: activePieceInstanced,
     mapper,
     renderConfig,
+    cameraBasePlacement: {
+      position: renderConfig.camera.position.clone(),
+      target: renderConfig.camera.target.clone(),
+    },
   };
 }
 
-function addLighting(
-  scene: THREE.Scene,
-  cameraPlacement: ReturnType<typeof computeCameraPlacement>
-): void {
-  const hemi = new THREE.HemisphereLight(0xfff8e1, 0x2a1a0a, 0.55);
+function addLighting(scene: THREE.Scene, config: LightRigConfig): void {
+  const hemi = new THREE.HemisphereLight(
+    config.hemisphere.skyColor,
+    config.hemisphere.groundColor,
+    config.hemisphere.intensity
+  );
   hemi.position.set(0, 1, 0);
   scene.add(hemi);
 
-  const ambient = new THREE.AmbientLight(0xffffff, 0.25);
+  const ambient = new THREE.AmbientLight(config.ambient.color, config.ambient.intensity);
   scene.add(ambient);
 
-  const key = new THREE.DirectionalLight(0xfff3cc, 0.9);
-  key.position.set(
-    cameraPlacement.position.x * 0.4,
-    cameraPlacement.position.y * 0.8,
-    cameraPlacement.position.z * 0.4
-  );
-  key.castShadow = false;
+  const key = new THREE.DirectionalLight(config.key.color, config.key.intensity);
+  key.position.copy(config.key.position);
+  if (config.key.target) {
+    key.target.position.copy(config.key.target);
+    scene.add(key.target);
+  }
+  key.castShadow = Boolean(config.key.castShadow);
   scene.add(key);
 }
 
@@ -93,4 +100,17 @@ export function resizeRenderer(ctx: RenderContext, width: number, height: number
   ctx.renderer.setSize(width, height, false);
   ctx.camera.aspect = width / height;
   ctx.camera.updateProjectionMatrix();
+
+  const adjustedPlacement = recomputeCameraPlacementForFrame(
+    ctx.renderConfig.boardDimensions,
+    ctx.renderConfig.board,
+    ctx.renderConfig.camera,
+    ctx.renderConfig.camera.fov
+  );
+  ctx.camera.position.copy(adjustedPlacement.position);
+  ctx.camera.lookAt(adjustedPlacement.target);
+  ctx.renderConfig.camera.position.copy(adjustedPlacement.position);
+  ctx.renderConfig.camera.target.copy(adjustedPlacement.target);
+  ctx.cameraBasePlacement.position.copy(adjustedPlacement.position);
+  ctx.cameraBasePlacement.target.copy(adjustedPlacement.target);
 }

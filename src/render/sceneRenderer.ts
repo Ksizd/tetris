@@ -10,7 +10,7 @@ export type SceneRenderContext = Pick<
 
 export function renderScene(ctx: SceneRenderContext, snapshot: Readonly<GameState>): void {
   renderBoard({ board: snapshot.board, instanced: ctx.board, mapper: ctx.mapper });
-  const offsetY = computeActivePieceOffset(snapshot, ctx.renderConfig.verticalSpacing);
+  const offsetY = computeActivePieceOffset(snapshot, ctx.renderConfig.board.verticalSpacing);
   renderActivePiece({
     piece: snapshot.currentPiece,
     instanced: ctx.activePiece,
