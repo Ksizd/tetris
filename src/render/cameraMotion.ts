@@ -20,7 +20,8 @@ export function updateCameraMotion(ctx: RenderContext, timeMs: number): void {
   const t = timeMs / 1000;
 
   const angleOffset = Math.sin(t * motion.orbitSpeed) * motion.orbitAmplitude;
-  const heightOffset = Math.sin(t * motion.heightSpeed) * (towerHeight * motion.heightAmplitudeRatio);
+  const heightOffset =
+    Math.sin(t * motion.heightSpeed) * (towerHeight * motion.heightAmplitudeRatio);
   const angle = wrapAngle(azimuth + angleOffset);
 
   const x = base.target.x + Math.cos(angle) * radius;

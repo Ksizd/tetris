@@ -3,7 +3,7 @@ import { BoardRenderConfig } from './boardConfig';
 import { createBeveledBoxGeometry } from './beveledBoxGeometry';
 import { applyMahjongUVLayout } from './uv';
 import { createMahjongMaterialMaps, createMahjongTileTexture } from './textures';
-import { VISUAL_DEFAULTS } from './visualDefaults';
+import { MaterialConfig } from './renderConfig';
 
 export interface ActivePieceInstancedResources {
   mesh: THREE.InstancedMesh;
@@ -18,7 +18,23 @@ const ACTIVE_PIECE_CAPACITY = 4;
  * Population will be handled by renderActivePiece.
  */
 export function createActivePieceInstancedMesh(
-  config: BoardRenderConfig
+  config: BoardRenderConfig,
+  materials: MaterialConfig = {
+    front: {
+      roughness: 0.22,
+      metalness: 0.04,
+      envMapIntensity: 0.9,
+      emissive: 0x221100,
+      emissiveIntensity: 0.06,
+    },
+    side: {
+      roughness: 0.28,
+      metalness: 1.0,
+      envMapIntensity: 1.8,
+      emissive: 0x331100,
+      emissiveIntensity: 0.08,
+    },
+  }
 ): ActivePieceInstancedResources {
   const geometry = createBeveledBoxGeometry({
     width: config.blockSize,
@@ -29,34 +45,40 @@ export function createActivePieceInstancedMesh(
   });
   applyMahjongUVLayout(geometry);
   const tileTexture = createMahjongTileTexture();
-  const { roughnessMap, metalnessMap, aoMap } = createMahjongMaterialMaps(tileTexture.image.width ?? 1024);
+  const { roughnessMap, metalnessMap, aoMap } = createMahjongMaterialMaps(
+    tileTexture.image.width ?? 1024
+  );
   tagFrontGroup(geometry);
   const frontMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: tileTexture,
-    roughness: VISUAL_DEFAULTS.materials.front.roughness,
-    metalness: VISUAL_DEFAULTS.materials.front.metalness,
+    roughness: materials.front.roughness,
+    metalness: materials.front.metalness,
     roughnessMap,
     metalnessMap,
     aoMap,
-    emissive: 0x221100,
-    emissiveIntensity: 0.06,
-    envMapIntensity: VISUAL_DEFAULTS.materials.front.envMapIntensity,
+    emissive: materials.front.emissive,
+    emissiveIntensity: materials.front.emissiveIntensity,
+    envMapIntensity: materials.front.envMapIntensity,
   });
   const sideMaterial = new THREE.MeshStandardMaterial({
     color: 0xf2c14b,
     map: tileTexture,
-    roughness: VISUAL_DEFAULTS.materials.side.roughness,
-    metalness: VISUAL_DEFAULTS.materials.side.metalness,
+    roughness: materials.side.roughness,
+    metalness: materials.side.metalness,
     roughnessMap,
     metalnessMap,
     aoMap,
-    emissive: 0x331100,
-    emissiveIntensity: 0.08,
-    envMapIntensity: VISUAL_DEFAULTS.materials.side.envMapIntensity,
+    emissive: materials.side.emissive,
+    emissiveIntensity: materials.side.emissiveIntensity,
+    envMapIntensity: materials.side.envMapIntensity,
   });
 
-  const mesh = new THREE.InstancedMesh(geometry, [frontMaterial, sideMaterial], ACTIVE_PIECE_CAPACITY);
+  const mesh = new THREE.InstancedMesh(
+    geometry,
+    [frontMaterial, sideMaterial],
+    ACTIVE_PIECE_CAPACITY
+  );
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.count = 0;
   mesh.frustumCulled = false;
@@ -73,7 +95,6 @@ function tagFrontGroup(geometry: THREE.BufferGeometry): void {
   }
   const FRONT_GROUP_INDEX = 4; // BoxGeometry order: +X, -X, +Y, -Y, +Z, -Z
   geometry.groups.forEach((group, idx) => {
-    // eslint-disable-next-line no-param-reassign
     group.materialIndex = idx === FRONT_GROUP_INDEX ? 0 : 1;
   });
 }

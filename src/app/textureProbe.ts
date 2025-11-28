@@ -45,7 +45,13 @@ export function startTextureProbe(canvas: HTMLCanvasElement): void {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f1016);
-  const envConfig: EnvironmentConfig = { enabled: true, useAsBackground: true, intensity: 1.1 };
+  const envConfig: EnvironmentConfig = {
+    enabled: true,
+    useAsBackground: true,
+    intensity: 1.1,
+    resolution: 1024,
+    variant: 'studio',
+  };
   const envResources = createEnvironmentMap(renderer, envConfig);
   if (envResources) {
     scene.environment = envResources.environmentMap;
@@ -186,13 +192,16 @@ function applyToneMapping(renderer: THREE.WebGLRenderer, config: ToneMappingConf
     config.mode === 'aces'
       ? THREE.ACESFilmicToneMapping
       : config.mode === 'reinhard'
-      ? THREE.ReinhardToneMapping
-      : THREE.NoToneMapping;
+        ? THREE.ReinhardToneMapping
+        : THREE.NoToneMapping;
   renderer.toneMapping = mode;
   renderer.toneMappingExposure = config.exposure;
 }
 
-function buildExposureScene(scene: THREE.Scene, config: ReturnType<typeof createBoardRenderConfig>): void {
+function buildExposureScene(
+  scene: THREE.Scene,
+  config: ReturnType<typeof createBoardRenderConfig>
+): void {
   const geometry = createBeveledBoxGeometry({
     width: config.blockSize,
     height: config.blockSize,
@@ -204,7 +213,9 @@ function buildExposureScene(scene: THREE.Scene, config: ReturnType<typeof create
   tagFrontGroup(geometry);
 
   const tileTexture = createMahjongTileTexture(1024);
-  const { roughnessMap, metalnessMap, aoMap } = createMahjongMaterialMaps(tileTexture.image.width ?? 1024);
+  const { roughnessMap, metalnessMap, aoMap } = createMahjongMaterialMaps(
+    tileTexture.image.width ?? 1024
+  );
 
   const { frontMaterial, sideMaterial } = createProductionMaterials(tileTexture, {
     roughnessMap,
@@ -308,7 +319,6 @@ function tagFrontGroup(geometry: THREE.BufferGeometry): void {
   }
   const FRONT_GROUP_INDEX = 4; // BoxGeometry order: +X, -X, +Y, -Y, +Z, -Z
   geometry.groups.forEach((group, idx) => {
-    // eslint-disable-next-line no-param-reassign
     group.materialIndex = idx === FRONT_GROUP_INDEX ? 0 : 1;
   });
 }

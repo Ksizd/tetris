@@ -11,11 +11,11 @@ export interface SpacingDiagnostics {
 }
 
 /**
-  * Computes simple spacing diagnostics to ensure cubes do not intersect and keep visible seams.
-  * - tangentialClearance: chord distance between adjacent columns minus blockSize (>= circumferentialGap).
-  * - verticalGap: spacing minus blockSize.
-  * - radialClearance: inner empty space from tower center to inner cube face.
-  */
+ * Computes simple spacing diagnostics to ensure cubes do not intersect and keep visible seams.
+ * - tangentialClearance: chord distance between adjacent columns minus blockSize (>= circumferentialGap).
+ * - verticalGap: spacing minus blockSize.
+ * - radialClearance: inner empty space from tower center to inner cube face.
+ */
 export function evaluateBoardSpacing(
   dimensions: BoardDimensions,
   config: BoardRenderConfig

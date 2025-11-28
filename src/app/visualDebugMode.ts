@@ -9,9 +9,9 @@ import {
   RenderConfigOverrides,
   RenderContext,
   renderScene,
+  renderFrame,
   resizeRenderer,
 } from '../render';
-import { updateCameraMotion } from '../render/cameraMotion';
 import {
   createVisualDebugControls,
   VisualControlState,
@@ -19,40 +19,50 @@ import {
 } from './visualDebugControls';
 import { OrbitCameraController } from './orbitCamera';
 import { QualityLevel } from '../render/renderConfig';
-import { applyMaterialDebugMode, createMaterialsSnapshot, MaterialDebugMode } from '../render/materialDebug';
+import { applyMaterialDebugMode, createMaterialsSnapshot } from '../render/materialDebug';
 import { deriveEnvOverrides, applyEnvDebugMode } from '../render/envDebug';
 
 type CameraMode = 'game' | 'inspect';
 
 const QUERY_FLAG = 'visualDebug';
+const ULTRA2_FLAG = 'ultra2lab';
 const CAMERA_TOGGLE_KEY = 'c';
 const CLOSEUP_KEY = 'v';
 const TRANSITION_DURATION_MS = 450;
-const GAME_MODE_ROTATION_LIMIT = THREE.MathUtils.degToRad(6);
 const GAME_MODE_ROTATION_SPEED = 0.00035;
 
 export function isVisualDebugModeEnabled(): boolean {
   const params = new URLSearchParams(window.location.search);
   const value = params.get(QUERY_FLAG);
+  return value === '1' || value === 'true' || isUltra2LabModeEnabled();
+}
+
+function isUltra2LabModeEnabled(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get(ULTRA2_FLAG);
   return value === '1' || value === 'true';
 }
 
 export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
-  const qualityFromUrl = parseQualityFromUrl(window.location.search);
-  const renderOverrides: RenderConfigOverrides = qualityFromUrl ? { quality: { level: qualityFromUrl } } : {};
+  const ultra2Lab = isUltra2LabModeEnabled();
+  const qualityFromUrl = ultra2Lab ? 'ultra2' : parseQualityFromUrl(window.location.search);
+  const renderOverrides: RenderConfigOverrides = qualityFromUrl
+    ? { quality: { level: qualityFromUrl } }
+    : {};
   let renderCtx = createRenderContext(canvas, renderOverrides);
   let snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions);
   let controlState = configToControlState(renderCtx.renderConfig);
   let materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
   const cameraOrientation = extractCameraOrientation(renderCtx.renderConfig);
-  let cameraMode: CameraMode = 'game';
+  let cameraMode: CameraMode = ultra2Lab ? 'inspect' : 'game';
   let gameRotationAngle = 0;
   let lastFrameTime = performance.now();
   const orbitControllerRef: { current: OrbitCameraController | null } = { current: null };
   const createOrbit = (placement = renderCtx.cameraBasePlacement) => {
     const ctrl = new OrbitCameraController(renderCtx.camera, placement, {
       minDistance: renderCtx.renderConfig.board.towerRadius * 1.25,
-      innerDistance: renderCtx.renderConfig.board.towerRadius + renderCtx.renderConfig.board.blockSize * 0.6,
+      innerDistance:
+        renderCtx.renderConfig.board.towerRadius + renderCtx.renderConfig.board.blockSize * 0.6,
       maxDistance: renderCtx.renderConfig.board.towerRadius * 3.2,
       minPolarAngle: THREE.MathUtils.degToRad(18),
       maxPolarAngle: THREE.MathUtils.degToRad(82),
@@ -72,26 +82,36 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
 
   const switchToInspect = (placement?: { position: THREE.Vector3; target: THREE.Vector3 }) => {
     cameraMode = 'inspect';
-    const basePlacement = placement ?? orbitControllerRef.current?.getPlacement() ?? renderCtx.cameraBasePlacement;
+    const basePlacement =
+      placement ?? orbitControllerRef.current?.getPlacement() ?? renderCtx.cameraBasePlacement;
     orbitControllerRef.current?.detach(canvas);
     createOrbit(basePlacement);
   };
-  const controls = createVisualDebugControls(controlState, (next) => {
-    controlState = next;
-    if (controlState.materialDebugMode !== next.materialDebugMode) {
-      applyMaterialDebugMode(renderCtx.board, renderCtx.activePiece, next.materialDebugMode, materialsSnapshot);
+  const controls = createVisualDebugControls(
+    controlState,
+    (next) => {
+      controlState = next;
+      if (controlState.materialDebugMode !== next.materialDebugMode) {
+        applyMaterialDebugMode(
+          renderCtx.board,
+          renderCtx.activePiece,
+          next.materialDebugMode,
+          materialsSnapshot
+        );
+      }
+      if (controlState.envDebugMode !== next.envDebugMode) {
+        applyEnvDebugMode(renderCtx, next.envDebugMode);
+      }
+      pendingRebuild = true;
+    },
+    () => {
+      controlState = configToControlState(renderCtx.renderConfig);
+      controlState.materialDebugMode = 'none';
+      controlState.envDebugMode = 'full';
+      controlState.autoRotateEnabled = false;
+      pendingRebuild = true;
     }
-    if (controlState.envDebugMode !== next.envDebugMode) {
-      applyEnvDebugMode(renderCtx, next.envDebugMode);
-    }
-    pendingRebuild = true;
-  }, () => {
-    controlState = configToControlState(renderCtx.renderConfig);
-    controlState.materialDebugMode = 'none';
-    controlState.envDebugMode = 'full';
-    controlState.autoRotateEnabled = false;
-    pendingRebuild = true;
-  });
+  );
 
   logVisualParameters(renderCtx);
 
@@ -110,7 +130,12 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     orbitControllerRef.current?.detach(canvas);
     createOrbit();
     materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
-    applyMaterialDebugMode(renderCtx.board, renderCtx.activePiece, controlState.materialDebugMode, materialsSnapshot);
+    applyMaterialDebugMode(
+      renderCtx.board,
+      renderCtx.activePiece,
+      controlState.materialDebugMode,
+      materialsSnapshot
+    );
     applyEnvDebugMode(renderCtx, controlState.envDebugMode);
     cameraMode = 'game';
     transitionCamera(renderCtx, renderCtx.cameraBasePlacement);
@@ -123,11 +148,18 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     const dt = Math.max(0, now - lastFrameTime);
     lastFrameTime = now;
     renderScene(renderCtx, snapshot);
-    applyCameraMode(renderCtx, cameraMode, orbitControllerRef, dt, controlState.autoRotateEnabled, () => {
-      gameRotationAngle += GAME_MODE_ROTATION_SPEED * dt;
-      return gameRotationAngle;
-    });
-    renderCtx.renderer.render(renderCtx.scene, renderCtx.camera);
+    applyCameraMode(
+      renderCtx,
+      cameraMode,
+      orbitControllerRef,
+      dt,
+      controlState.autoRotateEnabled,
+      () => {
+        gameRotationAngle += GAME_MODE_ROTATION_SPEED * dt;
+        return gameRotationAngle;
+      }
+    );
+    renderFrame(renderCtx, dt);
     requestAnimationFrame(loop);
   }
 
@@ -166,7 +198,10 @@ function createStaticSnapshot(dimensions: BoardDimensions): GameState {
 
 function buildStaticBoard(dimensions: BoardDimensions): Board {
   const board = Board.createEmpty(dimensions);
-  const filledLayers = Math.min(dimensions.height, Math.max(4, Math.floor(dimensions.height * 0.3)));
+  const filledLayers = Math.min(
+    dimensions.height,
+    Math.max(4, Math.floor(dimensions.height * 0.3))
+  );
 
   for (let y = 0; y < filledLayers; y += 1) {
     for (let x = 0; x < dimensions.width; x += 1) {
@@ -210,7 +245,8 @@ function extractCameraOrientation(config: RenderConfig): CameraOrientation {
     config.camera.position.x - target.x,
     config.camera.position.z - target.z
   );
-  const azimuthXZ = azimuthVector.lengthSq() > 0 ? azimuthVector.normalize() : new THREE.Vector2(1, 0);
+  const azimuthXZ =
+    azimuthVector.lengthSq() > 0 ? azimuthVector.normalize() : new THREE.Vector2(1, 0);
   return { target, azimuthXZ };
 }
 
@@ -252,6 +288,7 @@ function disposeRenderResources(ctx: RenderContext): void {
   disposeMaterials(ctx.activePiece.material);
   disposeMeshes(ctx.boardPlaceholder);
   ctx.environment?.dispose();
+  ctx.post?.composer.dispose();
   ctx.renderer.dispose();
 }
 
@@ -337,13 +374,6 @@ function attachCloseupHotkey(
   );
 }
 
-function applyCameraPlacement(ctx: RenderContext, placement: { position: THREE.Vector3; target: THREE.Vector3 }): void {
-  ctx.camera.position.copy(placement.position);
-  ctx.camera.lookAt(placement.target);
-  ctx.renderConfig.camera.position.copy(placement.position);
-  ctx.renderConfig.camera.target.copy(placement.target);
-}
-
 function transitionCamera(
   ctx: RenderContext,
   targetPlacement: { position: THREE.Vector3; target: THREE.Vector3 }
@@ -395,16 +425,29 @@ function applyCameraMode(
   ctx.renderConfig.camera.target.copy(base.target);
 }
 
-function createCloseupPlacement(ctx: RenderContext): { position: THREE.Vector3; target: THREE.Vector3 } {
-  const radius = Math.max(ctx.renderConfig.board.blockSize * 3.2, ctx.renderConfig.board.towerRadius * 0.9);
-  const baseAzimuth = new THREE.Vector2(ctx.cameraBasePlacement.position.x, ctx.cameraBasePlacement.position.z);
+function createCloseupPlacement(ctx: RenderContext): {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+} {
+  const radius = Math.max(
+    ctx.renderConfig.board.blockSize * 3.2,
+    ctx.renderConfig.board.towerRadius * 0.9
+  );
+  const baseAzimuth = new THREE.Vector2(
+    ctx.cameraBasePlacement.position.x,
+    ctx.cameraBasePlacement.position.z
+  );
   const dir = baseAzimuth.lengthSq() > 0 ? baseAzimuth.normalize() : new THREE.Vector2(1, 0);
   const targetY = Math.min(
     ctx.renderConfig.board.blockSize * 3,
     computeMidHeight(ctx.renderConfig.boardDimensions, ctx.renderConfig.board)
   );
   const target = new THREE.Vector3(0, targetY, 0);
-  const position = new THREE.Vector3(dir.x * radius, targetY + ctx.renderConfig.board.blockSize * 0.6, dir.y * radius);
+  const position = new THREE.Vector3(
+    dir.x * radius,
+    targetY + ctx.renderConfig.board.blockSize * 0.6,
+    dir.y * radius
+  );
   return { position, target };
 }
 
@@ -418,6 +461,9 @@ function parseQualityFromUrl(search: string): QualityLevel | null {
   const raw = params.get('quality')?.toLowerCase();
   if (raw === 'ultra' || raw === 'medium' || raw === 'low') {
     return raw;
+  }
+  if (raw === 'ultra2' || raw === 'ultra_cinematic') {
+    return 'ultra2';
   }
   return null;
 }

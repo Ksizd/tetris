@@ -134,13 +134,21 @@ export function createMahjongMaterialMaps(size = DEFAULT_TILE_SIZE): MahjongMate
   return { roughnessMap, metalnessMap, aoMap };
 }
 
-function drawAtlas(ctx: CanvasRenderingContext2D, size: number, glyph: HTMLImageElement | null): void {
+function drawAtlas(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  glyph: HTMLImageElement | null
+): void {
   ctx.clearRect(0, 0, size, size);
   drawFrontFace(ctx, size, glyph);
   drawSideFaces(ctx, size);
 }
 
-function drawFrontFace(ctx: CanvasRenderingContext2D, size: number, glyph: HTMLImageElement | null): void {
+function drawFrontFace(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  glyph: HTMLImageElement | null
+): void {
   const half = size / 2;
   const rand = createSeededRandom(20241203);
   ctx.save();
@@ -232,7 +240,14 @@ function drawSideFaces(ctx: CanvasRenderingContext2D, size: number): void {
   ctx.fillRect(0, 0, size, half);
 
   // Subtle radial highlight at center to unify faces.
-  const radial = ctx.createRadialGradient(size * 0.5, half * 0.5, 0, size * 0.5, half * 0.5, half * 0.75);
+  const radial = ctx.createRadialGradient(
+    size * 0.5,
+    half * 0.5,
+    0,
+    size * 0.5,
+    half * 0.5,
+    half * 0.75
+  );
   radial.addColorStop(0, 'rgba(255, 240, 200, 0.08)');
   radial.addColorStop(1, 'rgba(0, 0, 0, 0.05)');
   ctx.fillStyle = radial;

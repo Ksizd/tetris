@@ -83,8 +83,7 @@ export function createBoardRenderConfig(
   }
 
   const towerRadius =
-    overrides?.towerRadius ??
-    calculateTowerRadius(dimensions.width, blockSize, circumferentialGap);
+    overrides?.towerRadius ?? calculateTowerRadius(dimensions.width, blockSize, circumferentialGap);
   if (towerRadius <= 0) {
     throw new Error('towerRadius must be positive');
   }

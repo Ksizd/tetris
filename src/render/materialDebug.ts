@@ -64,7 +64,14 @@ function createMatcapTexture(size = 256): THREE.Texture {
     throw new Error('Unable to create 2D context for matcap');
   }
 
-  const grad = ctx.createRadialGradient(size * 0.4, size * 0.35, size * 0.1, size * 0.55, size * 0.6, size * 0.8);
+  const grad = ctx.createRadialGradient(
+    size * 0.4,
+    size * 0.35,
+    size * 0.1,
+    size * 0.55,
+    size * 0.6,
+    size * 0.8
+  );
   grad.addColorStop(0, '#fefefe');
   grad.addColorStop(0.45, '#e0e3ec');
   grad.addColorStop(0.75, '#9ea8bd');
@@ -72,7 +79,14 @@ function createMatcapTexture(size = 256): THREE.Texture {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
 
-  const rim = ctx.createRadialGradient(size * 0.8, size * 0.8, 0, size * 0.8, size * 0.8, size * 0.35);
+  const rim = ctx.createRadialGradient(
+    size * 0.8,
+    size * 0.8,
+    0,
+    size * 0.8,
+    size * 0.8,
+    size * 0.35
+  );
   rim.addColorStop(0, 'rgba(255,255,255,0.4)');
   rim.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = rim;

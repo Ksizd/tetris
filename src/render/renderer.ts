@@ -11,11 +11,17 @@ import {
   RenderConfig,
   RenderConfigOverrides,
   ToneMappingConfig,
+  RingLightBandConfig,
 } from './renderConfig';
 import { computeTowerHeight, recomputeCameraPlacementForFrame } from './cameraSetup';
 import { createEnvironmentMap, EnvironmentMapResources } from './environmentMap';
 import { BoardRenderConfig } from './boardConfig';
 import { BoardDimensions } from '../core/types';
+import {
+  PostProcessingContext,
+  createPostProcessingContext,
+  resizePostProcessing,
+} from './postProcessing';
 
 export interface RenderContext {
   scene: THREE.Scene;
@@ -28,6 +34,7 @@ export interface RenderContext {
   renderConfig: RenderConfig;
   cameraBasePlacement: { position: THREE.Vector3; target: THREE.Vector3 };
   environment?: EnvironmentMapResources | null;
+  post?: PostProcessingContext | null;
 }
 
 function enforceColorPipeline(renderer: THREE.WebGLRenderer): void {
@@ -37,11 +44,12 @@ function enforceColorPipeline(renderer: THREE.WebGLRenderer): void {
 }
 
 function applyToneMapping(renderer: THREE.WebGLRenderer, config: ToneMappingConfig): void {
-  const mode = config.mode === 'aces'
-    ? THREE.ACESFilmicToneMapping
-    : config.mode === 'reinhard'
-    ? THREE.ReinhardToneMapping
-    : THREE.NoToneMapping;
+  const mode =
+    config.mode === 'aces'
+      ? THREE.ACESFilmicToneMapping
+      : config.mode === 'reinhard'
+        ? THREE.ReinhardToneMapping
+        : THREE.NoToneMapping;
   renderer.toneMapping = mode;
   renderer.toneMappingExposure = config.exposure;
 }
@@ -54,10 +62,19 @@ export function createRenderContext(
   overrides?: RenderConfigOverrides
 ): RenderContext {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x000000);
-
   const renderConfig = createRenderConfig(overrides);
   const mapper = new BoardToWorldMapper(renderConfig.boardDimensions, renderConfig.board);
+
+  scene.background = new THREE.Color(0x000000);
+  if (renderConfig.fog.enabled) {
+    scene.fog = new THREE.FogExp2(
+      new THREE.Color(renderConfig.fog.color),
+      renderConfig.fog.density
+    );
+    if (!renderConfig.environment.useAsBackground) {
+      scene.background = new THREE.Color(renderConfig.fog.color);
+    }
+  }
 
   const camera = new THREE.PerspectiveCamera(
     renderConfig.camera.fov,
@@ -93,7 +110,13 @@ export function createRenderContext(
     return;
   };
 
-  addLighting(scene, renderer, renderConfig.lights, renderConfig.boardDimensions, renderConfig.board);
+  addLighting(
+    scene,
+    renderer,
+    renderConfig.lights,
+    renderConfig.boardDimensions,
+    renderConfig.board
+  );
   const environment = createEnvironmentMap(renderer, renderConfig.environment);
   if (environment) {
     scene.environment = environment.environmentMap;
@@ -105,14 +128,23 @@ export function createRenderContext(
   const placeholder = createBoardPlaceholder(renderConfig.boardDimensions, renderConfig.board);
   scene.add(placeholder.group);
 
-  const boardInstanced = createBoardInstancedMesh(renderConfig.boardDimensions, renderConfig.board);
+  const boardInstanced = createBoardInstancedMesh(
+    renderConfig.boardDimensions,
+    renderConfig.board,
+    renderConfig.materials
+  );
   scene.add(boardInstanced.mesh);
 
-  const activePieceInstanced = createActivePieceInstancedMesh(renderConfig.board);
+  const activePieceInstanced = createActivePieceInstancedMesh(
+    renderConfig.board,
+    renderConfig.materials
+  );
   scene.add(activePieceInstanced.mesh);
 
   const shadowCatcher = createShadowCatcher(renderConfig.board);
   scene.add(shadowCatcher);
+
+  const post = createPostProcessingContext(renderer, scene, camera, renderConfig.postProcessing);
 
   return {
     scene,
@@ -128,6 +160,7 @@ export function createRenderContext(
       target: renderConfig.camera.target.clone(),
     },
     environment,
+    post,
   };
 }
 
@@ -144,10 +177,9 @@ function addLighting(
   const shadowHalf = towerRadius + margin;
   const shadowTop = towerHeight + margin;
 
-  if (config.key.castShadow) {
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  }
+  renderer.shadowMap.enabled = hasShadowCastingLight(config);
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
   const hemi = new THREE.HemisphereLight(
     config.hemisphere.skyColor,
     config.hemisphere.groundColor,
@@ -159,49 +191,195 @@ function addLighting(
   const ambient = new THREE.AmbientLight(config.ambient.color, config.ambient.intensity);
   scene.add(ambient);
 
-  const key = new THREE.DirectionalLight(config.key.color, config.key.intensity);
-  key.position.copy(config.key.position);
-  if (config.key.target) {
-    key.target.position.copy(config.key.target);
-    scene.add(key.target);
-  }
-  key.castShadow = Boolean(config.key.castShadow);
-  if (key.castShadow && config.key.shadow) {
-    key.shadow.mapSize.set(config.key.shadow.mapSize, config.key.shadow.mapSize);
-    key.shadow.bias = config.key.shadow.bias;
-    key.shadow.normalBias = config.key.shadow.normalBias;
-    key.shadow.radius = config.key.shadow.radius;
+  const bounds = { shadowHalf, shadowTop, margin };
+  const baseLights = [
+    config.key,
+    config.rim,
+    config.fill,
+    config.top,
+    ...(config.accents ?? []),
+  ].filter((item): item is DirectionalLightConfig => Boolean(item));
 
-    const orthoCam = key.shadow.camera as THREE.OrthographicCamera;
-    orthoCam.left = -shadowHalf;
-    orthoCam.right = shadowHalf;
-    orthoCam.top = shadowTop;
-    orthoCam.bottom = -margin;
-    orthoCam.near = config.key.shadow.cameraNear;
-    orthoCam.far = Math.max(config.key.shadow.cameraFar, shadowTop + config.key.shadow.cameraMargin);
+  baseLights.forEach((lightConfig, idx) => {
+    const built = createLightFromConfig(lightConfig, bounds, renderer, `main-${idx}`);
+    scene.add(built.light);
+    if (built.target) {
+      scene.add(built.target);
+    }
+  });
+
+  config.ringBands?.forEach((band, idx) => {
+    const ringLights = createRingLights(band, bounds, renderer, `ring-${idx}`);
+    ringLights.forEach((entry) => {
+      scene.add(entry.light);
+      if (entry.target) {
+        scene.add(entry.target);
+      }
+    });
+  });
+}
+
+interface BuiltLight {
+  light: THREE.Light;
+  target?: THREE.Object3D;
+}
+
+function hasShadowCastingLight(config: LightRigConfig): boolean {
+  return Boolean(
+    config.key.castShadow ||
+      config.rim.castShadow ||
+      config.fill?.castShadow ||
+      config.top?.castShadow ||
+      config.accents?.some((l) => l.castShadow) ||
+      config.ringBands?.some((band) => band.castShadow)
+  );
+}
+
+function createLightFromConfig(
+  config: DirectionalLightConfig,
+  bounds: { shadowHalf: number; shadowTop: number; margin: number },
+  renderer: THREE.WebGLRenderer,
+  name?: string
+): BuiltLight {
+  const type = config.type ?? 'directional';
+  if (type === 'spot') {
+    const light = new THREE.SpotLight(config.color, config.intensity);
+    light.name = name ?? 'spotLight';
+    light.position.copy(config.position);
+    light.angle = config.angle ?? Math.PI / 3;
+    light.penumbra = config.penumbra ?? 0.4;
+    light.decay = config.decay ?? 1.35;
+    light.distance = config.distance ?? bounds.shadowTop * 1.6;
+    const target = (config.target ?? new THREE.Vector3(0, bounds.shadowTop * 0.35, 0)).clone();
+    light.target.position.copy(target);
+    light.castShadow = Boolean(config.castShadow);
+    if (light.castShadow && config.shadow) {
+      const size = clampShadowMapSize(renderer, config.shadow.mapSize);
+      light.shadow.mapSize.set(size, size);
+      light.shadow.bias = config.shadow.bias;
+      light.shadow.normalBias = config.shadow.normalBias;
+      light.shadow.radius = config.shadow.radius;
+      const perspective = light.shadow.camera as THREE.PerspectiveCamera;
+      perspective.near = config.shadow.cameraNear;
+      perspective.far = Math.max(
+        config.shadow.cameraFar,
+        bounds.shadowTop + config.shadow.cameraMargin
+      );
+      perspective.fov = config.shadow.cameraFov ?? THREE.MathUtils.radToDeg(light.angle) * 1.25;
+      perspective.updateProjectionMatrix();
+    }
+    return { light, target: light.target };
+  }
+  if (type === 'point') {
+    const light = new THREE.PointLight(
+      config.color,
+      config.intensity,
+      config.distance,
+      config.decay ?? 1.6
+    );
+    light.name = name ?? 'pointLight';
+    light.position.copy(config.position);
+    light.castShadow = Boolean(config.castShadow);
+    if (light.castShadow && config.shadow) {
+      const size = clampShadowMapSize(renderer, config.shadow.mapSize);
+      light.shadow.mapSize.set(size, size);
+      light.shadow.bias = config.shadow.bias;
+      light.shadow.normalBias = config.shadow.normalBias;
+      light.shadow.radius = config.shadow.radius;
+      const perspective = light.shadow.camera as THREE.PerspectiveCamera;
+      perspective.near = config.shadow.cameraNear;
+      perspective.far = Math.max(
+        config.shadow.cameraFar,
+        bounds.shadowTop + config.shadow.cameraMargin
+      );
+      perspective.fov = config.shadow.cameraFov ?? 50;
+      perspective.updateProjectionMatrix();
+    }
+    return { light };
+  }
+
+  const light = new THREE.DirectionalLight(config.color, config.intensity);
+  light.name = name ?? 'dirLight';
+  light.position.copy(config.position);
+  if (config.target) {
+    light.target.position.copy(config.target);
+  }
+  light.castShadow = Boolean(config.castShadow);
+  if (light.castShadow && config.shadow) {
+    const size = clampShadowMapSize(renderer, config.shadow.mapSize);
+    light.shadow.mapSize.set(size, size);
+    light.shadow.bias = config.shadow.bias;
+    light.shadow.normalBias = config.shadow.normalBias;
+    light.shadow.radius = config.shadow.radius;
+
+    const orthoCam = light.shadow.camera as THREE.OrthographicCamera;
+    orthoCam.left = -bounds.shadowHalf;
+    orthoCam.right = bounds.shadowHalf;
+    orthoCam.top = bounds.shadowTop;
+    orthoCam.bottom = -bounds.margin;
+    orthoCam.near = config.shadow.cameraNear;
+    orthoCam.far = Math.max(config.shadow.cameraFar, bounds.shadowTop + config.shadow.cameraMargin);
     orthoCam.updateProjectionMatrix();
   }
-  scene.add(key);
+  return { light, target: config.target ? light.target : undefined };
+}
 
-  const rim = new THREE.DirectionalLight(config.rim.color, config.rim.intensity);
-  rim.position.copy(config.rim.position);
-  if (config.rim.target) {
-    rim.target.position.copy(config.rim.target);
-    scene.add(rim.target);
-  }
-  rim.castShadow = Boolean(config.rim.castShadow);
-  scene.add(rim);
-
-  if (config.fill) {
-    const fill = new THREE.DirectionalLight(config.fill.color, config.fill.intensity);
-    fill.position.copy(config.fill.position);
-    if (config.fill.target) {
-      fill.target.position.copy(config.fill.target);
-      scene.add(fill.target);
+function createRingLights(
+  band: RingLightBandConfig,
+  bounds: { shadowHalf: number; shadowTop: number; margin: number },
+  renderer: THREE.WebGLRenderer,
+  namePrefix: string
+): BuiltLight[] {
+  const lights: BuiltLight[] = [];
+  const step = (Math.PI * 2) / Math.max(1, band.count);
+  const center = new THREE.Vector3(0, band.height, 0);
+  for (let i = 0; i < band.count; i += 1) {
+    const angle = i * step;
+    const hueShift = band.colorVariance ? (i / band.count - 0.5) * band.colorVariance : 0;
+    const color = new THREE.Color(band.color);
+    if (band.colorVariance) {
+      const hsl = { h: 0, s: 0, l: 0 };
+      color.getHSL(hsl);
+      color.setHSL(hsl.h + hueShift * 0.1, hsl.s, hsl.l);
     }
-    fill.castShadow = Boolean(config.fill.castShadow);
-    scene.add(fill);
+    const position = new THREE.Vector3(
+      Math.cos(angle) * band.radius,
+      band.height,
+      Math.sin(angle) * band.radius
+    );
+    const light = new THREE.SpotLight(color, band.intensity);
+    light.name = `${namePrefix}-${i}`;
+    light.position.copy(position);
+    light.angle = band.spread;
+    light.penumbra = band.penumbra;
+    light.decay = band.decay ?? 1.6;
+    light.distance = band.distance ?? band.radius * 3.2;
+
+    const target = center.clone().multiplyScalar(0.92);
+    target.y = Math.max(0.25, band.height - Math.tan(band.angleDown) * band.radius * 0.4);
+    light.target.position.copy(target);
+    light.castShadow = Boolean(band.castShadow);
+    if (light.castShadow) {
+      const size = clampShadowMapSize(renderer, band.castShadow ? band.penumbra * 2048 : 1024);
+      light.shadow.mapSize.set(size, size);
+      light.shadow.bias = -0.00008;
+      light.shadow.normalBias = 0.01;
+      light.shadow.radius = 2;
+      const perspective = light.shadow.camera as THREE.PerspectiveCamera;
+      perspective.near = 0.5;
+      perspective.far = Math.max(bounds.shadowTop + bounds.margin, band.radius * 4);
+      perspective.fov = THREE.MathUtils.radToDeg(light.angle) * 1.2;
+      perspective.updateProjectionMatrix();
+    }
+
+    lights.push({ light, target: light.target });
   }
+  return lights;
+}
+
+function clampShadowMapSize(renderer: THREE.WebGLRenderer, requested: number): number {
+  const maxSize = renderer.capabilities.maxTextureSize;
+  return Math.min(Math.max(256, Math.floor(requested)), maxSize);
 }
 
 function createShadowCatcher(boardConfig: BoardRenderConfig): THREE.Mesh {
@@ -234,4 +412,14 @@ export function resizeRenderer(ctx: RenderContext, width: number, height: number
   ctx.renderConfig.camera.target.copy(adjustedPlacement.target);
   ctx.cameraBasePlacement.position.copy(adjustedPlacement.position);
   ctx.cameraBasePlacement.target.copy(adjustedPlacement.target);
+
+  resizePostProcessing(ctx.post, width, height);
+}
+
+export function renderFrame(ctx: RenderContext, deltaMs?: number): void {
+  if (ctx.post?.composer) {
+    ctx.post.composer.render(deltaMs ? deltaMs / 1000 : undefined);
+  } else {
+    ctx.renderer.render(ctx.scene, ctx.camera);
+  }
 }

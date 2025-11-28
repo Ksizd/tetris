@@ -34,7 +34,11 @@ export class OrbitCameraController {
   private readonly floorY: number;
   private readonly damping: number;
 
-  constructor(camera: THREE.PerspectiveCamera, placement: CameraPlacement, opts: OrbitCameraOptions = {}) {
+  constructor(
+    camera: THREE.PerspectiveCamera,
+    placement: CameraPlacement,
+    opts: OrbitCameraOptions = {}
+  ) {
     this.camera = camera;
     this.target = placement.target.clone();
 
@@ -134,7 +138,11 @@ export class OrbitCameraController {
 
   private clampAngles(): void {
     const EPS = 0.0001;
-    this.phi = THREE.MathUtils.clamp(this.phi, this.options.minPolarAngle, this.options.maxPolarAngle);
+    this.phi = THREE.MathUtils.clamp(
+      this.phi,
+      this.options.minPolarAngle,
+      this.options.maxPolarAngle
+    );
     // theta unbounded for full orbit
     if (this.radius < EPS) {
       this.radius = EPS;

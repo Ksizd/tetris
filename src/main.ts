@@ -1,4 +1,4 @@
-import { createRenderContext, resizeRenderer, renderScene } from './render';
+import { createRenderContext, resizeRenderer, renderFrame, renderScene } from './render';
 import { updateCameraMotion } from './render/cameraMotion';
 import { GameController } from './app/gameController';
 import { KeyboardInput } from './input/keyboardInput';
@@ -34,7 +34,10 @@ if (isTextureProbeEnabled()) {
   console.log('Tower Tetris 3D app initialized', { canvas, hudContainer });
 
   const quality = parseQualityFromUrl(window.location.search);
-  const renderCtx = createRenderContext(canvas, quality ? { quality: { level: quality } } : undefined);
+  const renderCtx = createRenderContext(
+    canvas,
+    quality ? { quality: { level: quality } } : undefined
+  );
   const controller = new GameController();
   const keyboard = new KeyboardInput({
     onCommand: (command) => controller.enqueueCommand(command),
@@ -56,7 +59,7 @@ if (isTextureProbeEnabled()) {
     const snapshot = controller.update(deltaMs);
     renderScene(renderCtx, snapshot);
     updateCameraMotion(renderCtx, timestamp);
-    renderCtx.renderer.render(renderCtx.scene, renderCtx.camera);
+    renderFrame(renderCtx, deltaMs);
     hud.render(mapGameStateToHudData(snapshot));
     overlay.render(mapGameStatusToUIState(snapshot.gameStatus));
 
@@ -75,6 +78,9 @@ function parseQualityFromUrl(search: string): QualityLevel | null {
   const raw = params.get('quality')?.toLowerCase();
   if (raw === 'ultra' || raw === 'medium' || raw === 'low') {
     return raw as QualityLevel;
+  }
+  if (raw === 'ultra2' || raw === 'ultra_cinematic') {
+    return 'ultra2';
   }
   return null;
 }

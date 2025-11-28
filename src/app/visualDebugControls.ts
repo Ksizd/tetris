@@ -7,7 +7,7 @@ export interface VisualControlState {
   hemisphereIntensity: number;
   keyIntensity: number;
   autoRotateEnabled: boolean;
-  qualityLevel: 'ultra' | 'medium' | 'low';
+  qualityLevel: 'ultra' | 'ultra2' | 'medium' | 'low';
   materialDebugMode: 'none' | 'matcap' | 'flat';
   envDebugMode: 'full' | 'lightsOnly' | 'envOnly';
 }
@@ -150,7 +150,7 @@ export function createVisualDebugControls(
   qualityLabel.style.marginBottom = '2px';
 
   const qualitySelect = document.createElement('select');
-  ['ultra', 'medium', 'low'].forEach((level) => {
+  ['ultra', 'ultra2', 'medium', 'low'].forEach((level) => {
     const opt = document.createElement('option');
     opt.value = level;
     opt.textContent = level;

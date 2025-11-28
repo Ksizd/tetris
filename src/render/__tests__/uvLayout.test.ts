@@ -19,7 +19,11 @@ describe('applyMahjongUVLayout', () => {
     for (let i = 0; i < positions.count; i += 1) {
       const normal = new THREE.Vector3().fromBufferAttribute(normals, i);
       const v = uvs.getY(i);
-      if (normal.z > 0.9 && Math.abs(normal.z) >= Math.abs(normal.x) && Math.abs(normal.z) >= Math.abs(normal.y)) {
+      if (
+        normal.z > 0.9 &&
+        Math.abs(normal.z) >= Math.abs(normal.x) &&
+        Math.abs(normal.z) >= Math.abs(normal.y)
+      ) {
         frontCount += 1;
         frontVMin = Math.min(frontVMin, v);
         frontVMax = Math.max(frontVMax, v);

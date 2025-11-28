@@ -118,7 +118,7 @@ function findHorizontalDistance(params: FrameSolveParams): number {
   const { towerHeight, towerRadius, blockSize, cameraY, targetY, fovRad } = params;
   const margin = blockSize * 1.6;
   const minHorizontal = Math.max(towerRadius + margin, towerHeight * 0.3);
-  const fovLimit = (fovRad * 0.5) * 0.96; // keep 4% headroom
+  const fovLimit = fovRad * 0.5 * 0.96; // keep 4% headroom
   const probeAzimuth = Math.PI / 4;
   let horizontal = minHorizontal;
 
