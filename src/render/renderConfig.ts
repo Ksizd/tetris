@@ -27,6 +27,17 @@ export interface DirectionalLightConfig {
   position: THREE.Vector3;
   target?: THREE.Vector3;
   castShadow?: boolean;
+  shadow?: DirectionalLightShadowConfig;
+}
+
+export interface DirectionalLightShadowConfig {
+  mapSize: number;
+  radius: number;
+  bias: number;
+  normalBias: number;
+  cameraNear: number;
+  cameraFar: number;
+  cameraMargin: number;
 }
 
 export interface LightRigConfig {
@@ -132,6 +143,21 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
       position: (overrides.lights?.key?.position ?? defaultLights.key.position).clone(),
       target: (overrides.lights?.key?.target ?? defaultLights.key.target)?.clone(),
       castShadow: overrides.lights?.key?.castShadow ?? defaultLights.key.castShadow,
+      shadow: {
+        mapSize: overrides.lights?.key?.shadow?.mapSize ?? defaultLights.key.shadow?.mapSize ?? 2048,
+        radius: overrides.lights?.key?.shadow?.radius ?? defaultLights.key.shadow?.radius ?? 1.5,
+        bias: overrides.lights?.key?.shadow?.bias ?? defaultLights.key.shadow?.bias ?? -0.00025,
+        normalBias:
+          overrides.lights?.key?.shadow?.normalBias ?? defaultLights.key.shadow?.normalBias ?? 0.02,
+        cameraNear:
+          overrides.lights?.key?.shadow?.cameraNear ?? defaultLights.key.shadow?.cameraNear ?? 1.0,
+        cameraFar:
+          overrides.lights?.key?.shadow?.cameraFar ?? defaultLights.key.shadow?.cameraFar ?? 50,
+        cameraMargin:
+          overrides.lights?.key?.shadow?.cameraMargin ??
+          defaultLights.key.shadow?.cameraMargin ??
+          2.5,
+      },
     },
     rim: {
       color: overrides.lights?.rim?.color ?? defaultLights.rim.color,
@@ -139,6 +165,7 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
       position: (overrides.lights?.rim?.position ?? defaultLights.rim.position).clone(),
       target: (overrides.lights?.rim?.target ?? defaultLights.rim.target)?.clone(),
       castShadow: overrides.lights?.rim?.castShadow ?? defaultLights.rim.castShadow,
+      shadow: defaultLights.rim.shadow,
     },
   };
 
@@ -178,10 +205,19 @@ function createDefaultLights(camera: CameraConfig): LightRigConfig {
     },
     key: {
       color: 0xfff3cc,
-      intensity: 1.0,
+      intensity: 1.05,
       position: keyPosition,
       target: camera.target.clone(),
-      castShadow: false,
+      castShadow: true,
+      shadow: {
+        mapSize: 2048,
+        radius: 1.8,
+        bias: -0.00022,
+        normalBias: 0.018,
+        cameraNear: 0.6,
+        cameraFar: 60,
+        cameraMargin: 3.5,
+      },
     },
     rim: {
       color: 0xbad7ff,
@@ -189,6 +225,7 @@ function createDefaultLights(camera: CameraConfig): LightRigConfig {
       position: rimPosition,
       target: camera.target.clone(),
       castShadow: false,
+      shadow: undefined,
     },
   };
 }

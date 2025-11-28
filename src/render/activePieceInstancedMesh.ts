@@ -59,6 +59,8 @@ export function createActivePieceInstancedMesh(
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.count = 0;
   mesh.frustumCulled = false;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   mesh.name = 'activePieceInstanced';
 
   return { mesh, geometry, material: [frontMaterial, sideMaterial] };

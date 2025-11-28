@@ -6,8 +6,10 @@ import { createActivePieceInstancedMesh } from './activePieceInstancedMesh';
 import { ActivePieceInstancedResources } from './activePieceInstancedMesh';
 import { BoardInstancedResources } from './boardInstancedMesh';
 import { createRenderConfig, LightRigConfig, RenderConfig, RenderConfigOverrides } from './renderConfig';
-import { recomputeCameraPlacementForFrame } from './cameraSetup';
+import { computeTowerHeight, recomputeCameraPlacementForFrame } from './cameraSetup';
 import { createEnvironmentMap, EnvironmentMapResources } from './environmentMap';
+import { BoardRenderConfig } from './boardConfig';
+import { BoardDimensions } from '../core/types';
 
 export interface RenderContext {
   scene: THREE.Scene;
@@ -68,7 +70,7 @@ export function createRenderContext(
     return;
   };
 
-  addLighting(scene, renderConfig.lights);
+  addLighting(scene, renderer, renderConfig.lights, renderConfig.boardDimensions, renderConfig.board);
   const environment = createEnvironmentMap(renderer, renderConfig.environment);
   if (environment) {
     scene.environment = environment.environmentMap;
@@ -103,7 +105,23 @@ export function createRenderContext(
   };
 }
 
-function addLighting(scene: THREE.Scene, config: LightRigConfig): void {
+function addLighting(
+  scene: THREE.Scene,
+  renderer: THREE.WebGLRenderer,
+  config: LightRigConfig,
+  dimensions: BoardDimensions,
+  boardConfig: BoardRenderConfig
+): void {
+  const towerHeight = computeTowerHeight(dimensions, boardConfig);
+  const towerRadius = boardConfig.towerRadius;
+  const margin = boardConfig.blockSize * 2;
+  const shadowHalf = towerRadius + margin;
+  const shadowTop = towerHeight + margin;
+
+  if (config.key.castShadow) {
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  }
   const hemi = new THREE.HemisphereLight(
     config.hemisphere.skyColor,
     config.hemisphere.groundColor,
@@ -122,6 +140,21 @@ function addLighting(scene: THREE.Scene, config: LightRigConfig): void {
     scene.add(key.target);
   }
   key.castShadow = Boolean(config.key.castShadow);
+  if (key.castShadow && config.key.shadow) {
+    key.shadow.mapSize.set(config.key.shadow.mapSize, config.key.shadow.mapSize);
+    key.shadow.bias = config.key.shadow.bias;
+    key.shadow.normalBias = config.key.shadow.normalBias;
+    key.shadow.radius = config.key.shadow.radius;
+
+    const orthoCam = key.shadow.camera as THREE.OrthographicCamera;
+    orthoCam.left = -shadowHalf;
+    orthoCam.right = shadowHalf;
+    orthoCam.top = shadowTop;
+    orthoCam.bottom = -margin;
+    orthoCam.near = config.key.shadow.cameraNear;
+    orthoCam.far = Math.max(config.key.shadow.cameraFar, shadowTop + config.key.shadow.cameraMargin);
+    orthoCam.updateProjectionMatrix();
+  }
   scene.add(key);
 
   const rim = new THREE.DirectionalLight(config.rim.color, config.rim.intensity);

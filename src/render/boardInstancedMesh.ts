@@ -59,6 +59,8 @@ export function createBoardInstancedMesh(
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.count = 0;
   mesh.frustumCulled = false; // cylindrical layout; bounding sphere would need per-instance updates later
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   mesh.name = 'boardBlocksInstanced';
 
   return { mesh, geometry, material: [frontMaterial, sideMaterial], capacity };
