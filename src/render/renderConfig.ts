@@ -70,6 +70,7 @@ export interface EnvironmentConfig {
   enabled: boolean;
   useAsBackground: boolean;
   intensity: number;
+  resolution: number;
 }
 
 export interface RenderConfig {
@@ -80,6 +81,7 @@ export interface RenderConfig {
   lights: LightRigConfig;
   postProcessing: PostProcessingConfig;
   environment: EnvironmentConfig;
+  quality: QualityConfig;
 }
 
 export interface RenderConfigOverrides {
@@ -94,6 +96,7 @@ export interface RenderConfigOverrides {
   lights?: PartialLightRigConfig;
   postProcessing?: PostProcessingOverrides;
   environment?: Partial<EnvironmentConfig>;
+  quality?: Partial<QualityConfig>;
 }
 
 export interface PartialLightRigConfig {
@@ -118,9 +121,18 @@ export interface CameraMotionConfig {
   targetFollowRatio: number; // how much target follows height wobble
 }
 
+export type QualityLevel = 'ultra' | 'medium' | 'low';
+
+export interface QualityConfig {
+  level: QualityLevel;
+  shadowMapSize: number;
+  envResolution: number;
+}
+
 const DEFAULT_KEY_LIGHT_MULTIPLIER = new THREE.Vector3(0.4, 0.8, 0.4);
 
 export function createRenderConfig(overrides: RenderConfigOverrides = {}): RenderConfig {
+  const quality = resolveQuality(overrides.quality?.level);
   const boardDimensions: BoardDimensions = {
     width: overrides.boardWidth ?? overrides.boardDimensions?.width ?? DEFAULT_BOARD_DIMENSIONS.width,
     height: overrides.boardDimensions?.height ?? DEFAULT_BOARD_DIMENSIONS.height,
@@ -170,7 +182,10 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
       target: (overrides.lights?.key?.target ?? defaultLights.key.target)?.clone(),
       castShadow: overrides.lights?.key?.castShadow ?? defaultLights.key.castShadow,
       shadow: {
-        mapSize: overrides.lights?.key?.shadow?.mapSize ?? defaultLights.key.shadow?.mapSize ?? 2048,
+        mapSize:
+          overrides.lights?.key?.shadow?.mapSize ??
+          defaultLights.key.shadow?.mapSize ??
+          quality.shadowMapSize,
         radius: overrides.lights?.key?.shadow?.radius ?? defaultLights.key.shadow?.radius ?? 1.5,
         bias: overrides.lights?.key?.shadow?.bias ?? defaultLights.key.shadow?.bias ?? -0.00025,
         normalBias:
@@ -207,6 +222,7 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
     enabled: overrides.environment?.enabled ?? true,
     useAsBackground: overrides.environment?.useAsBackground ?? true,
     intensity: overrides.environment?.intensity ?? 1.25,
+    resolution: overrides.environment?.resolution ?? quality.envResolution,
   };
 
   return {
@@ -217,6 +233,7 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
     lights,
     postProcessing,
     environment,
+    quality,
   };
 }
 
@@ -275,4 +292,16 @@ function normalizeFov(fov: number): number {
     return DEFAULT_CAMERA_FOV;
   }
   return Math.min(85, Math.max(25, fov));
+}
+
+function resolveQuality(level: QualityLevel = 'ultra'): QualityConfig {
+  switch (level) {
+    case 'low':
+      return { level, shadowMapSize: 1024, envResolution: 512 };
+    case 'medium':
+      return { level, shadowMapSize: 2048, envResolution: 1024 };
+    case 'ultra':
+    default:
+      return { level: 'ultra', shadowMapSize: 4096, envResolution: 2048 };
+  }
 }

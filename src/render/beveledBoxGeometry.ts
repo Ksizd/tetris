@@ -5,7 +5,7 @@ export interface BeveledBoxParams {
   height: number;
   depth: number;
   radius: number;
-  smoothness?: number;
+  smoothness?: number; // segments per edge; higher = softer bevel
 }
 
 /**
@@ -22,7 +22,7 @@ export function createBeveledBoxGeometry(params: BeveledBoxParams): THREE.Buffer
   const halfD = depth / 2;
   const maxRadius = Math.min(halfW, halfH, halfD) - 1e-4;
   const radius = clamp(params.radius, 0, maxRadius);
-  const segments = Math.max(1, Math.floor(params.smoothness ?? 2));
+  const segments = Math.max(1, Math.floor(params.smoothness ?? 3));
 
   const geometry = new THREE.BoxGeometry(width, height, depth, segments, segments, segments);
   const position = geometry.attributes.position;
@@ -49,6 +49,7 @@ export function createBeveledBoxGeometry(params: BeveledBoxParams): THREE.Buffer
 
   position.needsUpdate = true;
   geometry.computeVertexNormals();
+  geometry.normalizeNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
 

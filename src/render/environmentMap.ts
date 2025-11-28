@@ -15,7 +15,7 @@ export function createEnvironmentMap(
     return null;
   }
 
-  const source = createStudioGradientTexture();
+  const source = createStudioGradientTexture(config.resolution);
   const pmremGenerator = new THREE.PMREMGenerator(renderer);
   pmremGenerator.compileEquirectangularShader();
 
@@ -40,9 +40,9 @@ export function createEnvironmentMap(
   return { environmentMap, backgroundTexture, dispose };
 }
 
-function createStudioGradientTexture(): THREE.Texture {
-  const width = 1024;
-  const height = 512;
+function createStudioGradientTexture(resolution = 1024): THREE.Texture {
+  const width = Math.max(256, Math.floor(resolution));
+  const height = Math.max(128, Math.floor(width / 2));
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;

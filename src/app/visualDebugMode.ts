@@ -23,6 +23,7 @@ type CameraMode = 'game' | 'inspect';
 
 const QUERY_FLAG = 'visualDebug';
 const CAMERA_TOGGLE_KEY = 'c';
+const CLOSEUP_KEY = 'v';
 const TRANSITION_DURATION_MS = 450;
 const GAME_MODE_ROTATION_LIMIT = THREE.MathUtils.degToRad(6);
 const GAME_MODE_ROTATION_SPEED = 0.00035;
@@ -63,11 +64,11 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     transitionCamera(renderCtx, renderCtx.cameraBasePlacement);
   };
 
-  const switchToInspect = () => {
+  const switchToInspect = (placement?: { position: THREE.Vector3; target: THREE.Vector3 }) => {
     cameraMode = 'inspect';
-    const placement = orbitControllerRef.current?.getPlacement() ?? renderCtx.cameraBasePlacement;
+    const basePlacement = placement ?? orbitControllerRef.current?.getPlacement() ?? renderCtx.cameraBasePlacement;
     orbitControllerRef.current?.detach(canvas);
-    createOrbit(placement);
+    createOrbit(basePlacement);
   };
   const controls = createVisualDebugControls(controlState, (next) => {
     controlState = next;
@@ -123,6 +124,10 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     } else {
       switchToGame();
     }
+  });
+  attachCloseupHotkey(renderCtx, orbitControllerRef, () => {
+    cameraMode = 'inspect';
+    switchToInspect(createCloseupPlacement(renderCtx));
   });
 }
 
@@ -286,6 +291,26 @@ function attachCameraModeToggle(onToggle: () => void): void {
   );
 }
 
+function attachCloseupHotkey(
+  ctx: RenderContext,
+  orbitRef: { current: OrbitCameraController | null },
+  onCloseup: () => void
+): void {
+  const handler = (ev: KeyboardEvent) => {
+    if (ev.key.toLowerCase() === CLOSEUP_KEY) {
+      onCloseup();
+    }
+  };
+  window.addEventListener('keydown', handler);
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      window.removeEventListener('keydown', handler);
+    },
+    { once: true }
+  );
+}
+
 function applyCameraPlacement(ctx: RenderContext, placement: { position: THREE.Vector3; target: THREE.Vector3 }): void {
   ctx.camera.position.copy(placement.position);
   ctx.camera.lookAt(placement.target);
@@ -342,6 +367,24 @@ function applyCameraMode(
   ctx.camera.lookAt(base.target);
   ctx.renderConfig.camera.position.copy(rotated);
   ctx.renderConfig.camera.target.copy(base.target);
+}
+
+function createCloseupPlacement(ctx: RenderContext): { position: THREE.Vector3; target: THREE.Vector3 } {
+  const radius = Math.max(ctx.renderConfig.board.blockSize * 3.2, ctx.renderConfig.board.towerRadius * 0.9);
+  const baseAzimuth = new THREE.Vector2(ctx.cameraBasePlacement.position.x, ctx.cameraBasePlacement.position.z);
+  const dir = baseAzimuth.lengthSq() > 0 ? baseAzimuth.normalize() : new THREE.Vector2(1, 0);
+  const targetY = Math.min(
+    ctx.renderConfig.board.blockSize * 3,
+    computeMidHeight(ctx.renderConfig.boardDimensions, ctx.renderConfig.board)
+  );
+  const target = new THREE.Vector3(0, targetY, 0);
+  const position = new THREE.Vector3(dir.x * radius, targetY + ctx.renderConfig.board.blockSize * 0.6, dir.y * radius);
+  return { position, target };
+}
+
+function computeMidHeight(dimensions: BoardDimensions, board: BoardRenderConfig): number {
+  const towerHeight = (dimensions.height - 1) * board.verticalSpacing + board.blockSize;
+  return towerHeight * 0.4;
 }
 
 function logVisualParameters(ctx: RenderContext): void {
