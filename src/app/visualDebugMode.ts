@@ -159,9 +159,9 @@ function controlStateToOverrides(
 
 function disposeRenderResources(ctx: RenderContext): void {
   ctx.board.geometry.dispose();
-  ctx.board.material.dispose();
+  disposeMaterials(ctx.board.material);
   ctx.activePiece.geometry.dispose();
-  ctx.activePiece.material.dispose();
+  disposeMaterials(ctx.activePiece.material);
   disposeMeshes(ctx.boardPlaceholder);
   ctx.renderer.dispose();
 }
@@ -179,6 +179,14 @@ function disposeMeshes(root: THREE.Object3D): void {
       }
     }
   });
+}
+
+function disposeMaterials(material: THREE.Material | THREE.Material[]): void {
+  if (Array.isArray(material)) {
+    material.forEach((m) => m.dispose());
+    return;
+  }
+  material.dispose();
 }
 
 function attachControlsDisposalOnUnload(controls: VisualDebugControls): void {

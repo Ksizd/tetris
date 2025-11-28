@@ -33,7 +33,7 @@ export function createMahjongTileTexture(size = DEFAULT_TILE_SIZE): THREE.Textur
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) {
     throw new Error('Unable to create 2D context for mahjong tile texture');
   }
@@ -61,6 +61,62 @@ export function createMahjongTileTexture(size = DEFAULT_TILE_SIZE): THREE.Textur
   }
 
   return texture;
+}
+
+/**
+ * Generates grayscale PBR maps aligned to the atlas:
+ * - Front (top half): smooth ceramic (low roughness, near-zero metalness), mild AO.
+ * - Sides (bottom half): moderate roughness/metalness (baseline for gold without overpowering front).
+ * Adds subtle noise to avoid flat highlights.
+ */
+export function createMahjongMaterialMaps(size = DEFAULT_TILE_SIZE): MahjongMaterialMaps {
+  const roughCanvas = document.createElement('canvas');
+  const metalCanvas = document.createElement('canvas');
+  const aoCanvas = document.createElement('canvas');
+  roughCanvas.width = metalCanvas.width = aoCanvas.width = size;
+  roughCanvas.height = metalCanvas.height = aoCanvas.height = size;
+
+  const ctxOptions: CanvasRenderingContext2DSettings = { willReadFrequently: true };
+  const roughCtx = roughCanvas.getContext('2d', ctxOptions);
+  const metalCtx = metalCanvas.getContext('2d', ctxOptions);
+  const aoCtx = aoCanvas.getContext('2d', ctxOptions);
+  if (!roughCtx || !metalCtx || !aoCtx) {
+    throw new Error('Unable to create PBR map contexts');
+  }
+
+  const half = size / 2;
+
+  // Roughness: front smoother (~0.18), sides tighter gloss (~0.25) for gold.
+  fillRect(roughCtx, 46, 0, 0, size, half);
+  fillRect(roughCtx, 64, 0, half, size, half);
+
+  // Metalness: front ceramic (~0.03), sides high (~0.94) for gold.
+  fillRect(metalCtx, 8, 0, 0, size, half);
+  fillRect(metalCtx, 240, 0, half, size, half);
+
+  // AO: gentle vignette on front, neutral on sides.
+  const aoGrad = aoCtx.createLinearGradient(0, 0, 0, size);
+  aoGrad.addColorStop(0, 'rgb(205,205,205)');
+  aoGrad.addColorStop(0.35, 'rgb(225,225,225)');
+  aoGrad.addColorStop(0.5, 'rgb(245,245,245)');
+  aoGrad.addColorStop(1, 'rgb(235,235,235)');
+  aoCtx.fillStyle = aoGrad;
+  aoCtx.fillRect(0, 0, size, size);
+
+  addNoise(roughCtx, size, half, 3, 0);
+  addNoise(roughCtx, size, half, 3, half);
+
+  const roughnessMap = new THREE.CanvasTexture(roughCanvas);
+  const metalnessMap = new THREE.CanvasTexture(metalCanvas);
+  const aoMap = new THREE.CanvasTexture(aoCanvas);
+  [roughnessMap, metalnessMap, aoMap].forEach((tex) => {
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.flipY = true;
+    tex.needsUpdate = true;
+  });
+
+  return { roughnessMap, metalnessMap, aoMap };
 }
 
 function drawAtlas(ctx: CanvasRenderingContext2D, size: number, glyph: HTMLImageElement | null): void {
@@ -102,10 +158,10 @@ function drawCenteredGlyph(
   if (!glyph || !glyph.complete || glyph.naturalWidth === 0) {
     return;
   }
-  const maxWidth = size * 0.8; // widen horizontally
+  const maxWidth = size * 0.98; // slightly wider footprint
   const maxHeight = half * 0.7; // maintain vertical padding
   const heightScale = maxHeight / glyph.naturalHeight;
-  const widthScale = Math.min(maxWidth / glyph.naturalWidth, heightScale * 1.12);
+  const widthScale = Math.min(maxWidth / glyph.naturalWidth, heightScale * 1.4);
   const drawW = glyph.naturalWidth * widthScale;
   const drawH = glyph.naturalHeight * heightScale;
   const centerX = size / 2;
@@ -146,31 +202,23 @@ function drawSideFaces(ctx: CanvasRenderingContext2D, size: number): void {
   ctx.save();
   ctx.translate(0, half);
 
-  const metallic = ctx.createLinearGradient(0, 0, 0, half);
-  metallic.addColorStop(0, '#f4d07a');
-  metallic.addColorStop(0.5, '#d2a342');
-  metallic.addColorStop(1, '#8a5415');
-  ctx.fillStyle = metallic;
+  // Base gold tone
+  ctx.fillStyle = '#d7a239';
   ctx.fillRect(0, 0, size, half);
 
-  const sheen = ctx.createLinearGradient(0, half * 0.1, 0, half * 0.9);
-  sheen.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
-  sheen.addColorStop(0.45, 'rgba(255, 255, 255, 0.05)');
-  sheen.addColorStop(0.55, 'rgba(0, 0, 0, 0.08)');
-  sheen.addColorStop(1, 'rgba(0, 0, 0, 0.18)');
-  ctx.fillStyle = sheen;
+  // Gentle vertical tint
+  const softVertical = ctx.createLinearGradient(0, 0, 0, half);
+  softVertical.addColorStop(0, 'rgba(255, 220, 140, 0.12)');
+  softVertical.addColorStop(1, 'rgba(120, 70, 20, 0.12)');
+  ctx.fillStyle = softVertical;
   ctx.fillRect(0, 0, size, half);
 
-  const stripeCount = 8;
-  ctx.lineWidth = size * 0.008;
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-  for (let i = 0; i < stripeCount; i += 1) {
-    const y = (half / stripeCount) * i + size * 0.01;
-    ctx.beginPath();
-    ctx.moveTo(size * 0.06, y);
-    ctx.lineTo(size * 0.94, y + size * 0.01);
-    ctx.stroke();
-  }
+  // Subtle radial highlight at center to unify faces.
+  const radial = ctx.createRadialGradient(size * 0.5, half * 0.5, 0, size * 0.5, half * 0.5, half * 0.75);
+  radial.addColorStop(0, 'rgba(255, 240, 200, 0.08)');
+  radial.addColorStop(1, 'rgba(0, 0, 0, 0.05)');
+  ctx.fillStyle = radial;
+  ctx.fillRect(0, 0, size, half);
 
   ctx.restore();
 }
@@ -183,4 +231,37 @@ function getGlyphImage(): HTMLImageElement {
   img.src = GLYPH_DATA_URL;
   cachedGlyphImage = img;
   return img;
+}
+
+function fillRect(
+  ctx: CanvasRenderingContext2D,
+  value: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): void {
+  ctx.fillStyle = `rgb(${value},${value},${value})`;
+  ctx.fillRect(x, y, w, h);
+}
+
+function addNoise(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  regionHeight: number,
+  strength: number,
+  offsetY = 0
+): void {
+  const imageData = ctx.getImageData(0, offsetY, size, regionHeight);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const n = (Math.random() - 0.5) * strength;
+    const v = data[i] + n;
+    data[i] = data[i + 1] = data[i + 2] = clamp255(v);
+  }
+  ctx.putImageData(imageData, 0, offsetY);
+}
+
+function clamp255(v: number): number {
+  return Math.max(0, Math.min(255, v));
 }

@@ -42,10 +42,29 @@ export function createRenderContext(
   camera.position.copy(renderConfig.camera.position);
   camera.lookAt(renderConfig.camera.target);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  const gl = canvas.getContext('webgl2', {
+    antialias: true,
+    alpha: false,
+    premultipliedAlpha: false,
+    powerPreference: 'high-performance',
+  }) as WebGL2RenderingContext | null;
+
+  const renderer = new THREE.WebGLRenderer({
+    canvas,
+    antialias: true,
+    context: gl ?? undefined,
+    alpha: false,
+    premultipliedAlpha: false,
+    powerPreference: 'high-performance',
+  });
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = false;
+  const glctx = renderer.getContext();
+  // We don't use 3D/array textures; skip texImage3D to avoid driver spam on flipY checks.
+  glctx.texImage3D = function noopTexImage3D() {
+    return;
+  };
 
   addLighting(scene, renderConfig.lights);
 

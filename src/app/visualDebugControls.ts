@@ -37,6 +37,7 @@ export function createVisualDebugControls(
   onChange: (state: VisualControlState) => void
 ): VisualDebugControls {
   const state: VisualControlState = { ...initial };
+  let pendingChange: number | undefined;
   const container = document.createElement('div');
   Object.assign(container.style, {
     position: 'fixed',
@@ -98,7 +99,13 @@ export function createVisualDebugControls(
       const parsed = Number.parseFloat(input.value);
       state[spec.key] = Number.isFinite(parsed) ? parsed : state[spec.key];
       syncValueLabel(state[spec.key]);
-      onChange({ ...state });
+      if (pendingChange !== undefined) {
+        window.clearTimeout(pendingChange);
+      }
+      pendingChange = window.setTimeout(() => {
+        pendingChange = undefined;
+        onChange({ ...state });
+      }, 120);
     });
 
     inputWrapper.appendChild(input);

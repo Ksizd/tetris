@@ -6,6 +6,7 @@ import { HudView, mapGameStateToHudData } from './ui/hud';
 import { OverlayView } from './ui/overlay';
 import { mapGameStatusToUIState } from './ui/uiState';
 import { isVisualDebugModeEnabled, startVisualDebugMode } from './app/visualDebugMode';
+import { isTextureProbeEnabled, startTextureProbe } from './app/textureProbe';
 
 const canvas = document.getElementById('render-canvas') as HTMLCanvasElement | null;
 
@@ -13,7 +14,9 @@ if (!canvas) {
   throw new Error('Render canvas element #render-canvas not found');
 }
 
-if (isVisualDebugModeEnabled()) {
+if (isTextureProbeEnabled()) {
+  startTextureProbe(canvas);
+} else if (isVisualDebugModeEnabled()) {
   startVisualDebugMode(canvas);
 } else {
   const hudContainer = document.getElementById('hud');
