@@ -3,6 +3,7 @@ import { BoardRenderConfig } from './boardConfig';
 import { createBeveledBoxGeometry } from './beveledBoxGeometry';
 import { applyMahjongUVLayout } from './uv';
 import { createMahjongMaterialMaps, createMahjongTileTexture } from './textures';
+import { VISUAL_DEFAULTS } from './visualDefaults';
 
 export interface ActivePieceInstancedResources {
   mesh: THREE.InstancedMesh;
@@ -33,26 +34,26 @@ export function createActivePieceInstancedMesh(
   const frontMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: tileTexture,
-    roughness: 0.22,
-    metalness: 0.04,
+    roughness: VISUAL_DEFAULTS.materials.front.roughness,
+    metalness: VISUAL_DEFAULTS.materials.front.metalness,
     roughnessMap,
     metalnessMap,
     aoMap,
     emissive: 0x221100,
     emissiveIntensity: 0.06,
-    envMapIntensity: 0.9,
+    envMapIntensity: VISUAL_DEFAULTS.materials.front.envMapIntensity,
   });
   const sideMaterial = new THREE.MeshStandardMaterial({
     color: 0xf2c14b,
     map: tileTexture,
-    roughness: 0.28,
-    metalness: 1.0,
+    roughness: VISUAL_DEFAULTS.materials.side.roughness,
+    metalness: VISUAL_DEFAULTS.materials.side.metalness,
     roughnessMap,
     metalnessMap,
     aoMap,
     emissive: 0x331100,
     emissiveIntensity: 0.08,
-    envMapIntensity: 1.8,
+    envMapIntensity: VISUAL_DEFAULTS.materials.side.envMapIntensity,
   });
 
   const mesh = new THREE.InstancedMesh(geometry, [frontMaterial, sideMaterial], ACTIVE_PIECE_CAPACITY);

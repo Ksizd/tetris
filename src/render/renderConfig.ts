@@ -9,6 +9,7 @@ import {
   DEFAULT_CAMERA_HEIGHT_RATIO,
   DEFAULT_TARGET_HEIGHT_RATIO,
 } from './cameraSetup';
+import { VISUAL_DEFAULTS } from './visualDefaults';
 
 export interface CameraConfig {
   fov: number;
@@ -132,7 +133,7 @@ export interface QualityConfig {
 const DEFAULT_KEY_LIGHT_MULTIPLIER = new THREE.Vector3(0.4, 0.8, 0.4);
 
 export function createRenderConfig(overrides: RenderConfigOverrides = {}): RenderConfig {
-  const quality = resolveQuality(overrides.quality?.level);
+  const quality = resolveQuality(overrides.quality?.level ?? VISUAL_DEFAULTS.quality.level);
   const boardDimensions: BoardDimensions = {
     width: overrides.boardWidth ?? overrides.boardDimensions?.width ?? DEFAULT_BOARD_DIMENSIONS.width,
     height: overrides.boardDimensions?.height ?? DEFAULT_BOARD_DIMENSIONS.height,
@@ -140,7 +141,7 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
 
   const board = createBoardRenderConfig(boardDimensions, overrides.board);
 
-  const cameraFov = normalizeFov(overrides.camera?.fov ?? DEFAULT_CAMERA_FOV);
+  const cameraFov = normalizeFov(overrides.camera?.fov ?? VISUAL_DEFAULTS.camera.fov);
   const computedPlacement = computeCameraPlacement(boardDimensions, board, {
     fovDeg: cameraFov,
     angleRadians: DEFAULT_CAMERA_ANGLE,
@@ -220,8 +221,8 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
 
   const environment: EnvironmentConfig = {
     enabled: overrides.environment?.enabled ?? true,
-    useAsBackground: overrides.environment?.useAsBackground ?? true,
-    intensity: overrides.environment?.intensity ?? 1.25,
+    useAsBackground: overrides.environment?.useAsBackground ?? VISUAL_DEFAULTS.environment.useAsBackground,
+    intensity: overrides.environment?.intensity ?? VISUAL_DEFAULTS.environment.intensity,
     resolution: overrides.environment?.resolution ?? quality.envResolution,
   };
 
@@ -238,23 +239,21 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
 }
 
 function createDefaultLights(camera: CameraConfig): LightRigConfig {
-  const keyPosition = camera.position
-    .clone()
-    .multiply(new THREE.Vector3(0.32, 0.95, 0.38)); // slightly higher/front-side
-  const rimPosition = camera.position.clone().multiply(new THREE.Vector3(-0.8, 0.9, -0.8));
+  const keyPosition = camera.position.clone().multiply(VISUAL_DEFAULTS.lights.key.positionMultiplier);
+  const rimPosition = camera.position.clone().multiply(VISUAL_DEFAULTS.lights.rim.positionMultiplier);
   return {
     hemisphere: {
-      skyColor: 0xfff8e1,
-      groundColor: 0x2a1a0a,
-      intensity: 0.55,
+      skyColor: VISUAL_DEFAULTS.lights.hemisphere.skyColor,
+      groundColor: VISUAL_DEFAULTS.lights.hemisphere.groundColor,
+      intensity: VISUAL_DEFAULTS.lights.hemisphere.intensity,
     },
     ambient: {
-      color: 0xffffff,
-      intensity: 0.22,
+      color: VISUAL_DEFAULTS.lights.ambient.color,
+      intensity: VISUAL_DEFAULTS.lights.ambient.intensity,
     },
     key: {
-      color: 0xffefdb,
-      intensity: 2.1,
+      color: VISUAL_DEFAULTS.lights.key.color,
+      intensity: VISUAL_DEFAULTS.lights.key.intensity,
       position: keyPosition,
       target: camera.target.clone(),
       castShadow: true,
@@ -269,16 +268,16 @@ function createDefaultLights(camera: CameraConfig): LightRigConfig {
       },
     },
     rim: {
-      color: 0xb7d5ff,
-      intensity: 0.6,
+      color: VISUAL_DEFAULTS.lights.rim.color,
+      intensity: VISUAL_DEFAULTS.lights.rim.intensity,
       position: rimPosition,
       target: camera.target.clone(),
       castShadow: false,
       shadow: undefined,
     },
     fill: {
-      color: 0xe5ecfa,
-      intensity: 0.65,
+      color: VISUAL_DEFAULTS.lights.fill.color,
+      intensity: VISUAL_DEFAULTS.lights.fill.intensity,
       position: camera.target.clone().add(new THREE.Vector3(-2.5, 1.2, -3.5)),
       target: camera.target.clone(),
       castShadow: false,

@@ -7,6 +7,9 @@ export interface VisualControlState {
   hemisphereIntensity: number;
   keyIntensity: number;
   autoRotateEnabled: boolean;
+  qualityLevel: 'ultra' | 'medium' | 'low';
+  materialDebugMode: 'none' | 'matcap' | 'flat';
+  envDebugMode: 'full' | 'lightsOnly' | 'envOnly';
 }
 
 export interface VisualDebugControls {
@@ -35,7 +38,8 @@ const CONTROL_SPECS: ControlSpec[] = [
 
 export function createVisualDebugControls(
   initial: VisualControlState,
-  onChange: (state: VisualControlState) => void
+  onChange: (state: VisualControlState) => void,
+  onReset?: () => void
 ): VisualDebugControls {
   const state: VisualControlState = { ...initial };
   let pendingChange: number | undefined;
@@ -135,6 +139,110 @@ export function createVisualDebugControls(
   autoRotateRow.appendChild(autoRotateLabel);
   autoRotateRow.appendChild(autoRotateCheckbox);
   container.appendChild(autoRotateRow);
+
+  const qualityRow = document.createElement('div');
+  qualityRow.style.display = 'flex';
+  qualityRow.style.flexDirection = 'column';
+  qualityRow.style.marginBottom = '8px';
+
+  const qualityLabel = document.createElement('label');
+  qualityLabel.textContent = 'Quality level';
+  qualityLabel.style.marginBottom = '2px';
+
+  const qualitySelect = document.createElement('select');
+  ['ultra', 'medium', 'low'].forEach((level) => {
+    const opt = document.createElement('option');
+    opt.value = level;
+    opt.textContent = level;
+    qualitySelect.appendChild(opt);
+  });
+  qualitySelect.value = state.qualityLevel;
+  qualitySelect.addEventListener('change', () => {
+    const val = qualitySelect.value as VisualControlState['qualityLevel'];
+    state.qualityLevel = val;
+    onChange({ ...state });
+  });
+
+  qualityRow.appendChild(qualityLabel);
+  qualityRow.appendChild(qualitySelect);
+  container.appendChild(qualityRow);
+
+  const materialRow = document.createElement('div');
+  materialRow.style.display = 'flex';
+  materialRow.style.flexDirection = 'column';
+  materialRow.style.marginBottom = '8px';
+
+  const materialLabel = document.createElement('label');
+  materialLabel.textContent = 'Material debug';
+  materialLabel.style.marginBottom = '2px';
+
+  const materialSelect = document.createElement('select');
+  [
+    { value: 'none', label: 'None' },
+    { value: 'matcap', label: 'Matcap' },
+    { value: 'flat', label: 'Flat IDs' },
+  ].forEach((optDef) => {
+    const opt = document.createElement('option');
+    opt.value = optDef.value;
+    opt.textContent = optDef.label;
+    materialSelect.appendChild(opt);
+  });
+  materialSelect.value = state.materialDebugMode;
+  materialSelect.addEventListener('change', () => {
+    const val = materialSelect.value as VisualControlState['materialDebugMode'];
+    state.materialDebugMode = val;
+    onChange({ ...state });
+  });
+
+  materialRow.appendChild(materialLabel);
+  materialRow.appendChild(materialSelect);
+  container.appendChild(materialRow);
+
+  const envRow = document.createElement('div');
+  envRow.style.display = 'flex';
+  envRow.style.flexDirection = 'column';
+  envRow.style.marginBottom = '8px';
+
+  const envLabel = document.createElement('label');
+  envLabel.textContent = 'Lighting debug';
+  envLabel.style.marginBottom = '2px';
+
+  const envSelect = document.createElement('select');
+  [
+    { value: 'full', label: 'Full (env + lights)' },
+    { value: 'lightsOnly', label: 'Lights only' },
+    { value: 'envOnly', label: 'Env only' },
+  ].forEach((optDef) => {
+    const opt = document.createElement('option');
+    opt.value = optDef.value;
+    opt.textContent = optDef.label;
+    envSelect.appendChild(opt);
+  });
+  envSelect.value = state.envDebugMode;
+  envSelect.addEventListener('change', () => {
+    const val = envSelect.value as VisualControlState['envDebugMode'];
+    state.envDebugMode = val;
+    onChange({ ...state });
+  });
+
+  envRow.appendChild(envLabel);
+  envRow.appendChild(envSelect);
+  container.appendChild(envRow);
+
+  if (onReset) {
+    const resetBtn = document.createElement('button');
+    resetBtn.textContent = 'Reset lighting/materials';
+    resetBtn.style.width = '100%';
+    resetBtn.style.padding = '6px';
+    resetBtn.style.marginTop = '6px';
+    resetBtn.style.background = '#2d6bff';
+    resetBtn.style.color = '#fff';
+    resetBtn.style.border = 'none';
+    resetBtn.style.borderRadius = '6px';
+    resetBtn.style.cursor = 'pointer';
+    resetBtn.addEventListener('click', () => onReset());
+    container.appendChild(resetBtn);
+  }
 
   document.body.appendChild(container);
 

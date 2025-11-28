@@ -18,6 +18,9 @@ import {
   VisualDebugControls,
 } from './visualDebugControls';
 import { OrbitCameraController } from './orbitCamera';
+import { QualityLevel } from '../render/renderConfig';
+import { applyMaterialDebugMode, createMaterialsSnapshot, MaterialDebugMode } from '../render/materialDebug';
+import { deriveEnvOverrides, applyEnvDebugMode } from '../render/envDebug';
 
 type CameraMode = 'game' | 'inspect';
 
@@ -35,9 +38,12 @@ export function isVisualDebugModeEnabled(): boolean {
 }
 
 export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
-  let renderCtx = createRenderContext(canvas);
+  const qualityFromUrl = parseQualityFromUrl(window.location.search);
+  const renderOverrides: RenderConfigOverrides = qualityFromUrl ? { quality: { level: qualityFromUrl } } : {};
+  let renderCtx = createRenderContext(canvas, renderOverrides);
   let snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions);
   let controlState = configToControlState(renderCtx.renderConfig);
+  let materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
   const cameraOrientation = extractCameraOrientation(renderCtx.renderConfig);
   let cameraMode: CameraMode = 'game';
   let gameRotationAngle = 0;
@@ -72,6 +78,18 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   };
   const controls = createVisualDebugControls(controlState, (next) => {
     controlState = next;
+    if (controlState.materialDebugMode !== next.materialDebugMode) {
+      applyMaterialDebugMode(renderCtx.board, renderCtx.activePiece, next.materialDebugMode, materialsSnapshot);
+    }
+    if (controlState.envDebugMode !== next.envDebugMode) {
+      applyEnvDebugMode(renderCtx, next.envDebugMode);
+    }
+    pendingRebuild = true;
+  }, () => {
+    controlState = configToControlState(renderCtx.renderConfig);
+    controlState.materialDebugMode = 'none';
+    controlState.envDebugMode = 'full';
+    controlState.autoRotateEnabled = false;
     pendingRebuild = true;
   });
 
@@ -91,6 +109,9 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions);
     orbitControllerRef.current?.detach(canvas);
     createOrbit();
+    materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
+    applyMaterialDebugMode(renderCtx.board, renderCtx.activePiece, controlState.materialDebugMode, materialsSnapshot);
+    applyEnvDebugMode(renderCtx, controlState.envDebugMode);
     cameraMode = 'game';
     transitionCamera(renderCtx, renderCtx.cameraBasePlacement);
     logVisualParameters(renderCtx);
@@ -172,6 +193,9 @@ function configToControlState(config: RenderConfig): VisualControlState {
     hemisphereIntensity: config.lights.hemisphere.intensity,
     keyIntensity: config.lights.key.intensity,
     autoRotateEnabled: false,
+    qualityLevel: config.quality.level,
+    materialDebugMode: 'none',
+    envDebugMode: 'full',
   };
 }
 
@@ -216,6 +240,8 @@ function controlStateToOverrides(
       hemisphere: { intensity: state.hemisphereIntensity },
       key: { intensity: state.keyIntensity },
     },
+    quality: { level: state.qualityLevel as QualityLevel },
+    environment: deriveEnvOverrides(state.envDebugMode),
   };
 }
 
@@ -385,6 +411,15 @@ function createCloseupPlacement(ctx: RenderContext): { position: THREE.Vector3; 
 function computeMidHeight(dimensions: BoardDimensions, board: BoardRenderConfig): number {
   const towerHeight = (dimensions.height - 1) * board.verticalSpacing + board.blockSize;
   return towerHeight * 0.4;
+}
+
+function parseQualityFromUrl(search: string): QualityLevel | null {
+  const params = new URLSearchParams(search);
+  const raw = params.get('quality')?.toLowerCase();
+  if (raw === 'ultra' || raw === 'medium' || raw === 'low') {
+    return raw;
+  }
+  return null;
 }
 
 function logVisualParameters(ctx: RenderContext): void {

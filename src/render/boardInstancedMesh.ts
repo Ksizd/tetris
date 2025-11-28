@@ -4,6 +4,7 @@ import { BoardRenderConfig, createBoardRenderConfig } from './boardConfig';
 import { createMahjongMaterialMaps, createMahjongTileTexture } from './textures';
 import { applyMahjongUVLayout } from './uv';
 import { createBeveledBoxGeometry } from './beveledBoxGeometry';
+import { VISUAL_DEFAULTS } from './visualDefaults';
 
 export interface BoardInstancedResources {
   mesh: THREE.InstancedMesh;
@@ -35,23 +36,23 @@ export function createBoardInstancedMesh(
   const frontMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: tileTexture,
-    roughness: 0.22,
-    metalness: 0.04,
+    roughness: VISUAL_DEFAULTS.materials.front.roughness,
+    metalness: VISUAL_DEFAULTS.materials.front.metalness,
     roughnessMap,
     metalnessMap,
     aoMap,
-    envMapIntensity: 0.9,
+    envMapIntensity: VISUAL_DEFAULTS.materials.front.envMapIntensity,
   });
 
   const sideMaterial = new THREE.MeshStandardMaterial({
     color: 0xf2c14b,
     map: tileTexture,
-    roughness: 0.28,
-    metalness: 1.0,
+    roughness: VISUAL_DEFAULTS.materials.side.roughness,
+    metalness: VISUAL_DEFAULTS.materials.side.metalness,
     roughnessMap,
     metalnessMap,
     aoMap,
-    envMapIntensity: 1.8,
+    envMapIntensity: VISUAL_DEFAULTS.materials.side.envMapIntensity,
   });
 
   const capacity = dimensions.width * dimensions.height;
