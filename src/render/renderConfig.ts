@@ -47,8 +47,16 @@ export interface LightRigConfig {
   rim: DirectionalLightConfig;
 }
 
+export type ToneMappingMode = 'aces' | 'reinhard' | 'none';
+
+export interface ToneMappingConfig {
+  mode: ToneMappingMode;
+  exposure: number;
+}
+
 export interface PostProcessingConfig {
   bloom: boolean;
+  toneMapping: ToneMappingConfig;
 }
 
 export interface EnvironmentConfig {
@@ -77,7 +85,7 @@ export interface RenderConfigOverrides {
   camera?: Partial<CameraConfig>;
   cameraMotion?: Partial<CameraMotionConfig>;
   lights?: PartialLightRigConfig;
-  postProcessing?: Partial<PostProcessingConfig>;
+  postProcessing?: PostProcessingOverrides;
   environment?: Partial<EnvironmentConfig>;
 }
 
@@ -86,6 +94,11 @@ export interface PartialLightRigConfig {
   hemisphere?: Partial<HemisphereLightConfig>;
   key?: Partial<DirectionalLightConfig>;
   rim?: Partial<DirectionalLightConfig>;
+}
+
+export interface PostProcessingOverrides {
+  bloom?: boolean;
+  toneMapping?: Partial<ToneMappingConfig>;
 }
 
 export interface CameraMotionConfig {
@@ -171,6 +184,10 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
 
   const postProcessing: PostProcessingConfig = {
     bloom: overrides.postProcessing?.bloom ?? false,
+    toneMapping: {
+      mode: overrides.postProcessing?.toneMapping?.mode ?? 'aces',
+      exposure: overrides.postProcessing?.toneMapping?.exposure ?? 1.05,
+    },
   };
 
   const environment: EnvironmentConfig = {

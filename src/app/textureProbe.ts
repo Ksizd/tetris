@@ -3,8 +3,11 @@ import { createBoardRenderConfig } from '../render/boardConfig';
 import { createBeveledBoxGeometry } from '../render/beveledBoxGeometry';
 import { applyMahjongUVLayout } from '../render/uv';
 import { createMahjongMaterialMaps, createMahjongTileTexture } from '../render/textures';
+import { ToneMappingConfig } from '../render/renderConfig';
+import { createEnvironmentMap, EnvironmentConfig } from '../render/environmentMap';
 
 const QUERY_FLAG = 'textureProbe';
+const EXPOSURE_PRESETS = [1.0, 1.25, 1.5];
 
 export function isTextureProbeEnabled(): boolean {
   const params = new URLSearchParams(window.location.search);
@@ -38,43 +41,35 @@ export function startTextureProbe(canvas: HTMLCanvasElement): void {
   };
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  enforceColorPipeline(renderer);
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0f1016);
+  const envConfig: EnvironmentConfig = { enabled: true, useAsBackground: true, intensity: 1.1 };
+  const envResources = createEnvironmentMap(renderer, envConfig);
+  if (envResources) {
+    scene.environment = envResources.environmentMap;
+    if (envResources.backgroundTexture) {
+      scene.background = envResources.backgroundTexture;
+    }
+  }
 
   const camera = new THREE.PerspectiveCamera(35, getAspect(canvas), 0.1, 100);
   const target = new THREE.Vector3(0, 0, 0);
 
   const dims = { width: 12, height: 24 };
   const config = createBoardRenderConfig(dims);
-  const geometry = createBeveledBoxGeometry({
-    width: config.blockSize,
-    height: config.blockSize,
-    depth: config.blockDepth,
-    radius: config.edgeRadius,
-    smoothness: 3,
-  });
-  applyMahjongUVLayout(geometry);
+  buildExposureScene(scene, config);
 
-  const tileTexture = createMahjongTileTexture(1024);
-  const { roughnessMap, metalnessMap, aoMap } = createMahjongMaterialMaps(tileTexture.image.width ?? 1024);
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    map: tileTexture,
-    roughness: 1.0,
-    metalness: 1.0,
-    roughnessMap,
-    metalnessMap,
-    aoMap,
-    envMapIntensity: 1.1,
-  });
-
-  const cube = new THREE.Mesh(geometry, material);
-  cube.position.set(0, 0, 0);
-  scene.add(cube);
-
-  addLights(scene);
+  const toneMappingConfig: ToneMappingConfig = { mode: 'aces', exposure: EXPOSURE_PRESETS[2] };
+  applyToneMapping(renderer, toneMappingConfig);
+  const updateOverlay = createExposureOverlay(toneMappingConfig.exposure);
+  const updateExposure = (next: number) => {
+    toneMappingConfig.exposure = next;
+    applyToneMapping(renderer, toneMappingConfig);
+    updateOverlay(next);
+  };
+  setupExposureControls(updateExposure, toneMappingConfig.exposure);
 
   const orbit = createOrbitController({
     camera,
@@ -103,15 +98,6 @@ export function startTextureProbe(canvas: HTMLCanvasElement): void {
   });
 
   requestAnimationFrame(render);
-}
-
-function addLights(scene: THREE.Scene): void {
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x202020, 0.6);
-  scene.add(hemi);
-  const dir = new THREE.DirectionalLight(0xffffff, 1.0);
-  dir.position.set(4, 6, 3);
-  scene.add(dir);
 }
 
 function getAspect(canvas: HTMLCanvasElement): number {
@@ -187,4 +173,188 @@ function createOrbitController(options: OrbitOptions) {
   return {
     update: updateCamera,
   };
+}
+
+function enforceColorPipeline(renderer: THREE.WebGLRenderer): void {
+  THREE.ColorManagement.enabled = true;
+  THREE.ColorManagement.workingColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+}
+
+function applyToneMapping(renderer: THREE.WebGLRenderer, config: ToneMappingConfig): void {
+  const mode =
+    config.mode === 'aces'
+      ? THREE.ACESFilmicToneMapping
+      : config.mode === 'reinhard'
+      ? THREE.ReinhardToneMapping
+      : THREE.NoToneMapping;
+  renderer.toneMapping = mode;
+  renderer.toneMappingExposure = config.exposure;
+}
+
+function buildExposureScene(scene: THREE.Scene, config: ReturnType<typeof createBoardRenderConfig>): void {
+  const geometry = createBeveledBoxGeometry({
+    width: config.blockSize,
+    height: config.blockSize,
+    depth: config.blockDepth,
+    radius: config.edgeRadius,
+    smoothness: 3,
+  });
+  applyMahjongUVLayout(geometry);
+  tagFrontGroup(geometry);
+
+  const tileTexture = createMahjongTileTexture(1024);
+  const { roughnessMap, metalnessMap, aoMap } = createMahjongMaterialMaps(tileTexture.image.width ?? 1024);
+
+  const { frontMaterial, sideMaterial } = createProductionMaterials(tileTexture, {
+    roughnessMap,
+    metalnessMap,
+    aoMap,
+  });
+
+  const cube = new THREE.Mesh(geometry, [frontMaterial, sideMaterial]);
+  cube.position.set(0, config.blockSize * 0.5, 0);
+  cube.castShadow = false;
+  cube.receiveShadow = false;
+  cube.name = 'productionCube';
+
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(config.blockSize * 8, config.blockSize * 8),
+    new THREE.MeshStandardMaterial({
+      color: 0x101010,
+      metalness: 0,
+      roughness: 0.8,
+    })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0;
+  floor.receiveShadow = true;
+  floor.name = 'floor';
+
+  const ambient = new THREE.AmbientLight(0xfff7e8, 0.85);
+  scene.add(ambient);
+
+  const hemi = new THREE.HemisphereLight(0xfffbf2, 0x0b0c0e, 6.5);
+  scene.add(hemi);
+
+  const keyLight = new THREE.DirectionalLight(0xfff6dc, 8.5);
+  keyLight.position.set(12, 12, 8);
+  keyLight.target.position.set(0, 0, 0);
+  scene.add(keyLight);
+  scene.add(keyLight.target);
+
+  const overhead = new THREE.DirectionalLight(0xfff5d7, 6.0);
+  overhead.position.set(0, 15, 0);
+  overhead.target.position.set(0, 0, 0);
+  scene.add(overhead);
+  scene.add(overhead.target);
+
+  const rimLight = new THREE.DirectionalLight(0xcfe4ff, 4.5);
+  rimLight.position.set(-9, 9, -7);
+  rimLight.target.position.set(0, 0, 0);
+  scene.add(rimLight);
+  scene.add(rimLight.target);
+
+  const backLight = new THREE.DirectionalLight(0xeaf3ff, 5.5);
+  backLight.position.set(-12, 11, -10);
+  backLight.target.position.set(0, 0, 0);
+  scene.add(backLight);
+  scene.add(backLight.target);
+
+  const sideFill = new THREE.PointLight(0xfff2ce, 2.0, 35);
+  sideFill.position.set(-5, config.blockSize * 0.8, -3);
+  scene.add(sideFill);
+
+  const bounce = new THREE.PointLight(0xffd8a0, 3.0, 50);
+  bounce.position.set(0, config.blockSize * 0.6, 5);
+  scene.add(bounce);
+
+  scene.add(cube);
+  scene.add(floor);
+}
+
+function createProductionMaterials(
+  tileTexture: THREE.Texture,
+  maps: { roughnessMap: THREE.Texture; metalnessMap: THREE.Texture; aoMap: THREE.Texture }
+): { frontMaterial: THREE.MeshStandardMaterial; sideMaterial: THREE.MeshStandardMaterial } {
+  const frontMaterial = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: tileTexture,
+    roughness: 0.22,
+    metalness: 0.04,
+    roughnessMap: maps.roughnessMap,
+    metalnessMap: maps.metalnessMap,
+    aoMap: maps.aoMap,
+    envMapIntensity: 0.9,
+  });
+
+  const sideMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf2c14b,
+    map: tileTexture,
+    roughness: 0.28,
+    metalness: 1.0,
+    roughnessMap: maps.roughnessMap,
+    metalnessMap: maps.metalnessMap,
+    aoMap: maps.aoMap,
+    envMapIntensity: 1.8,
+  });
+
+  return { frontMaterial, sideMaterial };
+}
+
+function tagFrontGroup(geometry: THREE.BufferGeometry): void {
+  if (!geometry.groups.length) {
+    return;
+  }
+  const FRONT_GROUP_INDEX = 4; // BoxGeometry order: +X, -X, +Y, -Y, +Z, -Z
+  geometry.groups.forEach((group, idx) => {
+    // eslint-disable-next-line no-param-reassign
+    group.materialIndex = idx === FRONT_GROUP_INDEX ? 0 : 1;
+  });
+}
+
+function setupExposureControls(onChange: (value: number) => void, start: number): void {
+  let idx = Math.max(0, EXPOSURE_PRESETS.indexOf(start));
+  const clampIndex = () => Math.max(0, Math.min(EXPOSURE_PRESETS.length - 1, idx));
+  const apply = () => onChange(EXPOSURE_PRESETS[clampIndex()]);
+
+  function handleKey(ev: KeyboardEvent) {
+    if (ev.key === 'ArrowLeft') {
+      idx -= 1;
+      apply();
+    } else if (ev.key === 'ArrowRight') {
+      idx += 1;
+      apply();
+    } else if (ev.key >= '1' && ev.key <= String(EXPOSURE_PRESETS.length)) {
+      idx = Number(ev.key) - 1;
+      apply();
+    }
+  }
+
+  window.addEventListener('keydown', handleKey);
+  apply();
+}
+
+function createExposureOverlay(initial: number): (value: number) => void {
+  const overlay = document.createElement('div');
+  overlay.style.position = 'fixed';
+  overlay.style.top = '12px';
+  overlay.style.left = '12px';
+  overlay.style.padding = '10px 12px';
+  overlay.style.background = 'rgba(0, 0, 0, 0.65)';
+  overlay.style.color = '#f5f5f5';
+  overlay.style.fontFamily = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  overlay.style.fontSize = '12px';
+  overlay.style.borderRadius = '8px';
+  overlay.style.lineHeight = '1.5';
+  overlay.style.zIndex = '9999';
+  document.body.appendChild(overlay);
+
+  const update = (value: number) => {
+    overlay.textContent = `Exposure presets [1..${EXPOSURE_PRESETS.length}, ←/→]:
+${EXPOSURE_PRESETS.map((v) => `${v.toFixed(2)}${v === value ? ' ◀ current' : ''}`).join('  |  ')}`;
+  };
+
+  update(initial);
+  return update;
 }

@@ -33,26 +33,26 @@ export function createActivePieceInstancedMesh(
   const frontMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: tileTexture,
-    roughness: 0.25,
-    metalness: 0.05,
+    roughness: 0.22,
+    metalness: 0.04,
     roughnessMap,
     metalnessMap,
     aoMap,
     emissive: 0x221100,
     emissiveIntensity: 0.06,
-    envMapIntensity: 1.0,
+    envMapIntensity: 0.9,
   });
   const sideMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf3c15c,
+    color: 0xf2c14b,
     map: tileTexture,
-    roughness: 0.25,
+    roughness: 0.28,
     metalness: 1.0,
     roughnessMap,
     metalnessMap,
     aoMap,
     emissive: 0x331100,
     emissiveIntensity: 0.08,
-    envMapIntensity: 1.25,
+    envMapIntensity: 1.8,
   });
 
   const mesh = new THREE.InstancedMesh(geometry, [frontMaterial, sideMaterial], ACTIVE_PIECE_CAPACITY);

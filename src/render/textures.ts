@@ -2,8 +2,21 @@ import * as THREE from 'three';
 
 const DEFAULT_TILE_SIZE = 1024;
 const SYMBOL_COLOR = '#b3001b';
-const FRONT_COLOR = '#fdfdf8';
-const FRONT_BORDER_COLOR = '#e4e4dd';
+const FRONT_COLOR = '#f7f2e8'; // slightly warm white to avoid monitor-like pure white
+const FRONT_BORDER_COLOR = '#e6e0d5';
+const FRONT_NOISE_LEVEL = 3;
+const GOLD_BASE_COLOR = '#f2c14b';
+const GOLD_NOISE_LEVEL = 8; // subtle 2-3% brightness variation
+
+type RandomSource = () => number;
+
+function createSeededRandom(seed: number): RandomSource {
+  let state = seed >>> 0;
+  return () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0xffffffff;
+  };
+}
 
 // Inlined reference glyph (zhong.png) with transparent background; used as a mask and tinted to SYMBOL_COLOR.
 const GLYPH_DATA_URL =
@@ -75,6 +88,7 @@ export function createMahjongMaterialMaps(size = DEFAULT_TILE_SIZE): MahjongMate
   const aoCanvas = document.createElement('canvas');
   roughCanvas.width = metalCanvas.width = aoCanvas.width = size;
   roughCanvas.height = metalCanvas.height = aoCanvas.height = size;
+  const rand = createSeededRandom(20241201);
 
   const ctxOptions: CanvasRenderingContext2DSettings = { willReadFrequently: true };
   const roughCtx = roughCanvas.getContext('2d', ctxOptions);
@@ -103,13 +117,14 @@ export function createMahjongMaterialMaps(size = DEFAULT_TILE_SIZE): MahjongMate
   aoCtx.fillStyle = aoGrad;
   aoCtx.fillRect(0, 0, size, size);
 
-  addNoise(roughCtx, size, half, 3, 0);
-  addNoise(roughCtx, size, half, 3, half);
+  addNoise(roughCtx, size, half, 3, 0, rand);
+  addNoise(roughCtx, size, half, 3, half, rand);
 
   const roughnessMap = new THREE.CanvasTexture(roughCanvas);
   const metalnessMap = new THREE.CanvasTexture(metalCanvas);
   const aoMap = new THREE.CanvasTexture(aoCanvas);
   [roughnessMap, metalnessMap, aoMap].forEach((tex) => {
+    tex.colorSpace = THREE.NoColorSpace;
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
     tex.flipY = true;
@@ -127,6 +142,7 @@ function drawAtlas(ctx: CanvasRenderingContext2D, size: number, glyph: HTMLImage
 
 function drawFrontFace(ctx: CanvasRenderingContext2D, size: number, glyph: HTMLImageElement | null): void {
   const half = size / 2;
+  const rand = createSeededRandom(20241203);
   ctx.save();
   ctx.fillStyle = FRONT_COLOR;
   ctx.fillRect(0, 0, size, half);
@@ -137,7 +153,7 @@ function drawFrontFace(ctx: CanvasRenderingContext2D, size: number, glyph: HTMLI
 
   const faceGradient = ctx.createLinearGradient(0, inset, 0, inset + innerHeight);
   faceGradient.addColorStop(0, '#ffffff');
-  faceGradient.addColorStop(1, '#f3f3ed');
+  faceGradient.addColorStop(1, '#f1ece3');
   ctx.fillStyle = faceGradient;
   ctx.fillRect(inset, inset, innerWidth, innerHeight);
 
@@ -145,6 +161,7 @@ function drawFrontFace(ctx: CanvasRenderingContext2D, size: number, glyph: HTMLI
   ctx.lineWidth = size * 0.012;
   ctx.strokeRect(inset, inset, innerWidth, innerHeight);
 
+  addFrontNoise(ctx, size, half, rand);
   drawCenteredGlyph(ctx, size, half, glyph);
   ctx.restore();
 }
@@ -199,16 +216,17 @@ function drawCenteredGlyph(
 
 function drawSideFaces(ctx: CanvasRenderingContext2D, size: number): void {
   const half = size / 2;
+  const rand = createSeededRandom(20241205);
   ctx.save();
   ctx.translate(0, half);
 
   // Base gold tone
-  ctx.fillStyle = '#d7a239';
+  ctx.fillStyle = GOLD_BASE_COLOR;
   ctx.fillRect(0, 0, size, half);
 
   // Gentle vertical tint
   const softVertical = ctx.createLinearGradient(0, 0, 0, half);
-  softVertical.addColorStop(0, 'rgba(255, 220, 140, 0.12)');
+  softVertical.addColorStop(0, 'rgba(255, 225, 150, 0.12)');
   softVertical.addColorStop(1, 'rgba(120, 70, 20, 0.12)');
   ctx.fillStyle = softVertical;
   ctx.fillRect(0, 0, size, half);
@@ -220,7 +238,57 @@ function drawSideFaces(ctx: CanvasRenderingContext2D, size: number): void {
   ctx.fillStyle = radial;
   ctx.fillRect(0, 0, size, half);
 
+  addSideNoise(ctx, size, half, rand);
+
   ctx.restore();
+}
+
+function addFrontNoise(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  half: number,
+  random: RandomSource
+): void {
+  const imageData = ctx.getImageData(0, 0, size, half);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const base = (random() - 0.5) * FRONT_NOISE_LEVEL;
+    data[i] = clamp255(data[i] + base);
+    data[i + 1] = clamp255(data[i + 1] + base);
+    data[i + 2] = clamp255(data[i + 2] + base);
+
+    if (random() < 0.01) {
+      const speck = (random() - 0.5) * FRONT_NOISE_LEVEL * 1.8;
+      data[i] = clamp255(data[i] + speck);
+      data[i + 1] = clamp255(data[i + 1] + speck);
+      data[i + 2] = clamp255(data[i + 2] + speck);
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+function addSideNoise(
+  ctx: CanvasRenderingContext2D,
+  size: number,
+  half: number,
+  random: RandomSource
+): void {
+  const imageData = ctx.getImageData(0, half, size, half);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const base = (random() - 0.5) * GOLD_NOISE_LEVEL;
+    data[i] = clamp255(data[i] + base);
+    data[i + 1] = clamp255(data[i + 1] + base * 0.9);
+    data[i + 2] = clamp255(data[i + 2] + base * 0.6);
+
+    if (random() < 0.008) {
+      const streak = (random() - 0.5) * GOLD_NOISE_LEVEL * 1.6;
+      data[i] = clamp255(data[i] + streak);
+      data[i + 1] = clamp255(data[i + 1] + streak * 0.9);
+      data[i + 2] = clamp255(data[i + 2] + streak * 0.6);
+    }
+  }
+  ctx.putImageData(imageData, 0, half);
 }
 
 function getGlyphImage(): HTMLImageElement {
@@ -250,12 +318,13 @@ function addNoise(
   size: number,
   regionHeight: number,
   strength: number,
-  offsetY = 0
+  offsetY = 0,
+  random: RandomSource = Math.random
 ): void {
   const imageData = ctx.getImageData(0, offsetY, size, regionHeight);
   const data = imageData.data;
   for (let i = 0; i < data.length; i += 4) {
-    const n = (Math.random() - 0.5) * strength;
+    const n = (random() - 0.5) * strength;
     const v = data[i] + n;
     data[i] = data[i + 1] = data[i + 2] = clamp255(v);
   }

@@ -5,7 +5,13 @@ import { createBoardInstancedMesh } from './boardInstancedMesh';
 import { createActivePieceInstancedMesh } from './activePieceInstancedMesh';
 import { ActivePieceInstancedResources } from './activePieceInstancedMesh';
 import { BoardInstancedResources } from './boardInstancedMesh';
-import { createRenderConfig, LightRigConfig, RenderConfig, RenderConfigOverrides } from './renderConfig';
+import {
+  createRenderConfig,
+  LightRigConfig,
+  RenderConfig,
+  RenderConfigOverrides,
+  ToneMappingConfig,
+} from './renderConfig';
 import { computeTowerHeight, recomputeCameraPlacementForFrame } from './cameraSetup';
 import { createEnvironmentMap, EnvironmentMapResources } from './environmentMap';
 import { BoardRenderConfig } from './boardConfig';
@@ -22,6 +28,22 @@ export interface RenderContext {
   renderConfig: RenderConfig;
   cameraBasePlacement: { position: THREE.Vector3; target: THREE.Vector3 };
   environment?: EnvironmentMapResources | null;
+}
+
+function enforceColorPipeline(renderer: THREE.WebGLRenderer): void {
+  THREE.ColorManagement.enabled = true;
+  THREE.ColorManagement.workingColorSpace = THREE.LinearSRGBColorSpace;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+}
+
+function applyToneMapping(renderer: THREE.WebGLRenderer, config: ToneMappingConfig): void {
+  const mode = config.mode === 'aces'
+    ? THREE.ACESFilmicToneMapping
+    : config.mode === 'reinhard'
+    ? THREE.ReinhardToneMapping
+    : THREE.NoToneMapping;
+  renderer.toneMapping = mode;
+  renderer.toneMappingExposure = config.exposure;
 }
 
 /**
@@ -62,7 +84,8 @@ export function createRenderContext(
     powerPreference: 'high-performance',
   });
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  enforceColorPipeline(renderer);
+  applyToneMapping(renderer, renderConfig.postProcessing.toneMapping);
   renderer.shadowMap.enabled = false;
   const glctx = renderer.getContext();
   // We don't use 3D/array textures; skip texImage3D to avoid driver spam on flipY checks.
