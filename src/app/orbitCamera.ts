@@ -12,7 +12,6 @@ export interface OrbitCameraOptions {
   innerDistance?: number;
   minTargetY?: number;
   floorY?: number;
-  damping?: number;
 }
 
 interface PointerState {
@@ -28,16 +27,11 @@ export class OrbitCameraController {
   private radius: number;
   private theta: number;
   private phi: number;
-  private thetaVelocity = 0;
-  private phiVelocity = 0;
-  private radiusVelocity = 0;
-  private readonly damping: number;
   private readonly options: Required<OrbitCameraOptions>;
   private pointer: PointerState = { dragging: false, mode: 'rotate', lastX: 0, lastY: 0 };
   private readonly innerDistance: number;
   private readonly minTargetY: number;
   private readonly floorY: number;
-  private lastUpdate = performance.now();
   private readonly damping: number;
 
   constructor(camera: THREE.PerspectiveCamera, placement: CameraPlacement, opts: OrbitCameraOptions = {}) {
@@ -54,11 +48,10 @@ export class OrbitCameraController {
       maxDistance: opts.maxDistance ?? this.radius * 2.2,
       minPolarAngle: opts.minPolarAngle ?? THREE.MathUtils.degToRad(20),
       maxPolarAngle: opts.maxPolarAngle ?? THREE.MathUtils.degToRad(85),
-      rotateSpeed: opts.rotateSpeed ?? 0.003,
+      rotateSpeed: opts.rotateSpeed ?? 0.002,
       zoomSpeed: opts.zoomSpeed ?? 0.0025,
       panSpeed: opts.panSpeed ?? 0.005,
     };
-    this.damping = opts.damping ?? 0.9;
     this.innerDistance = opts.innerDistance ?? this.options.minDistance;
     this.minTargetY = opts.minTargetY ?? 0;
     this.floorY = opts.floorY ?? 0;
@@ -110,8 +103,8 @@ export class OrbitCameraController {
     this.pointer.lastY = ev.clientY;
 
     if (this.pointer.mode === 'rotate') {
-      this.thetaVelocity -= dx * this.options.rotateSpeed;
-      this.phiVelocity -= dy * this.options.rotateSpeed;
+      this.theta += dx * this.options.rotateSpeed;
+      this.phi += dy * this.options.rotateSpeed;
       this.clampAngles();
     } else {
       const panX = -dx * this.options.panSpeed;
@@ -132,7 +125,11 @@ export class OrbitCameraController {
 
   private onWheel = (ev: WheelEvent) => {
     const delta = ev.deltaY * this.options.zoomSpeed;
-    this.radiusVelocity += delta;
+    this.radius = THREE.MathUtils.clamp(
+      this.radius + delta,
+      Math.max(this.options.minDistance, this.innerDistance),
+      this.options.maxDistance
+    );
   };
 
   private clampAngles(): void {
@@ -145,25 +142,6 @@ export class OrbitCameraController {
   }
 
   private updateCamera(): void {
-    const now = performance.now();
-    const delta = Math.max(0, now - this.lastUpdate);
-    this.lastUpdate = now;
-    const dt = delta / 16.6667; // normalize to 60fps
-
-    this.theta += this.thetaVelocity * dt;
-    this.phi += this.phiVelocity * dt;
-    this.radius += this.radiusVelocity * dt;
-    this.thetaVelocity *= this.damping;
-    this.phiVelocity *= this.damping;
-    this.radiusVelocity *= this.damping;
-
-    this.radius = THREE.MathUtils.clamp(
-      this.radius,
-      Math.max(this.options.minDistance, this.innerDistance),
-      this.options.maxDistance
-    );
-    this.clampAngles();
-
     const sinPhi = Math.sin(this.phi);
     const cosPhi = Math.cos(this.phi);
     const sinTheta = Math.sin(this.theta);
