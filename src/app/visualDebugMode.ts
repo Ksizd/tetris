@@ -17,8 +17,15 @@ import {
   VisualControlState,
   VisualDebugControls,
 } from './visualDebugControls';
+import { OrbitCameraController } from './orbitCamera';
+
+type CameraMode = 'game' | 'inspect';
 
 const QUERY_FLAG = 'visualDebug';
+const CAMERA_TOGGLE_KEY = 'c';
+const TRANSITION_DURATION_MS = 450;
+const GAME_MODE_ROTATION_LIMIT = THREE.MathUtils.degToRad(6);
+const GAME_MODE_ROTATION_SPEED = 0.00035;
 
 export function isVisualDebugModeEnabled(): boolean {
   const params = new URLSearchParams(window.location.search);
@@ -31,6 +38,37 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   let snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions);
   let controlState = configToControlState(renderCtx.renderConfig);
   const cameraOrientation = extractCameraOrientation(renderCtx.renderConfig);
+  let cameraMode: CameraMode = 'game';
+  let gameRotationAngle = 0;
+  let lastFrameTime = performance.now();
+  const orbitControllerRef: { current: OrbitCameraController | null } = { current: null };
+  const createOrbit = (placement = renderCtx.cameraBasePlacement) => {
+    const ctrl = new OrbitCameraController(renderCtx.camera, placement, {
+      minDistance: renderCtx.renderConfig.board.towerRadius * 1.25,
+      innerDistance: renderCtx.renderConfig.board.towerRadius + renderCtx.renderConfig.board.blockSize * 0.6,
+      maxDistance: renderCtx.renderConfig.board.towerRadius * 3.2,
+      minPolarAngle: THREE.MathUtils.degToRad(18),
+      maxPolarAngle: THREE.MathUtils.degToRad(82),
+      minTargetY: renderCtx.renderConfig.board.blockSize * 0.4,
+      floorY: 0,
+    });
+    ctrl.attach(canvas);
+    orbitControllerRef.current = ctrl;
+  };
+  createOrbit();
+  const switchToGame = () => {
+    cameraMode = 'game';
+    orbitControllerRef.current?.detach(canvas);
+    orbitControllerRef.current = null;
+    transitionCamera(renderCtx, renderCtx.cameraBasePlacement);
+  };
+
+  const switchToInspect = () => {
+    cameraMode = 'inspect';
+    const placement = orbitControllerRef.current?.getPlacement() ?? renderCtx.cameraBasePlacement;
+    orbitControllerRef.current?.detach(canvas);
+    createOrbit(placement);
+  };
   const controls = createVisualDebugControls(controlState, (next) => {
     controlState = next;
     pendingRebuild = true;
@@ -50,13 +88,23 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     const overrides = controlStateToOverrides(controlState, cameraOrientation);
     renderCtx = createRenderContext(canvas, overrides);
     snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions);
+    orbitControllerRef.current?.detach(canvas);
+    createOrbit();
+    cameraMode = 'game';
+    transitionCamera(renderCtx, renderCtx.cameraBasePlacement);
     logVisualParameters(renderCtx);
   }
 
   function loop() {
     rebuildContextIfNeeded();
+    const now = performance.now();
+    const dt = Math.max(0, now - lastFrameTime);
+    lastFrameTime = now;
     renderScene(renderCtx, snapshot);
-    updateCameraMotion(renderCtx, performance.now());
+    applyCameraMode(renderCtx, cameraMode, orbitControllerRef, dt, controlState.autoRotateEnabled, () => {
+      gameRotationAngle += GAME_MODE_ROTATION_SPEED * dt;
+      return gameRotationAngle;
+    });
     renderCtx.renderer.render(renderCtx.scene, renderCtx.camera);
     requestAnimationFrame(loop);
   }
@@ -68,6 +116,14 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   });
 
   attachControlsDisposalOnUnload(controls);
+  attachOrbitDisposalOnUnload(orbitControllerRef, canvas);
+  attachCameraModeToggle(() => {
+    if (cameraMode === 'game') {
+      switchToInspect();
+    } else {
+      switchToGame();
+    }
+  });
 }
 
 function createStaticSnapshot(dimensions: BoardDimensions): GameState {
@@ -110,6 +166,7 @@ function configToControlState(config: RenderConfig): VisualControlState {
     ambientIntensity: config.lights.ambient.intensity,
     hemisphereIntensity: config.lights.hemisphere.intensity,
     keyIntensity: config.lights.key.intensity,
+    autoRotateEnabled: false,
   };
 }
 
@@ -198,6 +255,93 @@ function attachControlsDisposalOnUnload(controls: VisualDebugControls): void {
     },
     { once: true }
   );
+}
+
+function attachOrbitDisposalOnUnload(
+  ref: { current: OrbitCameraController | null },
+  canvas: HTMLCanvasElement
+): void {
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      ref.current?.detach(canvas);
+    },
+    { once: true }
+  );
+}
+
+function attachCameraModeToggle(onToggle: () => void): void {
+  const handler = (ev: KeyboardEvent) => {
+    if (ev.key.toLowerCase() === CAMERA_TOGGLE_KEY) {
+      onToggle();
+    }
+  };
+  window.addEventListener('keydown', handler);
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      window.removeEventListener('keydown', handler);
+    },
+    { once: true }
+  );
+}
+
+function applyCameraPlacement(ctx: RenderContext, placement: { position: THREE.Vector3; target: THREE.Vector3 }): void {
+  ctx.camera.position.copy(placement.position);
+  ctx.camera.lookAt(placement.target);
+  ctx.renderConfig.camera.position.copy(placement.position);
+  ctx.renderConfig.camera.target.copy(placement.target);
+}
+
+function transitionCamera(
+  ctx: RenderContext,
+  targetPlacement: { position: THREE.Vector3; target: THREE.Vector3 }
+): void {
+  const startPos = ctx.camera.position.clone();
+  const startTarget = ctx.renderConfig.camera.target.clone();
+  const endPos = targetPlacement.position.clone();
+  const endTarget = targetPlacement.target.clone();
+  const startTime = performance.now();
+
+  function step() {
+    const t = Math.min(1, (performance.now() - startTime) / TRANSITION_DURATION_MS);
+    const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // easeInOutQuad
+    ctx.camera.position.lerpVectors(startPos, endPos, eased);
+    const nextTarget = startTarget.clone().lerp(endTarget, eased);
+    ctx.camera.lookAt(nextTarget);
+    ctx.renderConfig.camera.position.copy(ctx.camera.position);
+    ctx.renderConfig.camera.target.copy(nextTarget);
+    if (t < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+
+  step();
+}
+
+function applyCameraMode(
+  ctx: RenderContext,
+  mode: CameraMode,
+  orbitRef: { current: OrbitCameraController | null },
+  dtMs: number,
+  autoRotateEnabled: boolean,
+  nextAngle: () => number
+): void {
+  if (mode === 'inspect') {
+    orbitRef.current?.update();
+    return;
+  }
+  const offset = autoRotateEnabled ? nextAngle() : 0;
+  const base = ctx.cameraBasePlacement;
+  const rotated = new THREE.Vector3(
+    base.position.x * Math.cos(offset) - base.position.z * Math.sin(offset),
+    base.position.y,
+    base.position.x * Math.sin(offset) + base.position.z * Math.cos(offset)
+  );
+  ctx.camera.position.copy(rotated);
+  ctx.camera.lookAt(base.target);
+  ctx.renderConfig.camera.position.copy(rotated);
+  ctx.renderConfig.camera.target.copy(base.target);
 }
 
 function logVisualParameters(ctx: RenderContext): void {

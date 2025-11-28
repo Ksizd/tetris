@@ -6,6 +6,7 @@ export interface VisualControlState {
   ambientIntensity: number;
   hemisphereIntensity: number;
   keyIntensity: number;
+  autoRotateEnabled: boolean;
 }
 
 export interface VisualDebugControls {
@@ -113,6 +114,27 @@ export function createVisualDebugControls(
     row.appendChild(inputWrapper);
     container.appendChild(row);
   });
+
+  const autoRotateRow = document.createElement('div');
+  autoRotateRow.style.display = 'flex';
+  autoRotateRow.style.alignItems = 'center';
+  autoRotateRow.style.marginBottom = '8px';
+
+  const autoRotateLabel = document.createElement('label');
+  autoRotateLabel.textContent = 'Auto-rotate (game view)';
+  autoRotateLabel.style.flex = '1';
+
+  const autoRotateCheckbox = document.createElement('input');
+  autoRotateCheckbox.type = 'checkbox';
+  autoRotateCheckbox.checked = Boolean(state.autoRotateEnabled);
+  autoRotateCheckbox.addEventListener('change', () => {
+    state.autoRotateEnabled = autoRotateCheckbox.checked;
+    onChange({ ...state });
+  });
+
+  autoRotateRow.appendChild(autoRotateLabel);
+  autoRotateRow.appendChild(autoRotateCheckbox);
+  container.appendChild(autoRotateRow);
 
   document.body.appendChild(container);
 

@@ -111,6 +111,9 @@ export function createRenderContext(
   const activePieceInstanced = createActivePieceInstancedMesh(renderConfig.board);
   scene.add(activePieceInstanced.mesh);
 
+  const shadowCatcher = createShadowCatcher(renderConfig.board);
+  scene.add(shadowCatcher);
+
   return {
     scene,
     camera,
@@ -188,6 +191,30 @@ function addLighting(
   }
   rim.castShadow = Boolean(config.rim.castShadow);
   scene.add(rim);
+
+  if (config.fill) {
+    const fill = new THREE.DirectionalLight(config.fill.color, config.fill.intensity);
+    fill.position.copy(config.fill.position);
+    if (config.fill.target) {
+      fill.target.position.copy(config.fill.target);
+      scene.add(fill.target);
+    }
+    fill.castShadow = Boolean(config.fill.castShadow);
+    scene.add(fill);
+  }
+}
+
+function createShadowCatcher(boardConfig: BoardRenderConfig): THREE.Mesh {
+  const radius = boardConfig.towerRadius * 1.6;
+  const geometry = new THREE.CircleGeometry(radius, 48);
+  const material = new THREE.ShadowMaterial({ opacity: 0.35 });
+  const catcher = new THREE.Mesh(geometry, material);
+  catcher.rotation.x = -Math.PI / 2;
+  catcher.position.y = 0.005;
+  catcher.receiveShadow = true;
+  catcher.castShadow = false;
+  catcher.name = 'shadowCatcher';
+  return catcher;
 }
 
 export function resizeRenderer(ctx: RenderContext, width: number, height: number): void {

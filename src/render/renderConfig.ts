@@ -2,7 +2,13 @@ import * as THREE from 'three';
 import { DEFAULT_BOARD_DIMENSIONS } from '../core/constants';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig, createBoardRenderConfig } from './boardConfig';
-import { computeCameraPlacement, DEFAULT_CAMERA_FOV } from './cameraSetup';
+import {
+  computeCameraPlacement,
+  DEFAULT_CAMERA_FOV,
+  DEFAULT_CAMERA_ANGLE,
+  DEFAULT_CAMERA_HEIGHT_RATIO,
+  DEFAULT_TARGET_HEIGHT_RATIO,
+} from './cameraSetup';
 
 export interface CameraConfig {
   fov: number;
@@ -45,6 +51,7 @@ export interface LightRigConfig {
   hemisphere: HemisphereLightConfig;
   key: DirectionalLightConfig;
   rim: DirectionalLightConfig;
+  fill?: DirectionalLightConfig;
 }
 
 export type ToneMappingMode = 'aces' | 'reinhard' | 'none';
@@ -94,6 +101,7 @@ export interface PartialLightRigConfig {
   hemisphere?: Partial<HemisphereLightConfig>;
   key?: Partial<DirectionalLightConfig>;
   rim?: Partial<DirectionalLightConfig>;
+  fill?: Partial<DirectionalLightConfig>;
 }
 
 export interface PostProcessingOverrides {
@@ -121,7 +129,12 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
   const board = createBoardRenderConfig(boardDimensions, overrides.board);
 
   const cameraFov = normalizeFov(overrides.camera?.fov ?? DEFAULT_CAMERA_FOV);
-  const computedPlacement = computeCameraPlacement(boardDimensions, board, { fovDeg: cameraFov });
+  const computedPlacement = computeCameraPlacement(boardDimensions, board, {
+    fovDeg: cameraFov,
+    angleRadians: DEFAULT_CAMERA_ANGLE,
+    cameraHeightRatio: DEFAULT_CAMERA_HEIGHT_RATIO,
+    targetHeightRatio: DEFAULT_TARGET_HEIGHT_RATIO,
+  });
   const cameraPosition = overrides.camera?.position ?? computedPlacement.position;
   const cameraTarget = overrides.camera?.target ?? computedPlacement.target;
   const camera: CameraConfig = {
@@ -192,8 +205,8 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
 
   const environment: EnvironmentConfig = {
     enabled: overrides.environment?.enabled ?? true,
-    useAsBackground: overrides.environment?.useAsBackground ?? false,
-    intensity: overrides.environment?.intensity ?? 1.1,
+    useAsBackground: overrides.environment?.useAsBackground ?? true,
+    intensity: overrides.environment?.intensity ?? 1.25,
   };
 
   return {
@@ -208,8 +221,10 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
 }
 
 function createDefaultLights(camera: CameraConfig): LightRigConfig {
-  const keyPosition = camera.position.clone().multiply(DEFAULT_KEY_LIGHT_MULTIPLIER);
-  const rimPosition = camera.position.clone().multiply(new THREE.Vector3(-0.55, 0.4, -0.55));
+  const keyPosition = camera.position
+    .clone()
+    .multiply(new THREE.Vector3(0.32, 0.95, 0.38)); // slightly higher/front-side
+  const rimPosition = camera.position.clone().multiply(new THREE.Vector3(-0.8, 0.9, -0.8));
   return {
     hemisphere: {
       skyColor: 0xfff8e1,
@@ -221,25 +236,33 @@ function createDefaultLights(camera: CameraConfig): LightRigConfig {
       intensity: 0.22,
     },
     key: {
-      color: 0xfff3cc,
-      intensity: 1.05,
+      color: 0xffefdb,
+      intensity: 2.1,
       position: keyPosition,
       target: camera.target.clone(),
       castShadow: true,
       shadow: {
-        mapSize: 2048,
-        radius: 1.8,
-        bias: -0.00022,
-        normalBias: 0.018,
+        mapSize: 4096,
+        radius: 2.4,
+        bias: -0.00018,
+        normalBias: 0.012,
         cameraNear: 0.6,
         cameraFar: 60,
         cameraMargin: 3.5,
       },
     },
     rim: {
-      color: 0xbad7ff,
-      intensity: 0.38,
+      color: 0xb7d5ff,
+      intensity: 0.6,
       position: rimPosition,
+      target: camera.target.clone(),
+      castShadow: false,
+      shadow: undefined,
+    },
+    fill: {
+      color: 0xe5ecfa,
+      intensity: 0.65,
+      position: camera.target.clone().add(new THREE.Vector3(-2.5, 1.2, -3.5)),
       target: camera.target.clone(),
       castShadow: false,
       shadow: undefined,
