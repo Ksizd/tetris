@@ -33,10 +33,17 @@ export interface LightRigConfig {
   ambient: AmbientLightConfig;
   hemisphere: HemisphereLightConfig;
   key: DirectionalLightConfig;
+  rim: DirectionalLightConfig;
 }
 
 export interface PostProcessingConfig {
   bloom: boolean;
+}
+
+export interface EnvironmentConfig {
+  enabled: boolean;
+  useAsBackground: boolean;
+  intensity: number;
 }
 
 export interface RenderConfig {
@@ -46,6 +53,7 @@ export interface RenderConfig {
   cameraMotion: CameraMotionConfig;
   lights: LightRigConfig;
   postProcessing: PostProcessingConfig;
+  environment: EnvironmentConfig;
 }
 
 export interface RenderConfigOverrides {
@@ -59,12 +67,14 @@ export interface RenderConfigOverrides {
   cameraMotion?: Partial<CameraMotionConfig>;
   lights?: PartialLightRigConfig;
   postProcessing?: Partial<PostProcessingConfig>;
+  environment?: Partial<EnvironmentConfig>;
 }
 
 export interface PartialLightRigConfig {
   ambient?: Partial<AmbientLightConfig>;
   hemisphere?: Partial<HemisphereLightConfig>;
   key?: Partial<DirectionalLightConfig>;
+  rim?: Partial<DirectionalLightConfig>;
 }
 
 export interface CameraMotionConfig {
@@ -123,10 +133,23 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
       target: (overrides.lights?.key?.target ?? defaultLights.key.target)?.clone(),
       castShadow: overrides.lights?.key?.castShadow ?? defaultLights.key.castShadow,
     },
+    rim: {
+      color: overrides.lights?.rim?.color ?? defaultLights.rim.color,
+      intensity: overrides.lights?.rim?.intensity ?? defaultLights.rim.intensity,
+      position: (overrides.lights?.rim?.position ?? defaultLights.rim.position).clone(),
+      target: (overrides.lights?.rim?.target ?? defaultLights.rim.target)?.clone(),
+      castShadow: overrides.lights?.rim?.castShadow ?? defaultLights.rim.castShadow,
+    },
   };
 
   const postProcessing: PostProcessingConfig = {
     bloom: overrides.postProcessing?.bloom ?? false,
+  };
+
+  const environment: EnvironmentConfig = {
+    enabled: overrides.environment?.enabled ?? true,
+    useAsBackground: overrides.environment?.useAsBackground ?? false,
+    intensity: overrides.environment?.intensity ?? 1.1,
   };
 
   return {
@@ -136,11 +159,13 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
     cameraMotion,
     lights,
     postProcessing,
+    environment,
   };
 }
 
 function createDefaultLights(camera: CameraConfig): LightRigConfig {
   const keyPosition = camera.position.clone().multiply(DEFAULT_KEY_LIGHT_MULTIPLIER);
+  const rimPosition = camera.position.clone().multiply(new THREE.Vector3(-0.55, 0.4, -0.55));
   return {
     hemisphere: {
       skyColor: 0xfff8e1,
@@ -149,12 +174,19 @@ function createDefaultLights(camera: CameraConfig): LightRigConfig {
     },
     ambient: {
       color: 0xffffff,
-      intensity: 0.25,
+      intensity: 0.22,
     },
     key: {
       color: 0xfff3cc,
-      intensity: 0.9,
+      intensity: 1.0,
       position: keyPosition,
+      target: camera.target.clone(),
+      castShadow: false,
+    },
+    rim: {
+      color: 0xbad7ff,
+      intensity: 0.38,
+      position: rimPosition,
       target: camera.target.clone(),
       castShadow: false,
     },

@@ -5,14 +5,15 @@ export interface BoardRenderConfig {
   blockDepth: number;
   towerRadius: number;
   verticalSpacing: number;
+  verticalGap: number;
   circumferentialGap: number;
   edgeRadius: number;
 }
 
 export const DEFAULT_BLOCK_SIZE = 1;
-export const DEFAULT_VERTICAL_SPACING = DEFAULT_BLOCK_SIZE;
+export const DEFAULT_VERTICAL_GAP_RATIO = 0.06;
 export const DEFAULT_BLOCK_DEPTH_RATIO = 0.9;
-export const DEFAULT_CIRCUMFERENTIAL_GAP_RATIO = 0.03;
+export const DEFAULT_CIRCUMFERENTIAL_GAP_RATIO = 0.05;
 export const DEFAULT_EDGE_RADIUS_RATIO = 0.08;
 
 export function calculateTowerRadius(
@@ -35,7 +36,7 @@ export function calculateTowerRadius(
 
 /**
  * Builds a normalized render config with defaults and validation for block size, radius and spacing.
- * verticalSpacing defaults to blockSize as per plan 7.1.2.
+ * verticalSpacing defaults to blockSize + verticalGap to create thin seams per plan 11x.7.2.
  */
 export function createBoardRenderConfig(
   dimensions: BoardDimensions,
@@ -55,9 +56,17 @@ export function createBoardRenderConfig(
     throw new Error('blockDepth must be positive');
   }
 
-  const verticalSpacing = overrides?.verticalSpacing ?? blockSize;
-  if (verticalSpacing <= 0) {
+  const verticalGap = overrides?.verticalGap ?? blockSize * DEFAULT_VERTICAL_GAP_RATIO;
+  if (verticalGap < 0) {
+    throw new Error('verticalGap must be non-negative');
+  }
+
+  const verticalSpacingCandidate = overrides?.verticalSpacing ?? blockSize + verticalGap;
+  if (verticalSpacingCandidate <= 0) {
     throw new Error('verticalSpacing must be positive');
+  }
+  if (verticalSpacingCandidate < blockSize) {
+    throw new Error('verticalSpacing must be at least the blockSize to avoid inverted gaps');
   }
 
   const circumferentialGap =
@@ -83,7 +92,8 @@ export function createBoardRenderConfig(
     blockSize,
     blockDepth,
     towerRadius,
-    verticalSpacing,
+    verticalSpacing: verticalSpacingCandidate,
+    verticalGap: Math.max(0, verticalSpacingCandidate - blockSize),
     circumferentialGap,
     edgeRadius: Math.min(edgeRadius, maxEdgeRadius),
   };

@@ -163,6 +163,7 @@ function disposeRenderResources(ctx: RenderContext): void {
   ctx.activePiece.geometry.dispose();
   disposeMaterials(ctx.activePiece.material);
   disposeMeshes(ctx.boardPlaceholder);
+  ctx.environment?.dispose();
   ctx.renderer.dispose();
 }
 
@@ -220,6 +221,11 @@ function logVisualParameters(ctx: RenderContext): void {
       ...lights.key,
       position: lights.key.position.toArray(),
       target: lights.key.target?.toArray(),
+    },
+    rim: {
+      ...lights.rim,
+      position: lights.rim.position.toArray(),
+      target: lights.rim.target?.toArray(),
     },
   });
   console.log('postProcessing', postProcessing);

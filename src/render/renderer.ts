@@ -7,6 +7,7 @@ import { ActivePieceInstancedResources } from './activePieceInstancedMesh';
 import { BoardInstancedResources } from './boardInstancedMesh';
 import { createRenderConfig, LightRigConfig, RenderConfig, RenderConfigOverrides } from './renderConfig';
 import { recomputeCameraPlacementForFrame } from './cameraSetup';
+import { createEnvironmentMap, EnvironmentMapResources } from './environmentMap';
 
 export interface RenderContext {
   scene: THREE.Scene;
@@ -18,6 +19,7 @@ export interface RenderContext {
   mapper: BoardToWorldMapper;
   renderConfig: RenderConfig;
   cameraBasePlacement: { position: THREE.Vector3; target: THREE.Vector3 };
+  environment?: EnvironmentMapResources | null;
 }
 
 /**
@@ -67,6 +69,13 @@ export function createRenderContext(
   };
 
   addLighting(scene, renderConfig.lights);
+  const environment = createEnvironmentMap(renderer, renderConfig.environment);
+  if (environment) {
+    scene.environment = environment.environmentMap;
+    if (renderConfig.environment.useAsBackground && environment.backgroundTexture) {
+      scene.background = environment.backgroundTexture;
+    }
+  }
 
   const placeholder = createBoardPlaceholder(renderConfig.boardDimensions, renderConfig.board);
   scene.add(placeholder.group);
@@ -90,6 +99,7 @@ export function createRenderContext(
       position: renderConfig.camera.position.clone(),
       target: renderConfig.camera.target.clone(),
     },
+    environment,
   };
 }
 
@@ -113,6 +123,15 @@ function addLighting(scene: THREE.Scene, config: LightRigConfig): void {
   }
   key.castShadow = Boolean(config.key.castShadow);
   scene.add(key);
+
+  const rim = new THREE.DirectionalLight(config.rim.color, config.rim.intensity);
+  rim.position.copy(config.rim.position);
+  if (config.rim.target) {
+    rim.target.position.copy(config.rim.target);
+    scene.add(rim.target);
+  }
+  rim.castShadow = Boolean(config.rim.castShadow);
+  scene.add(rim);
 }
 
 export function resizeRenderer(ctx: RenderContext, width: number, height: number): void {

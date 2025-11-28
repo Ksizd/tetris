@@ -10,3 +10,4 @@ export * from './activePieceRenderer';
 export * from './sceneRenderer';
 export * from './renderConfig';
 export * from './cameraMotion';
+export * from './environmentMap';
