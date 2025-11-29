@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { BoardToWorldMapper } from './boardToWorldMapper';
-import { createBoardPlaceholder } from './boardPlaceholder';
 import { createBoardInstancedMesh } from './boardInstancedMesh';
 import { createActivePieceInstancedMesh } from './activePieceInstancedMesh';
 import { ActivePieceInstancedResources } from './activePieceInstancedMesh';
@@ -13,7 +12,7 @@ import {
   ToneMappingConfig,
   RingLightBandConfig,
 } from './renderConfig';
-import { computeTowerHeight, recomputeCameraPlacementForFrame } from './cameraSetup';
+import { computeTowerHeight, computeGameCameraPose } from './cameraSetup';
 import { createEnvironmentMap, EnvironmentMapResources } from './environmentMap';
 import { BoardRenderConfig } from './boardConfig';
 import { BoardDimensions } from '../core/types';
@@ -22,6 +21,8 @@ import {
   createPostProcessingContext,
   resizePostProcessing,
 } from './postProcessing';
+import { getTowerBounds } from './towerBounds';
+import { createDebugOverlays } from './debugOverlays';
 
 export interface RenderContext {
   scene: THREE.Scene;
@@ -62,7 +63,8 @@ export function createRenderContext(
   overrides?: RenderConfigOverrides
 ): RenderContext {
   const scene = new THREE.Scene();
-  const renderConfig = createRenderConfig(overrides);
+  const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
+  const renderConfig = createRenderConfig(overrides, aspect);
   const mapper = new BoardToWorldMapper(renderConfig.boardDimensions, renderConfig.board);
 
   scene.background = new THREE.Color(0x000000);
@@ -125,8 +127,12 @@ export function createRenderContext(
     }
   }
 
-  const placeholder = createBoardPlaceholder(renderConfig.boardDimensions, renderConfig.board);
-  scene.add(placeholder.group);
+  const debugOverlays = createDebugOverlays({
+    dimensions: renderConfig.boardDimensions,
+    board: renderConfig.board,
+    renderMode: renderConfig.renderMode,
+  });
+  scene.add(debugOverlays.group);
 
   const boardInstanced = createBoardInstancedMesh(
     renderConfig.boardDimensions,
@@ -150,7 +156,7 @@ export function createRenderContext(
     scene,
     camera,
     renderer,
-    boardPlaceholder: placeholder.group,
+    boardPlaceholder: debugOverlays.group,
     board: boardInstanced,
     activePiece: activePieceInstanced,
     mapper,
@@ -400,18 +406,14 @@ export function resizeRenderer(ctx: RenderContext, width: number, height: number
   ctx.camera.aspect = width / height;
   ctx.camera.updateProjectionMatrix();
 
-  const adjustedPlacement = recomputeCameraPlacementForFrame(
-    ctx.renderConfig.boardDimensions,
-    ctx.renderConfig.board,
-    ctx.renderConfig.camera,
-    ctx.renderConfig.camera.fov
-  );
-  ctx.camera.position.copy(adjustedPlacement.position);
-  ctx.camera.lookAt(adjustedPlacement.target);
-  ctx.renderConfig.camera.position.copy(adjustedPlacement.position);
-  ctx.renderConfig.camera.target.copy(adjustedPlacement.target);
-  ctx.cameraBasePlacement.position.copy(adjustedPlacement.position);
-  ctx.cameraBasePlacement.target.copy(adjustedPlacement.target);
+  const bounds = getTowerBounds(ctx.renderConfig.boardDimensions, ctx.renderConfig.board);
+  const pose = computeGameCameraPose(bounds, ctx.camera.aspect, { fovDeg: ctx.renderConfig.camera.fov });
+  ctx.camera.position.copy(pose.position);
+  ctx.camera.lookAt(pose.target);
+  ctx.renderConfig.camera.position.copy(pose.position);
+  ctx.renderConfig.camera.target.copy(pose.target);
+  ctx.cameraBasePlacement.position.copy(pose.position);
+  ctx.cameraBasePlacement.target.copy(pose.target);
 
   resizePostProcessing(ctx.post, width, height);
 }
@@ -422,4 +424,17 @@ export function renderFrame(ctx: RenderContext, deltaMs?: number): void {
   } else {
     ctx.renderer.render(ctx.scene, ctx.camera);
   }
+}
+
+export function updateDebugOverlays(ctx: RenderContext): void {
+  if (ctx.boardPlaceholder.parent) {
+    ctx.boardPlaceholder.parent.remove(ctx.boardPlaceholder);
+  }
+  const overlays = createDebugOverlays({
+    dimensions: ctx.renderConfig.boardDimensions,
+    board: ctx.renderConfig.board,
+    renderMode: ctx.renderConfig.renderMode,
+  });
+  ctx.boardPlaceholder = overlays.group;
+  ctx.scene.add(overlays.group);
 }

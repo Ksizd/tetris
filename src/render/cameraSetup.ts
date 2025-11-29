@@ -1,16 +1,36 @@
 import * as THREE from 'three';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig } from './boardConfig';
+import { TowerBounds } from './towerBounds';
 
 export interface CameraPlacement {
   position: THREE.Vector3;
   target: THREE.Vector3;
 }
 
+export interface BoundingSphere {
+  center: THREE.Vector3;
+  radius: number;
+}
+
 export const DEFAULT_CAMERA_FOV = 36;
 export const DEFAULT_CAMERA_ANGLE = (Math.PI / 4) * -1; // -45 deg
 export const DEFAULT_CAMERA_HEIGHT_RATIO = 0.58;
 export const DEFAULT_TARGET_HEIGHT_RATIO = 0.5;
+
+export interface GameCameraPose {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  fov: number;
+}
+
+export interface GameCameraPoseOptions {
+  fovDeg?: number;
+  azimuthRadians?: number;
+  elevationDeg?: number;
+  targetHeightBias?: number;
+  radiusMarginRatio?: number;
+}
 
 export interface CameraSetupOptions {
   angleRadians?: number; // around Y
@@ -22,6 +42,71 @@ export interface CameraSetupOptions {
 
 export function computeTowerHeight(dimensions: BoardDimensions, config: BoardRenderConfig): number {
   return (dimensions.height - 1) * config.verticalSpacing + config.blockSize;
+}
+
+export function computeTowerBoundingSphere(bounds: TowerBounds): BoundingSphere {
+  const height = Math.max(0, bounds.maxY - bounds.minY);
+  const centerY = bounds.minY + height * 0.5;
+  const radius = Math.sqrt(bounds.radius * bounds.radius + (height * 0.5) * (height * 0.5));
+  return {
+    center: new THREE.Vector3(bounds.center.x, centerY, bounds.center.z),
+    radius,
+  };
+}
+
+export function isTowerBoundsInsideFrustum(
+  camera: THREE.PerspectiveCamera | THREE.OrthographicCamera,
+  bounds: TowerBounds,
+  extraRadius = 0
+): boolean {
+  const sphere = computeTowerBoundingSphere(bounds);
+  const checkSphere = new THREE.Sphere(sphere.center.clone(), sphere.radius + Math.max(0, extraRadius));
+  const frustum = new THREE.Frustum();
+  const matrix = new THREE.Matrix4().multiplyMatrices(
+    camera.projectionMatrix,
+    camera.matrixWorldInverse
+  );
+  frustum.setFromProjectionMatrix(matrix);
+  return frustum.containsSphere(checkSphere);
+}
+
+/**
+ * Computes a stable game camera pose that frames the full tower bounds with headroom.
+ */
+export function computeGameCameraPose(
+  bounds: TowerBounds,
+  viewportAspect: number,
+  options: GameCameraPoseOptions = {}
+): GameCameraPose {
+  const height = Math.max(0, bounds.maxY - bounds.minY);
+  const centerY = bounds.minY + height * 0.5;
+  const targetBias = options.targetHeightBias ?? 0.48;
+  const targetY = THREE.MathUtils.clamp(bounds.minY + height * targetBias, bounds.minY, bounds.maxY);
+  const target = new THREE.Vector3(bounds.center.x, targetY, bounds.center.z);
+
+  const fov = THREE.MathUtils.clamp(options.fovDeg ?? DEFAULT_CAMERA_FOV, 30, 40);
+  const fovRad = THREE.MathUtils.degToRad(fov);
+  const halfVert = fovRad * 0.5;
+  const halfHorz = Math.atan(Math.tan(halfVert) * Math.max(0.1, viewportAspect));
+  const effectiveHalfFov = Math.min(halfVert, halfHorz);
+
+  const radiusMarginRatio = options.radiusMarginRatio ?? 1.05;
+  const boundingSphereRadius =
+    Math.sqrt(bounds.radius * bounds.radius + (height * 0.5) * (height * 0.5)) *
+    radiusMarginRatio;
+  const distance = boundingSphereRadius / Math.max(0.01, Math.sin(effectiveHalfFov));
+
+  const azimuth = options.azimuthRadians ?? DEFAULT_CAMERA_ANGLE;
+  const elevation = THREE.MathUtils.degToRad(options.elevationDeg ?? 32);
+  const center = new THREE.Vector3(bounds.center.x, centerY, bounds.center.z);
+  const offset = new THREE.Vector3(
+    Math.cos(elevation) * Math.cos(azimuth) * distance,
+    Math.sin(elevation) * distance,
+    Math.cos(elevation) * Math.sin(azimuth) * distance
+  );
+
+  const position = center.add(offset);
+  return { position, target, fov };
 }
 
 /**

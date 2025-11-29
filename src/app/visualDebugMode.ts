@@ -18,7 +18,7 @@ import {
   VisualDebugControls,
 } from './visualDebugControls';
 import { OrbitCameraController } from './orbitCamera';
-import { QualityLevel } from '../render/renderConfig';
+import { QualityLevel, RenderModeConfig } from '../render/renderConfig';
 import { applyMaterialDebugMode, createMaterialsSnapshot } from '../render/materialDebug';
 import { deriveEnvOverrides, applyEnvDebugMode } from '../render/envDebug';
 
@@ -30,6 +30,12 @@ const CAMERA_TOGGLE_KEY = 'c';
 const CLOSEUP_KEY = 'v';
 const TRANSITION_DURATION_MS = 450;
 const GAME_MODE_ROTATION_SPEED = 0.00035;
+const VISUAL_DEBUG_RENDER_MODE: RenderModeConfig = {
+  kind: 'visualDebug',
+  showGuides: true,
+  showDebugRing: true,
+  showColliders: true,
+};
 
 export function isVisualDebugModeEnabled(): boolean {
   const params = new URLSearchParams(window.location.search);
@@ -46,9 +52,10 @@ function isUltra2LabModeEnabled(): boolean {
 export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   const ultra2Lab = isUltra2LabModeEnabled();
   const qualityFromUrl = ultra2Lab ? 'ultra2' : parseQualityFromUrl(window.location.search);
+  const baseOverrides: RenderConfigOverrides = { renderMode: { ...VISUAL_DEBUG_RENDER_MODE } };
   const renderOverrides: RenderConfigOverrides = qualityFromUrl
-    ? { quality: { level: qualityFromUrl } }
-    : {};
+    ? { ...baseOverrides, quality: { level: qualityFromUrl } }
+    : baseOverrides;
   let renderCtx = createRenderContext(canvas, renderOverrides);
   let snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions);
   let controlState = configToControlState(renderCtx.renderConfig);
@@ -278,6 +285,7 @@ function controlStateToOverrides(
     },
     quality: { level: state.qualityLevel as QualityLevel },
     environment: deriveEnvOverrides(state.envDebugMode),
+    renderMode: { ...VISUAL_DEBUG_RENDER_MODE },
   };
 }
 

@@ -7,7 +7,7 @@ import { OverlayView } from './ui/overlay';
 import { mapGameStatusToUIState } from './ui/uiState';
 import { isVisualDebugModeEnabled, startVisualDebugMode } from './app/visualDebugMode';
 import { isTextureProbeEnabled, startTextureProbe } from './app/textureProbe';
-import { QualityLevel } from './render/renderConfig';
+import { QualityLevel, RenderConfigOverrides } from './render/renderConfig';
 
 const canvas = document.getElementById('render-canvas') as HTMLCanvasElement | null;
 
@@ -34,10 +34,13 @@ if (isTextureProbeEnabled()) {
   console.log('Tower Tetris 3D app initialized', { canvas, hudContainer });
 
   const quality = parseQualityFromUrl(window.location.search);
-  const renderCtx = createRenderContext(
-    canvas,
-    quality ? { quality: { level: quality } } : undefined
-  );
+  const renderOverrides: RenderConfigOverrides = {
+    renderMode: { kind: 'game' },
+  };
+  if (quality) {
+    renderOverrides.quality = { level: quality };
+  }
+  const renderCtx = createRenderContext(canvas, renderOverrides);
   const controller = new GameController();
   const keyboard = new KeyboardInput({
     onCommand: (command) => controller.enqueueCommand(command),

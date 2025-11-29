@@ -3,14 +3,12 @@ import { DEFAULT_BOARD_DIMENSIONS } from '../core/constants';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig, createBoardRenderConfig } from './boardConfig';
 import {
-  computeCameraPlacement,
   DEFAULT_CAMERA_FOV,
-  DEFAULT_CAMERA_ANGLE,
-  DEFAULT_CAMERA_HEIGHT_RATIO,
-  DEFAULT_TARGET_HEIGHT_RATIO,
+  computeGameCameraPose,
   computeTowerHeight,
 } from './cameraSetup';
 import { VISUAL_DEFAULTS } from './visualDefaults';
+import { getTowerBounds } from './towerBounds';
 
 export interface CameraConfig {
   fov: number;
@@ -167,6 +165,15 @@ export interface EnvironmentConfig {
   variant?: 'studio' | 'ultra2';
 }
 
+export type RenderModeKind = 'game' | 'visualDebug' | 'textureProbe';
+
+export interface RenderModeConfig {
+  kind: RenderModeKind;
+  showGuides: boolean;
+  showDebugRing: boolean;
+  showColliders: boolean;
+}
+
 export interface RenderConfig {
   boardDimensions: BoardDimensions;
   board: BoardRenderConfig;
@@ -178,6 +185,7 @@ export interface RenderConfig {
   environment: EnvironmentConfig;
   fog: FogConfig;
   quality: QualityConfig;
+  renderMode: RenderModeConfig;
 }
 
 export interface RenderConfigOverrides {
@@ -195,6 +203,7 @@ export interface RenderConfigOverrides {
   materials?: Partial<MaterialConfig>;
   fog?: Partial<FogConfig>;
   quality?: Partial<QualityConfig>;
+  renderMode?: Partial<RenderModeConfig>;
 }
 
 export interface PartialLightRigConfig {
@@ -234,7 +243,16 @@ export interface QualityConfig {
   envResolution: number;
 }
 
-export function createRenderConfig(overrides: RenderConfigOverrides = {}): RenderConfig {
+const RENDER_MODE_DEFAULTS: Record<RenderModeKind, Omit<RenderModeConfig, 'kind'>> = {
+  game: { showGuides: false, showDebugRing: false, showColliders: false },
+  visualDebug: { showGuides: true, showDebugRing: true, showColliders: true },
+  textureProbe: { showGuides: false, showDebugRing: false, showColliders: false },
+};
+
+export function createRenderConfig(
+  overrides: RenderConfigOverrides = {},
+  viewportAspect = 16 / 9
+): RenderConfig {
   const quality = resolveQuality(overrides.quality?.level ?? VISUAL_DEFAULTS.quality.level);
   const boardDimensions: BoardDimensions = {
     width:
@@ -244,15 +262,11 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
 
   const board = createBoardRenderConfig(boardDimensions, overrides.board);
 
-  const cameraFov = normalizeFov(overrides.camera?.fov ?? VISUAL_DEFAULTS.camera.fov);
-  const computedPlacement = computeCameraPlacement(boardDimensions, board, {
-    fovDeg: cameraFov,
-    angleRadians: DEFAULT_CAMERA_ANGLE,
-    cameraHeightRatio: DEFAULT_CAMERA_HEIGHT_RATIO,
-    targetHeightRatio: DEFAULT_TARGET_HEIGHT_RATIO,
-  });
-  const cameraPosition = overrides.camera?.position ?? computedPlacement.position;
-  const cameraTarget = overrides.camera?.target ?? computedPlacement.target;
+  const bounds = getTowerBounds(boardDimensions, board);
+  const pose = computeGameCameraPose(bounds, viewportAspect, { fovDeg: VISUAL_DEFAULTS.camera.fov });
+  const cameraFov = normalizeFov(overrides.camera?.fov ?? pose.fov);
+  const cameraPosition = overrides.camera?.position ?? pose.position;
+  const cameraTarget = overrides.camera?.target ?? pose.target;
   const camera: CameraConfig = {
     fov: cameraFov,
     position: cameraPosition.clone(),
@@ -310,6 +324,8 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
 
   const fog = mergeFogConfig(VISUAL_DEFAULTS.fog, overrides.fog);
 
+  const renderMode = resolveRenderMode(overrides.renderMode);
+
   let config: RenderConfig = {
     boardDimensions,
     board,
@@ -321,6 +337,7 @@ export function createRenderConfig(overrides: RenderConfigOverrides = {}): Rende
     environment,
     fog,
     quality,
+    renderMode,
   };
 
   if (quality.level === 'ultra2') {
@@ -570,6 +587,17 @@ function mergeFogConfig(defaults: FogConfig, overrides?: Partial<FogConfig>): Fo
     enabled: overrides?.enabled ?? defaults.enabled,
     color: overrides?.color ?? defaults.color,
     density: overrides?.density ?? defaults.density,
+  };
+}
+
+function resolveRenderMode(override?: Partial<RenderModeConfig>): RenderModeConfig {
+  const kind = override?.kind ?? 'game';
+  const fallback = RENDER_MODE_DEFAULTS[kind] ?? RENDER_MODE_DEFAULTS.game;
+  return {
+    kind,
+    showGuides: override?.showGuides ?? fallback.showGuides,
+    showDebugRing: override?.showDebugRing ?? fallback.showDebugRing,
+    showColliders: override?.showColliders ?? fallback.showColliders,
   };
 }
 

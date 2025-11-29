@@ -11,3 +11,7 @@ export * from './sceneRenderer';
 export * from './renderConfig';
 export * from './cameraMotion';
 export * from './environmentMap';
+export * from './towerBounds';
+export * from './debugOverlays';
+export { updateDebugOverlays } from './renderer';
+export * from './towerFootprint';
