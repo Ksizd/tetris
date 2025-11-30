@@ -36,10 +36,12 @@ export function renderActivePiece({
 
   let instanceIndex = 0;
   for (const block of blocks) {
-    if (block.y < 0 || block.y >= dimensions.height) {
+    if (block.y < 0) {
       continue; // outside visible tower; skip to avoid mapper bounds errors
     }
-    const worldPos = mapper.cellToWorldPosition(block.x, block.y);
+    const worldPos = mapper.cellToWorldPosition(block.x, block.y, {
+      allowOverflowY: block.y >= dimensions.height,
+    });
     const shifted = worldPos.clone();
     shifted.y += offsetY;
     mapper.getRadialOrientation(block.x, rotation);

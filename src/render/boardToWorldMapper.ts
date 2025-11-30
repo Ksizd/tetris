@@ -25,10 +25,17 @@ export class BoardToWorldMapper {
     return { ...this.dimensions };
   }
 
-  cellToWorldPosition(x: number, y: number): THREE.Vector3 {
+  cellToWorldPosition(
+    x: number,
+    y: number,
+    options: { allowOverflowY?: boolean } = {}
+  ): THREE.Vector3 {
     this.ensureIntegerCoord(x, 'x');
     this.ensureIntegerCoord(y, 'y');
-    this.ensureValidY(y);
+    const allowOverflowY = options.allowOverflowY ?? false;
+    if (!allowOverflowY || y < 0) {
+      this.ensureValidY(y);
+    }
     const normalizedX = wrapX(x, this.dimensions.width);
     const angle = this.columnAngle(normalizedX);
     const worldX = Math.cos(angle) * this.config.towerRadius;

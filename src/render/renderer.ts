@@ -12,7 +12,11 @@ import {
   ToneMappingConfig,
   RingLightBandConfig,
 } from './renderConfig';
-import { computeTowerHeight, computeGameCameraPose } from './cameraSetup';
+import {
+  computeTowerHeight,
+  computeGameCameraPose,
+  computeTowerBoundingSphere,
+} from './cameraSetup';
 import { createEnvironmentMap, EnvironmentMapResources } from './environmentMap';
 import { BoardRenderConfig } from './boardConfig';
 import { BoardDimensions } from '../core/types';
@@ -55,6 +59,18 @@ function applyToneMapping(renderer: THREE.WebGLRenderer, config: ToneMappingConf
   renderer.toneMappingExposure = config.exposure;
 }
 
+function computeCameraNear(
+  bounds: ReturnType<typeof getTowerBounds>,
+  board: BoardRenderConfig,
+  cameraPosition: THREE.Vector3
+): number {
+  const sphere = computeTowerBoundingSphere(bounds);
+  const distanceToCenter = cameraPosition.distanceTo(sphere.center);
+  const clearance = distanceToCenter - sphere.radius - board.blockSize * 0.5;
+  // Keep near small enough to avoid clipping spawned blocks close to the camera, but not too small for precision.
+  return Math.max(0.05, Math.min(clearance, 2));
+}
+
 /**
  * D~D«D,¥+D,DøD¯D,DúD,¥?¥ŸDæ¥, DñDøDúD_Dý¥Ÿ¥Z 3D-¥?¥+DæD«¥Ÿ D«Dø D¨Dæ¥?DæD'DøD«D«D_D¬ canvas.
  */
@@ -66,6 +82,7 @@ export function createRenderContext(
   const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
   const renderConfig = createRenderConfig(overrides, aspect);
   const mapper = new BoardToWorldMapper(renderConfig.boardDimensions, renderConfig.board);
+  const towerBounds = getTowerBounds(renderConfig.boardDimensions, renderConfig.board);
 
   scene.background = new THREE.Color(0x000000);
   if (renderConfig.fog.enabled) {
@@ -81,7 +98,7 @@ export function createRenderContext(
   const camera = new THREE.PerspectiveCamera(
     renderConfig.camera.fov,
     canvas.clientWidth / canvas.clientHeight,
-    0.1,
+    computeCameraNear(towerBounds, renderConfig.board, renderConfig.camera.position),
     1000
   );
   camera.position.copy(renderConfig.camera.position);
