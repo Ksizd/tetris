@@ -7,6 +7,18 @@ export interface FallTiming {
   fallIntervalMs: number;
 }
 
+export interface FallState {
+  landed: boolean;
+  lockTimeMs: number;
+  lockMovesCount: number;
+}
+
+export const FALL_STATE_DEFAULT: FallState = {
+  landed: false,
+  lockTimeMs: 0,
+  lockMovesCount: 0,
+};
+
 /**
  * Доменное состояние игры без рендера и ввода.
  */
@@ -21,4 +33,5 @@ export interface GameState {
   timing: FallTiming;
   pieceQueue: PieceQueue;
   clearingLayers: number[];
+  fallState: FallState;
 }

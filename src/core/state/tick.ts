@@ -1,8 +1,9 @@
 import { GameStatus, PieceOrientation } from '../types';
-import { canMove, canPlacePiece } from '../collision';
-import { GameState } from './gameState';
+import { canPlacePiece } from '../collision';
+import { FALL_STATE_DEFAULT, GameState } from './gameState';
 import { lockCurrentPiece } from './lock';
 import { beginClearingPhase } from './clearing';
+import { tryMovePiece } from './movement';
 
 export function tickGame(state: GameState, deltaTimeMs: number): GameState {
   if (
@@ -15,6 +16,18 @@ export function tickGame(state: GameState, deltaTimeMs: number): GameState {
 
   const nextTiming = { ...state.timing, fallProgressMs: state.timing.fallProgressMs + deltaTimeMs };
   let nextState: GameState = { ...state, timing: nextTiming };
+
+  // accumulate lock time while landed
+  if (nextState.fallState.landed) {
+    nextState = {
+      ...nextState,
+      fallState: {
+        ...nextState.fallState,
+        lockTimeMs: nextState.fallState.lockTimeMs + deltaTimeMs,
+      },
+      timing: { ...nextState.timing, fallProgressMs: 0 },
+    };
+  }
 
   if (nextTiming.fallProgressMs < nextTiming.fallIntervalMs) {
     return nextState;
@@ -52,6 +65,7 @@ function spawnPiece(state: GameState): GameState {
     ...state,
     currentPiece: spawn,
     gameStatus: state.gameStatus === GameStatus.Idle ? GameStatus.Running : state.gameStatus,
+    fallState: FALL_STATE_DEFAULT,
   };
 }
 
@@ -69,7 +83,8 @@ function applyGravitySteps(state: GameState, fallSteps: number): GameState {
   }
 
   for (let step = 0; step < fallSteps; step += 1) {
-    if (!canMove(state.board, piece, 0, -1)) {
+    const moved = tryMovePiece({ ...state, currentPiece: piece }, { dx: 0, dy: -1, rotation: 0 });
+    if (!moved.moved || !moved.state.currentPiece) {
       const locked = lockCurrentPiece({
         ...state,
         currentPiece: piece,
@@ -77,21 +92,14 @@ function applyGravitySteps(state: GameState, fallSteps: number): GameState {
       });
       return beginClearingPhase(locked);
     }
-
-    piece = {
-      ...piece,
-      position: { x: piece.position.x, y: piece.position.y - 1 },
+    piece = moved.state.currentPiece;
+    state = {
+      ...state,
+      fallState: FALL_STATE_DEFAULT,
+      currentPiece: piece,
+      timing: { ...state.timing, fallProgressMs: 0 },
     };
   }
 
-  const stateAfterFall = { ...state, currentPiece: piece };
-  if (!canMove(stateAfterFall.board, piece, 0, -1)) {
-    const locked = lockCurrentPiece({
-      ...stateAfterFall,
-      timing: { ...stateAfterFall.timing, fallProgressMs: 0 },
-    });
-    return beginClearingPhase(locked);
-  }
-
-  return stateAfterFall;
+  return { ...state, currentPiece: piece, fallState: FALL_STATE_DEFAULT };
 }

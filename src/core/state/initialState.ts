@@ -5,6 +5,7 @@ import { PieceQueue } from '../piece';
 import { DEFAULT_GAME_CONFIG, GameConfig } from './config';
 import { GameState } from './gameState';
 import { DEFAULT_FALL_SPEED, getFallIntervalMs } from './fallSpeed';
+import { FALL_STATE_DEFAULT } from './gameState';
 
 export function createInitialGameState(config: Partial<GameConfig> = {}): GameState {
   const merged: GameConfig = {
@@ -33,5 +34,6 @@ export function createInitialGameState(config: Partial<GameConfig> = {}): GameSt
     },
     pieceQueue: new PieceQueue({ seed: merged.seed, mode: merged.pieceMode }),
     clearingLayers: [],
+    fallState: { ...FALL_STATE_DEFAULT },
   };
 }

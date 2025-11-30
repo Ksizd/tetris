@@ -16,7 +16,7 @@ export interface BoundingSphere {
 export const DEFAULT_CAMERA_FOV = 36;
 export const DEFAULT_CAMERA_ANGLE = (Math.PI / 4) * -1; // -45 deg
 export const DEFAULT_CAMERA_HEIGHT_RATIO = 0.58;
-export const DEFAULT_TARGET_HEIGHT_RATIO = 0.5;
+export const DEFAULT_TARGET_HEIGHT_RATIO = 0.55;
 
 export interface GameCameraPose {
   position: THREE.Vector3;
@@ -47,7 +47,7 @@ export function computeTowerHeight(dimensions: BoardDimensions, config: BoardRen
 export function computeTowerBoundingSphere(bounds: TowerBounds): BoundingSphere {
   const height = Math.max(0, bounds.maxY - bounds.minY);
   const centerY = bounds.minY + height * 0.5;
-  const radius = Math.sqrt(bounds.radius * bounds.radius + (height * 0.5) * (height * 0.5));
+  const radius = Math.sqrt(bounds.radius * bounds.radius + height * 0.5 * (height * 0.5));
   return {
     center: new THREE.Vector3(bounds.center.x, centerY, bounds.center.z),
     radius,
@@ -60,7 +60,10 @@ export function isTowerBoundsInsideFrustum(
   extraRadius = 0
 ): boolean {
   const sphere = computeTowerBoundingSphere(bounds);
-  const checkSphere = new THREE.Sphere(sphere.center.clone(), sphere.radius + Math.max(0, extraRadius));
+  const checkSphere = new THREE.Sphere(
+    sphere.center.clone(),
+    sphere.radius + Math.max(0, extraRadius)
+  );
   const frustum = new THREE.Frustum();
   const matrix = new THREE.Matrix4().multiplyMatrices(
     camera.projectionMatrix,
@@ -81,7 +84,11 @@ export function computeGameCameraPose(
   const height = Math.max(0, bounds.maxY - bounds.minY);
   const centerY = bounds.minY + height * 0.5;
   const targetBias = options.targetHeightBias ?? 0.48;
-  const targetY = THREE.MathUtils.clamp(bounds.minY + height * targetBias, bounds.minY, bounds.maxY);
+  const targetY = THREE.MathUtils.clamp(
+    bounds.minY + height * targetBias,
+    bounds.minY,
+    bounds.maxY
+  );
   const target = new THREE.Vector3(bounds.center.x, targetY, bounds.center.z);
 
   const fov = THREE.MathUtils.clamp(options.fovDeg ?? DEFAULT_CAMERA_FOV, 30, 40);
@@ -92,8 +99,7 @@ export function computeGameCameraPose(
 
   const radiusMarginRatio = options.radiusMarginRatio ?? 1.05;
   const boundingSphereRadius =
-    Math.sqrt(bounds.radius * bounds.radius + (height * 0.5) * (height * 0.5)) *
-    radiusMarginRatio;
+    Math.sqrt(bounds.radius * bounds.radius + height * 0.5 * (height * 0.5)) * radiusMarginRatio;
   const distance = boundingSphereRadius / Math.max(0.01, Math.sin(effectiveHalfFov));
 
   const azimuth = options.azimuthRadians ?? DEFAULT_CAMERA_ANGLE;
@@ -133,14 +139,15 @@ export function computeCameraPlacement(
   const targetY = towerHeight * targetHeightRatio;
   const fovRad = THREE.MathUtils.degToRad(options.fovDeg ?? DEFAULT_CAMERA_FOV);
 
-  const horizontalDistance = findHorizontalDistance({
-    towerHeight,
-    towerRadius: config.towerRadius,
-    blockSize: config.blockSize,
-    cameraY,
-    targetY,
-    fovRad,
-  });
+  const horizontalDistance =
+    findHorizontalDistance({
+      towerHeight,
+      towerRadius: config.towerRadius,
+      blockSize: config.blockSize,
+      cameraY,
+      targetY,
+      fovRad,
+    }) * 1.06;
 
   const x = Math.cos(angle) * horizontalDistance;
   const z = Math.sin(angle) * horizontalDistance;
@@ -201,7 +208,7 @@ interface FrameSolveParams {
 
 function findHorizontalDistance(params: FrameSolveParams): number {
   const { towerHeight, towerRadius, blockSize, cameraY, targetY, fovRad } = params;
-  const margin = blockSize * 1.6;
+  const margin = blockSize * 1.75;
   const minHorizontal = Math.max(towerRadius + margin, towerHeight * 0.3);
   const fovLimit = fovRad * 0.5 * 0.96; // keep 4% headroom
   const probeAzimuth = Math.PI / 4;

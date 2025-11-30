@@ -83,6 +83,24 @@ export function createMahjongTileTexture(size = DEFAULT_TILE_SIZE): THREE.Textur
  * Adds subtle noise to avoid flat highlights.
  */
 export function createMahjongMaterialMaps(size = DEFAULT_TILE_SIZE): MahjongMaterialMaps {
+  if (typeof document === 'undefined') {
+    const makeMap = (value: number): THREE.DataTexture => {
+      const data = new Uint8Array([value, value, value, 255]);
+      const tex = new THREE.DataTexture(data, 1, 1);
+      tex.colorSpace = THREE.NoColorSpace;
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      tex.flipY = true;
+      tex.needsUpdate = true;
+      return tex;
+    };
+    return {
+      roughnessMap: makeMap(64),
+      metalnessMap: makeMap(16),
+      aoMap: makeMap(230),
+    };
+  }
+
   const roughCanvas = document.createElement('canvas');
   const metalCanvas = document.createElement('canvas');
   const aoCanvas = document.createElement('canvas');

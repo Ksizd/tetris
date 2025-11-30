@@ -26,9 +26,9 @@ export interface TowerBoundsOptions {
 }
 
 /**
-  * Computes cylindrical bounds of the tower in world space for camera/frustum planning.
-  * minY: floor level; maxY: logical tower top + configurable margin; radius: outer radius + margin.
-  */
+ * Computes cylindrical bounds of the tower in world space for camera/frustum planning.
+ * minY: floor level; maxY: logical tower top + configurable margin; radius: outer radius + margin.
+ */
 export function computeTowerEnvelope(
   dimensions: BoardDimensions,
   config: BoardRenderConfig,

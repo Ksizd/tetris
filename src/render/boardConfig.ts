@@ -11,7 +11,7 @@ export interface BoardRenderConfig {
 }
 
 export const DEFAULT_BLOCK_SIZE = 1;
-export const DEFAULT_VERTICAL_GAP_RATIO = 0.06;
+export const DEFAULT_VERTICAL_GAP_RATIO = 0;
 export const DEFAULT_BLOCK_DEPTH_RATIO = 0.9;
 export const DEFAULT_CIRCUMFERENTIAL_GAP_RATIO = 0.05;
 export const DEFAULT_EDGE_RADIUS_RATIO = 0.08;
@@ -36,7 +36,7 @@ export function calculateTowerRadius(
 
 /**
  * Builds a normalized render config with defaults and validation for block size, radius and spacing.
- * verticalSpacing defaults to blockSize + verticalGap to create thin seams per plan 11x.7.2.
+ * verticalSpacing defaults to blockSize (no gap) unless overridden.
  */
 export function createBoardRenderConfig(
   dimensions: BoardDimensions,

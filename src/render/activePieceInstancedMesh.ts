@@ -19,7 +19,7 @@ const ACTIVE_PIECE_CAPACITY = 4;
  */
 export function createActivePieceInstancedMesh(
   config: BoardRenderConfig,
-  materials: MaterialConfig = {
+  materialConfig: MaterialConfig = {
     front: {
       roughness: 0.22,
       metalness: 0.04,
@@ -52,33 +52,31 @@ export function createActivePieceInstancedMesh(
   const frontMaterial = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: tileTexture,
-    roughness: materials.front.roughness,
-    metalness: materials.front.metalness,
+    roughness: materialConfig.front.roughness,
+    metalness: materialConfig.front.metalness,
     roughnessMap,
     metalnessMap,
     aoMap,
-    emissive: materials.front.emissive,
-    emissiveIntensity: materials.front.emissiveIntensity,
-    envMapIntensity: materials.front.envMapIntensity,
+    emissive: materialConfig.front.emissive ?? 0x000000,
+    emissiveIntensity: materialConfig.front.emissiveIntensity ?? 0,
+    envMapIntensity: materialConfig.front.envMapIntensity,
   });
   const sideMaterial = new THREE.MeshStandardMaterial({
     color: 0xf2c14b,
     map: tileTexture,
-    roughness: materials.side.roughness,
-    metalness: materials.side.metalness,
+    roughness: materialConfig.side.roughness,
+    metalness: materialConfig.side.metalness,
     roughnessMap,
     metalnessMap,
     aoMap,
-    emissive: materials.side.emissive,
-    emissiveIntensity: materials.side.emissiveIntensity,
-    envMapIntensity: materials.side.envMapIntensity,
+    emissive: materialConfig.side.emissive ?? 0x000000,
+    emissiveIntensity: materialConfig.side.emissiveIntensity ?? 0,
+    envMapIntensity: materialConfig.side.envMapIntensity,
   });
 
-  const mesh = new THREE.InstancedMesh(
-    geometry,
-    [frontMaterial, sideMaterial],
-    ACTIVE_PIECE_CAPACITY
-  );
+  const materials = [frontMaterial, sideMaterial];
+  const mesh = new THREE.InstancedMesh(geometry, materials, ACTIVE_PIECE_CAPACITY);
+  mesh.material = materials;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.count = 0;
   mesh.frustumCulled = false;
@@ -86,7 +84,7 @@ export function createActivePieceInstancedMesh(
   mesh.receiveShadow = true;
   mesh.name = 'activePieceInstanced';
 
-  return { mesh, geometry, material: [frontMaterial, sideMaterial] };
+  return { mesh, geometry, material: materials };
 }
 
 function tagFrontGroup(geometry: THREE.BufferGeometry): void {

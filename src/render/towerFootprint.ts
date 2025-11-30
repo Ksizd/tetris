@@ -65,8 +65,8 @@ export function createTowerFootprint({
     const sin = Math.sin(angle);
     const outerX = cos * outerRadius;
     const outerZ = sin * outerRadius;
-    const innerX = cos * (innerRadius);
-    const innerZ = sin * (innerRadius);
+    const innerX = cos * innerRadius;
+    const innerZ = sin * innerRadius;
     lineVertices.push(outerX, 0, outerZ, innerX, 0, innerZ);
   }
   const lineGeometry = new THREE.BufferGeometry();
@@ -76,7 +76,7 @@ export function createTowerFootprint({
   );
   const lineMaterial = new THREE.LineBasicMaterial({
     color: 0xe9ecf5,
-    linewidth: 2,
+    linewidth: lineWidth,
     transparent: true,
     opacity: 0.8,
     depthWrite: true,

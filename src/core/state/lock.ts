@@ -1,6 +1,6 @@
 import { CellContent } from '../types';
 import { getWorldBlocks } from '../piece';
-import { GameState } from './gameState';
+import { FALL_STATE_DEFAULT, GameState } from './gameState';
 
 /**
  * Фиксирует текущую фигуру на поле: записывает блоки и сбрасывает currentPiece.
@@ -27,5 +27,6 @@ export function lockCurrentPiece(state: GameState): GameState {
     ...state,
     board,
     currentPiece: null,
+    fallState: FALL_STATE_DEFAULT,
   };
 }

@@ -14,7 +14,7 @@ export const VISUAL_DEFAULTS = {
   environment: {
     intensity: 1.25,
     resolution: 2048,
-    useAsBackground: true,
+    useAsBackground: false,
     variant: 'studio' as const,
   },
   materials: {

@@ -2,11 +2,7 @@ import * as THREE from 'three';
 import { DEFAULT_BOARD_DIMENSIONS } from '../core/constants';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig, createBoardRenderConfig } from './boardConfig';
-import {
-  DEFAULT_CAMERA_FOV,
-  computeGameCameraPose,
-  computeTowerHeight,
-} from './cameraSetup';
+import { DEFAULT_CAMERA_FOV, computeGameCameraPose, computeTowerHeight } from './cameraSetup';
 import { VISUAL_DEFAULTS } from './visualDefaults';
 import { getTowerBounds } from './towerBounds';
 
@@ -263,7 +259,9 @@ export function createRenderConfig(
   const board = createBoardRenderConfig(boardDimensions, overrides.board);
 
   const bounds = getTowerBounds(boardDimensions, board);
-  const pose = computeGameCameraPose(bounds, viewportAspect, { fovDeg: VISUAL_DEFAULTS.camera.fov });
+  const pose = computeGameCameraPose(bounds, viewportAspect, {
+    fovDeg: VISUAL_DEFAULTS.camera.fov,
+  });
   const cameraFov = normalizeFov(overrides.camera?.fov ?? pose.fov);
   const cameraPosition = overrides.camera?.position ?? pose.position;
   const cameraTarget = overrides.camera?.target ?? pose.target;

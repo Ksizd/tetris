@@ -407,7 +407,9 @@ export function resizeRenderer(ctx: RenderContext, width: number, height: number
   ctx.camera.updateProjectionMatrix();
 
   const bounds = getTowerBounds(ctx.renderConfig.boardDimensions, ctx.renderConfig.board);
-  const pose = computeGameCameraPose(bounds, ctx.camera.aspect, { fovDeg: ctx.renderConfig.camera.fov });
+  const pose = computeGameCameraPose(bounds, ctx.camera.aspect, {
+    fovDeg: ctx.renderConfig.camera.fov,
+  });
   ctx.camera.position.copy(pose.position);
   ctx.camera.lookAt(pose.target);
   ctx.renderConfig.camera.position.copy(pose.position);

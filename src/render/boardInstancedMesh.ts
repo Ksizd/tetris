@@ -39,7 +39,7 @@ export function createBoardInstancedMesh(
   );
   tagFrontGroup(geometry);
 
-  const frontMaterial = new THREE.MeshStandardMaterial({
+  const material = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     map: tileTexture,
     roughness: materials.front.roughness,
@@ -48,25 +48,12 @@ export function createBoardInstancedMesh(
     metalnessMap,
     aoMap,
     envMapIntensity: materials.front.envMapIntensity,
-    emissive: materials.front.emissive,
-    emissiveIntensity: materials.front.emissiveIntensity,
-  });
-
-  const sideMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf2c14b,
-    map: tileTexture,
-    roughness: materials.side.roughness,
-    metalness: materials.side.metalness,
-    roughnessMap,
-    metalnessMap,
-    aoMap,
-    envMapIntensity: materials.side.envMapIntensity,
-    emissive: materials.side.emissive,
-    emissiveIntensity: materials.side.emissiveIntensity,
+    emissive: materials.front.emissive ?? 0x000000,
+    emissiveIntensity: materials.front.emissiveIntensity ?? 0,
   });
 
   const capacity = dimensions.width * dimensions.height;
-  const mesh = new THREE.InstancedMesh(geometry, [frontMaterial, sideMaterial], capacity);
+  const mesh = new THREE.InstancedMesh(geometry, material, capacity);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.count = 0;
   mesh.frustumCulled = false; // cylindrical layout; bounding sphere would need per-instance updates later
@@ -74,7 +61,7 @@ export function createBoardInstancedMesh(
   mesh.receiveShadow = true;
   mesh.name = 'boardBlocksInstanced';
 
-  return { mesh, geometry, material: [frontMaterial, sideMaterial], capacity };
+  return { mesh, geometry, material, capacity };
 }
 
 function tagFrontGroup(geometry: THREE.BufferGeometry): void {

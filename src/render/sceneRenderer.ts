@@ -2,6 +2,7 @@ import { GameState } from '../core/state/gameState';
 import { renderBoard } from './boardRenderer';
 import { renderActivePiece } from './activePieceRenderer';
 import { RenderContext } from './renderer';
+import { canMove } from '../core/collision';
 
 export type SceneRenderContext = Pick<
   RenderContext,
@@ -21,6 +22,13 @@ export function renderScene(ctx: SceneRenderContext, snapshot: Readonly<GameStat
 
 function computeActivePieceOffset(snapshot: Readonly<GameState>, verticalSpacing: number): number {
   if (!snapshot.currentPiece) {
+    return 0;
+  }
+  if (snapshot.fallState?.landed) {
+    return 0;
+  }
+  const canFall = canMove(snapshot.board, snapshot.currentPiece, 0, -1);
+  if (!canFall) {
     return 0;
   }
   const { fallProgressMs, fallIntervalMs } = snapshot.timing;
