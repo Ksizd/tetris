@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { PieceOrientation, PieceType } from '../../core/types';
-import { DEFAULT_BOARD_DIMENSIONS } from '../../core/constants/board';
 import { getWorldBlocks } from '../../core/piece';
 import { createBoardRenderConfig } from '../boardConfig';
 import { BoardToWorldMapper } from '../boardToWorldMapper';
@@ -9,7 +8,11 @@ import { createRenderConfig } from '../renderConfig';
 import { getTowerBounds } from '../towerBounds';
 import { computeGameCameraPose, computeTowerBoundingSphere } from '../cameraSetup';
 
-function computeCameraNear(bounds: ReturnType<typeof getTowerBounds>, blockSize: number, cameraPos: THREE.Vector3) {
+function computeCameraNear(
+  bounds: ReturnType<typeof getTowerBounds>,
+  blockSize: number,
+  cameraPos: THREE.Vector3
+) {
   const sphere = computeTowerBoundingSphere(bounds);
   const distanceToCenter = cameraPos.distanceTo(sphere.center);
   const clearance = distanceToCenter - sphere.radius - blockSize * 0.5;
