@@ -30,8 +30,8 @@ export function createTowerFootprint({
   // Align footprint with actual cube footprint: centers at towerRadius, faces at +/- blockDepth/2.
   const outerRadius = board.towerRadius + board.blockDepth * 0.5;
   const innerRadius = Math.max(board.towerRadius - board.blockDepth * 0.5, outerRadius * 0.55);
-  // Sit just above the floor to avoid z-fighting; blocks cover it via depth test.
-  const footprintY = board.blockSize * 0.0005;
+  // Place footprint at the bottom face of the first layer (just above to avoid z-fighting).
+  const footprintY = -board.blockSize * 0.5 + board.blockSize * 0.001;
 
   // Base ring fill
   const ringGeometry = new THREE.RingGeometry(innerRadius, outerRadius, radialSegments, 1);
