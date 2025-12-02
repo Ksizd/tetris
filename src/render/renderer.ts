@@ -27,6 +27,10 @@ import {
 } from './postProcessing';
 import { getTowerBounds } from './towerBounds';
 import { createDebugOverlays } from './debugOverlays';
+import {
+  FragmentInstancedResources,
+  createFragmentInstancedMeshes,
+} from './destruction/fragmentInstancedMesh';
 
 export interface RenderContext {
   scene: THREE.Scene;
@@ -40,6 +44,7 @@ export interface RenderContext {
   cameraBasePlacement: { position: THREE.Vector3; target: THREE.Vector3 };
   environment?: EnvironmentMapResources | null;
   post?: PostProcessingContext | null;
+  fragments?: FragmentInstancedResources | null;
 }
 
 function enforceColorPipeline(renderer: THREE.WebGLRenderer): void {
@@ -164,6 +169,9 @@ export function createRenderContext(
   );
   scene.add(activePieceInstanced.mesh);
 
+  const fragments = createFragmentInstancedMeshes(renderConfig.boardDimensions, renderConfig.board);
+  Object.values(fragments.meshes).forEach((mesh) => scene.add(mesh));
+
   const shadowCatcher = createShadowCatcher(renderConfig.board);
   scene.add(shadowCatcher);
 
@@ -184,6 +192,7 @@ export function createRenderContext(
     },
     environment,
     post,
+    fragments,
   };
 }
 
@@ -416,6 +425,45 @@ function createShadowCatcher(boardConfig: BoardRenderConfig): THREE.Mesh {
   catcher.castShadow = false;
   catcher.name = 'shadowCatcher';
   return catcher;
+}
+
+function disposeMaterials(material: THREE.Material | THREE.Material[]): void {
+  if (Array.isArray(material)) {
+    material.forEach((m) => m.dispose());
+    return;
+  }
+  material.dispose();
+}
+
+function disposeMeshes(root: THREE.Object3D): void {
+  root.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (mesh.isMesh) {
+      mesh.geometry?.dispose();
+      const material = mesh.material as THREE.Material | THREE.Material[];
+      if (Array.isArray(material)) {
+        material.forEach((m) => m.dispose());
+      } else {
+        material?.dispose();
+      }
+    }
+  });
+}
+
+export function disposeRenderResources(ctx: RenderContext): void {
+  ctx.board.geometry.dispose();
+  disposeMaterials(ctx.board.material);
+  ctx.activePiece.geometry.dispose();
+  disposeMaterials(ctx.activePiece.material);
+  if (ctx.fragments) {
+    Object.values(ctx.fragments.geometries).forEach((geom) => geom.dispose());
+    Object.values(ctx.fragments.materials).forEach((mat) => mat.dispose());
+    Object.values(ctx.fragments.meshes).forEach((mesh) => mesh.dispose());
+  }
+  disposeMeshes(ctx.boardPlaceholder);
+  ctx.environment?.dispose();
+  ctx.post?.composer.dispose();
+  ctx.renderer.dispose();
 }
 
 export function resizeRenderer(ctx: RenderContext, width: number, height: number): void {

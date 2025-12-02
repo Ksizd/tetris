@@ -21,6 +21,20 @@ import { OrbitCameraController } from './orbitCamera';
 import { QualityLevel, RenderModeConfig } from '../render/renderConfig';
 import { applyMaterialDebugMode, createMaterialsSnapshot } from '../render/materialDebug';
 import { deriveEnvOverrides, applyEnvDebugMode } from '../render/envDebug';
+import {
+  createDestructionDebugPanel,
+  DestructionDebugPanel,
+  FragmentDebugFilter,
+} from './destructionDebugPanel';
+import { startLineDestructionFromBoard } from './destruction/destructionStarter';
+import { DestructionSimulationState } from './destruction/destructionSimulationState';
+import { launchScheduledExplosions } from './destruction/orchestrator';
+import { stepDestructionSimulations } from './destruction/simulationManager';
+import { shouldRenderWholeCube } from './destruction/explosionLifecycle';
+import { FragmentInstanceUpdate } from './destruction/fragmentInstances';
+import { FragmentMaterialId } from './destruction/cubeDestructionSim';
+import { applyFragmentInstanceUpdates } from '../render/destruction/instanceUpdater';
+import { FragmentPhysicsConfig, DEFAULT_FRAGMENT_PHYSICS } from './destruction/fragmentSimulation';
 
 type CameraMode = 'game' | 'inspect';
 
@@ -60,6 +74,8 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   let snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions);
   let controlState = configToControlState(renderCtx.renderConfig);
   let materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
+  let destructionSim: DestructionSimulationState | null = null;
+  let fragmentFilter: FragmentDebugFilter = 'all';
   const cameraOrientation = extractCameraOrientation(renderCtx.renderConfig);
   let cameraMode: CameraMode = ultra2Lab ? 'inspect' : 'game';
   let gameRotationAngle = 0;
@@ -123,12 +139,134 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   logVisualParameters(renderCtx);
 
   let pendingRebuild = false;
+  let destructionPanel: DestructionDebugPanel | null = null;
+  function triggerDestruction(level: number) {
+    const started = startLineDestructionFromBoard({
+      board: snapshot.board,
+      mapper: renderCtx.mapper,
+      levels: [level],
+      startedAtMs: performance.now(),
+    });
+    destructionSim = started.simulation;
+    console.log('[visual debug] StartLineDestruction', started.event, {
+      levels: started.scenario.levels,
+      activeCubes: destructionSim.activeCubes.length,
+      rows: started.scenario.perLevel.size,
+    });
+  }
+
+  function applyDestructionMask(board: Board, sim: DestructionSimulationState) {
+    sim.rows.perLevel.forEach((row) => {
+      row.cubes.forEach((cube, idx) => {
+        const renderWhole = shouldRenderWholeCube(row, idx);
+        board.setCell({ x: cube.id.x, y: cube.id.y }, renderWhole ? CellContent.Block : CellContent.Empty);
+      });
+    });
+  }
+
+  function collectFragmentUpdates(
+    sim: DestructionSimulationState
+  ): Record<FragmentMaterialId, FragmentInstanceUpdate[]> {
+    const map: Record<FragmentMaterialId, FragmentInstanceUpdate[]> = {
+      gold: [],
+      face: [],
+      inner: [],
+      dust: [],
+    };
+    sim.activeCubes.forEach((cubeSim) => {
+      cubeSim.fragments.forEach((fragment) => {
+        const updates = map[fragment.materialId];
+        updates.push({
+          instanceId: updates.length,
+          position: fragment.position.clone(),
+          rotation: fragment.rotation.clone(),
+          scale: fragment.scale.clone(),
+          fade: fragment.fade,
+          uvRect: fragment.uvRect,
+          colorTint: fragment.colorTint,
+        });
+      });
+    });
+    return map;
+  }
+
+  function renderFragmentInstances(
+    ctx: RenderContext,
+    sim: DestructionSimulationState | null
+  ): void {
+    const fragments = ctx.fragments;
+    if (!fragments) {
+      return;
+    }
+    if (!sim) {
+      Object.values(fragments.meshes).forEach((mesh) => {
+        mesh.count = 0;
+        mesh.instanceMatrix.needsUpdate = true;
+      });
+      return;
+    }
+    const updatesByMat = collectFragmentUpdates(sim);
+    const mats: FragmentMaterialId[] =
+      fragmentFilter === 'all'
+        ? ['gold', 'face', 'inner', 'dust']
+        : fragmentFilter === 'gold'
+          ? ['gold', 'inner']
+          : [fragmentFilter];
+    (['gold', 'face', 'inner', 'dust'] as const).forEach((mat) => {
+      const mesh = fragments.meshes[mat];
+      if (!mats.includes(mat)) {
+        mesh.count = 0;
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) {
+          mesh.instanceColor.needsUpdate = true;
+        }
+        return;
+      }
+      const updates = updatesByMat[mat];
+      const capped = updates.slice(0, fragments.capacity);
+      mesh.count = capped.length;
+      const base = fragments.materials[mat].color;
+      applyFragmentInstanceUpdates(mesh, capped, { r: base.r, g: base.g, b: base.b });
+    });
+  }
+
+  function getFragmentPhysicsConfig(): FragmentPhysicsConfig {
+    const base = DEFAULT_FRAGMENT_PHYSICS;
+    return {
+      ...base,
+      floor: { floorY: 0, minBounceSpeed: 0.8, bounceFactor: 0.35, smallOffset: 0.002 },
+      radiusLimit: {
+        center: new THREE.Vector3(0, 0, 0),
+        maxRadius: renderCtx.renderConfig.board.towerRadius * 2.6,
+        radialDamping: 2.2,
+        killOutside: false,
+      },
+    };
+  }
+
+  function ensureDestructionPanel(ctx: RenderContext) {
+    if (!destructionPanel) {
+      destructionPanel = createDestructionDebugPanel({
+        levels: getLevels(ctx.renderConfig.boardDimensions.height),
+        onDestroy: (level) => {
+          triggerDestruction(level);
+        },
+        onFilterChange: (filter) => {
+          fragmentFilter = filter;
+        },
+      });
+      attachPanelDisposalOnUnload(() => destructionPanel?.dispose());
+    } else {
+      destructionPanel.setLevels(getLevels(ctx.renderConfig.boardDimensions.height));
+    }
+  }
 
   function rebuildContextIfNeeded() {
     if (!pendingRebuild) {
       return;
     }
     pendingRebuild = false;
+    destructionSim = null;
 
     disposeRenderResources(renderCtx);
     const overrides = controlStateToOverrides(controlState, cameraOrientation);
@@ -146,6 +284,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     applyEnvDebugMode(renderCtx, controlState.envDebugMode);
     cameraMode = 'game';
     transitionCamera(renderCtx, renderCtx.cameraBasePlacement);
+    ensureDestructionPanel(renderCtx);
     logVisualParameters(renderCtx);
   }
 
@@ -154,6 +293,16 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     const now = performance.now();
     const dt = Math.max(0, now - lastFrameTime);
     lastFrameTime = now;
+    if (destructionSim) {
+      const withStarts = launchScheduledExplosions(destructionSim, now);
+      const stepped = stepDestructionSimulations(withStarts.state, dt, getFragmentPhysicsConfig());
+      destructionSim = stepped.state;
+      applyDestructionMask(snapshot.board, destructionSim);
+      if (destructionSim.rows.finished) {
+        destructionSim = null;
+      }
+    }
+    renderFragmentInstances(renderCtx, destructionSim);
     renderScene(renderCtx, snapshot);
     applyCameraMode(
       renderCtx,
@@ -172,6 +321,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
 
   requestAnimationFrame(loop);
 
+  ensureDestructionPanel(renderCtx);
   window.addEventListener('resize', () => {
     resizeRenderer(renderCtx, canvas.clientWidth, canvas.clientHeight);
   });
@@ -382,6 +532,16 @@ function attachCloseupHotkey(
   );
 }
 
+function attachPanelDisposalOnUnload(dispose: () => void): void {
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      dispose();
+    },
+    { once: true }
+  );
+}
+
 function transitionCamera(
   ctx: RenderContext,
   targetPlacement: { position: THREE.Vector3; target: THREE.Vector3 }
@@ -457,6 +617,14 @@ function createCloseupPlacement(ctx: RenderContext): {
     dir.y * radius
   );
   return { position, target };
+}
+
+function getLevels(height: number): number[] {
+  const result: number[] = [];
+  for (let y = 0; y < height; y += 1) {
+    result.push(y);
+  }
+  return result;
 }
 
 function computeMidHeight(dimensions: BoardDimensions, board: BoardRenderConfig): number {
