@@ -25,6 +25,18 @@ export class BoardToWorldMapper {
     return { ...this.dimensions };
   }
 
+  getBlockSize(): number {
+    return this.config.blockSize;
+  }
+
+  getBlockDepth(): number {
+    return this.config.blockDepth;
+  }
+
+  getVerticalSpacing(): number {
+    return this.config.verticalSpacing;
+  }
+
   cellToWorldPosition(
     x: number,
     y: number,

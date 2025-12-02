@@ -1,5 +1,5 @@
 export enum GameEventType {
-  LinesCleared = 'lines_cleared',
+  StartLineDestruction = 'StartLineDestruction',
   PieceLocked = 'piece_locked',
   NewPieceSpawned = 'new_piece_spawned',
   GameOver = 'game_over',
@@ -7,8 +7,8 @@ export enum GameEventType {
 
 export type GameEvent =
   | {
-      type: GameEventType.LinesCleared;
-      layers: number[];
+      type: GameEventType.StartLineDestruction;
+      clearedLevels: number[];
     }
   | {
       type: GameEventType.PieceLocked;

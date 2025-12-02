@@ -68,11 +68,14 @@ export class GameController {
     }
 
     const hadNoClearing = prev.clearingLayers.length === 0;
-    const startedClearing = current.clearingLayers.length > 0 && hadNoClearing;
+    const startedClearing =
+      current.clearingLayers.length > 0 &&
+      hadNoClearing &&
+      current.gameStatus === GameStatus.Clearing;
     if (startedClearing) {
       this.lastEvents.push({
-        type: GameEventType.LinesCleared,
-        layers: current.clearingLayers,
+        type: GameEventType.StartLineDestruction,
+        clearedLevels: current.clearingLayers,
       });
     }
 

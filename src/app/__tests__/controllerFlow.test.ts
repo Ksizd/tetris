@@ -28,7 +28,7 @@ describe('Controller flow: command -> state -> events', () => {
     expect(events).toContain(GameEventType.PieceLocked);
   });
 
-  it('clearing emits LinesCleared event', () => {
+  it('clearing emits StartLineDestruction event with levels payload', () => {
     const base = createInitialGameState();
     const board = Board.createEmpty(base.board.getDimensions());
     const width = board.getDimensions().width;
@@ -50,7 +50,10 @@ describe('Controller flow: command -> state -> events', () => {
     ctrl.enqueueCommand({ type: GameCommandType.HardDrop });
     ctrl.update(0);
 
-    expect(ctrl.getEvents().some((e) => e.type === GameEventType.LinesCleared)).toBe(true);
+    const events = ctrl.getEvents();
+    const started = events.find((e) => e.type === GameEventType.StartLineDestruction);
+    expect(started).toBeDefined();
+    expect(started && 'clearedLevels' in started ? started.clearedLevels : []).toEqual([0]);
   });
 
   it('blocked spawn leads to game over with event', () => {

@@ -15,3 +15,5 @@ export * from './towerBounds';
 export * from './debugOverlays';
 export { updateDebugOverlays } from './renderer';
 export * from './towerFootprint';
+export * from './destruction/types';
+export * from './destruction/instanceUpdater';

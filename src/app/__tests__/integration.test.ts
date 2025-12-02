@@ -28,7 +28,7 @@ describe('Integration: controller + domain', () => {
     expect(ctrl.getEvents().some((e) => e.type === GameEventType.PieceLocked)).toBe(true);
   });
 
-  it('sequence clears a layer', () => {
+  it('sequence triggers line destruction start event', () => {
     const base = createInitialGameState();
     const board = Board.createEmpty(base.board.getDimensions());
     for (let x = 0; x < board.getDimensions().width; x += 1) {
@@ -47,7 +47,9 @@ describe('Integration: controller + domain', () => {
     });
     ctrl.enqueueCommand({ type: GameCommandType.HardDrop });
     ctrl.update(0);
-    expect(ctrl.getEvents().some((e) => e.type === GameEventType.LinesCleared)).toBe(true);
+    expect(
+      ctrl.getEvents().some((e) => e.type === GameEventType.StartLineDestruction)
+    ).toBe(true);
   });
 
   it('goes to game over when spawn is blocked', () => {

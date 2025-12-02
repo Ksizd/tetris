@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { Board } from '../../board';
 import { CellContent } from '../../types';
-import { beginClearingPhase, completeClearingPhase, findFullLayers } from '../clearing';
+import {
+  beginClearingPhase,
+  completeClearingPhase,
+  finishLineDestruction,
+  findFullLayers,
+} from '../clearing';
 import { createInitialGameState } from '../initialState';
 import { GameStatus } from '../../types';
 
@@ -31,6 +36,26 @@ describe('findFullLayers', () => {
   });
 });
 
+describe('finishLineDestruction', () => {
+  it('finishes clearing by collapsing layers and resetting state', () => {
+    const state = createInitialGameState({ seed: 5 });
+    const board = state.board.clone();
+    const { width } = board.getDimensions();
+    for (let x = 0; x < width; x += 1) {
+      board.setCell({ x, y: 0 }, CellContent.Block);
+    }
+    const clearingState = { ...state, board, clearingLayers: [0], gameStatus: GameStatus.Clearing };
+
+    const finished = finishLineDestruction(clearingState);
+
+    expect(finished.clearingLayers).toEqual([]);
+    expect(finished.board.getCell({ x: 0, y: 0 })).toBe(CellContent.Empty);
+    expect(
+      finished.gameStatus === GameStatus.Running || finished.gameStatus === GameStatus.GameOver
+    ).toBe(true);
+  });
+});
+
 describe('beginClearingPhase', () => {
   it('marks clearing when layers are full', () => {
     const state = createInitialGameState();
@@ -41,6 +66,7 @@ describe('beginClearingPhase', () => {
     const next = beginClearingPhase({ ...state, board });
     expect(next.clearingLayers).toEqual([0]);
     expect(next.gameStatus).toBe(GameStatus.Clearing);
+    expect(next.board.getCell({ x: 0, y: 0 })).toBe(CellContent.Block);
   });
 
   it('keeps status when no layers to clear', () => {

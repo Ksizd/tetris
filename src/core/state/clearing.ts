@@ -97,3 +97,11 @@ function spawnNextPiece(state: GameState): GameState {
 
   return { ...state, currentPiece: spawn, gameStatus: GameStatus.Running };
 }
+
+/**
+ * Завершает фазу разрушения линий: вызывает существующую логику схлопывания clearedLayers и спавна следующей фигуры.
+ * Визуальный слой должен вызывать это только после завершения симуляции взрывов.
+ */
+export function finishLineDestruction(state: GameState): GameState {
+  return completeClearingPhase(state);
+}
