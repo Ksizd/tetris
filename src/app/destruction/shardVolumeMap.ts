@@ -1,5 +1,5 @@
-import { Vector2, Vector3 } from 'three';
-import { FaceId } from './cubeSpace';
+﻿import { Vector2, Vector3 } from 'three';
+import { CubeFace } from './cubeSpace';
 import { ShardTemplate } from './shardTemplate';
 import { getFaceBasis } from './shardGeometryBuilder';
 
@@ -61,7 +61,7 @@ export function computeShardLocalCenter(template: ShardTemplate): Vector3 {
 }
 
 /**
- * Эвристика: центр ближе к наружной поверхности, чем к центру куба → считаем, что осколок содержит наружную часть.
+ * Ð­Ð²Ñ€Ð¸ÑÑ‚Ð¸ÐºÐ°: Ñ†ÐµÐ½Ñ‚Ñ€ Ð±Ð»Ð¸Ð¶Ðµ Ðº Ð½Ð°Ñ€ÑƒÐ¶Ð½Ð¾Ð¹ Ð¿Ð¾Ð²ÐµÑ€Ñ…Ð½Ð¾ÑÑ‚Ð¸, Ñ‡ÐµÐ¼ Ðº Ñ†ÐµÐ½Ñ‚Ñ€Ñƒ ÐºÑƒÐ±Ð° â†’ ÑÑ‡Ð¸Ñ‚Ð°ÐµÐ¼, Ñ‡Ñ‚Ð¾ Ð¾ÑÐºÐ¾Ð»Ð¾Ðº ÑÐ¾Ð´ÐµÑ€Ð¶Ð¸Ñ‚ Ð½Ð°Ñ€ÑƒÐ¶Ð½ÑƒÑŽ Ñ‡Ð°ÑÑ‚ÑŒ.
  */
 export function isShardSurfaceBiased(template: ShardTemplate): boolean {
   const center = computeShardLocalCenter(template);
@@ -89,7 +89,7 @@ function pointInPolygon2D(point: Vector2, polygon: Vector2[]): boolean {
   return inside;
 }
 
-function projectPointToFace(face: FaceId, point: Vector3): { u: number; v: number; depth: number } {
+function projectPointToFace(face: CubeFace, point: Vector3): { u: number; v: number; depth: number } {
   const basis = getFaceBasis(face);
   const delta = point.clone().sub(basis.origin);
   const depth = -delta.dot(basis.normal); // positive = inward
@@ -140,8 +140,8 @@ export function estimateShardCoverage(
 }
 
 /**
- * Быстрая проверка: достаточно ли шаблонов перекрывают объём куба.
- * Немного “дырок” допускается, поэтому minCoveredFraction < 1.
+ * Ð‘Ñ‹ÑÑ‚Ñ€Ð°Ñ Ð¿Ñ€Ð¾Ð²ÐµÑ€ÐºÐ°: Ð´Ð¾ÑÑ‚Ð°Ñ‚Ð¾Ñ‡Ð½Ð¾ Ð»Ð¸ ÑˆÐ°Ð±Ð»Ð¾Ð½Ð¾Ð² Ð¿ÐµÑ€ÐµÐºÑ€Ñ‹Ð²Ð°ÑŽÑ‚ Ð¾Ð±ÑŠÑ‘Ð¼ ÐºÑƒÐ±Ð°.
+ * ÐÐµÐ¼Ð½Ð¾Ð³Ð¾ â€œÐ´Ñ‹Ñ€Ð¾Ðºâ€ Ð´Ð¾Ð¿ÑƒÑÐºÐ°ÐµÑ‚ÑÑ, Ð¿Ð¾ÑÑ‚Ð¾Ð¼Ñƒ minCoveredFraction < 1.
  */
 export function validateShardCoverage(
   templates: readonly ShardTemplate[],

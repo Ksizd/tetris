@@ -1,5 +1,5 @@
-import { Vector2 } from 'three';
-import { FaceId } from './cubeSpace';
+﻿import { Vector2 } from 'three';
+import { CubeFace } from './cubeSpace';
 import { ShardTemplate, validateShardTemplate } from './shardTemplate';
 
 type Axis = 'x' | 'y';
@@ -15,29 +15,29 @@ export interface DepthRange {
 }
 
 export interface ShardGenerationOptions {
-  faceCounts?: Partial<Record<FaceId, FaceCountRange>>;
+  faceCounts?: Partial<Record<CubeFace, FaceCountRange>>;
   minArea?: number; // in square units of the local face (full face area = 1)
   random?: () => number;
 }
 
-const DEFAULT_FACE_COUNTS: Record<FaceId, FaceCountRange> = {
-  front: { min: 6, max: 12 },
-  right: { min: 4, max: 8 },
-  left: { min: 4, max: 8 },
-  top: { min: 4, max: 8 },
-  bottom: { min: 4, max: 8 },
-  back: { min: 3, max: 5 },
+const DEFAULT_FACE_COUNTS: Record<CubeFace, FaceCountRange> = {
+  [CubeFace.Front]: { min: 6, max: 12 },
+  [CubeFace.Right]: { min: 4, max: 8 },
+  [CubeFace.Left]: { min: 4, max: 8 },
+  [CubeFace.Top]: { min: 4, max: 8 },
+  [CubeFace.Bottom]: { min: 4, max: 8 },
+  [CubeFace.Back]: { min: 3, max: 5 },
 };
 
-const DEFAULT_MIN_AREA = 0.02; // ~2% of face area to avoid микрополигонов
+const DEFAULT_MIN_AREA = 0.02; // ~2% of face area to avoid Ð¼Ð¸ÐºÑ€Ð¾Ð¿Ð¾Ð»Ð¸Ð³Ð¾Ð½Ð¾Ð²
 
-const DEPTH_RANGES: Record<FaceId, DepthRange> = {
-  front: { min: 0.05, max: 0.35 },
-  right: { min: 0.15, max: 0.55 },
-  left: { min: 0.15, max: 0.55 },
-  top: { min: 0.18, max: 0.58 },
-  bottom: { min: 0.18, max: 0.58 },
-  back: { min: 0.25, max: 0.65 },
+const DEPTH_RANGES: Record<CubeFace, DepthRange> = {
+  [CubeFace.Front]: { min: 0.05, max: 0.35 },
+  [CubeFace.Right]: { min: 0.15, max: 0.55 },
+  [CubeFace.Left]: { min: 0.15, max: 0.55 },
+  [CubeFace.Top]: { min: 0.18, max: 0.58 },
+  [CubeFace.Bottom]: { min: 0.18, max: 0.58 },
+  [CubeFace.Back]: { min: 0.25, max: 0.65 },
 };
 
 function randomInt(min: number, max: number, rnd: () => number): number {
@@ -176,7 +176,7 @@ function splitPolygonByLine(
 
 function randomNormal(rnd: () => number): Vector2 {
   let angle = rnd() * Math.PI * 2;
-  // Уходим от жёстко осевых углов, чтобы осколки не были координатно выровнены
+  // Ð£Ñ…Ð¾Ð´Ð¸Ð¼ Ð¾Ñ‚ Ð¶Ñ‘ÑÑ‚ÐºÐ¾ Ð¾ÑÐµÐ²Ñ‹Ñ… ÑƒÐ³Ð»Ð¾Ð², Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð¾ÑÐºÐ¾Ð»ÐºÐ¸ Ð½Ðµ Ð±Ñ‹Ð»Ð¸ ÐºÐ¾Ð¾Ñ€Ð´Ð¸Ð½Ð°Ñ‚Ð½Ð¾ Ð²Ñ‹Ñ€Ð¾Ð²Ð½ÐµÐ½Ñ‹
   if (Math.abs(Math.sin(angle)) < 0.15 || Math.abs(Math.cos(angle)) < 0.15) {
     angle += Math.PI * 0.35;
   }
@@ -222,7 +222,7 @@ function splitPolygonIrregular(
   if (split) {
     return split;
   }
-  // резервный подход: осевой разрез, если сырой рез не удался
+  // Ñ€ÐµÐ·ÐµÑ€Ð²Ð½Ñ‹Ð¹ Ð¿Ð¾Ð´Ñ…Ð¾Ð´: Ð¾ÑÐµÐ²Ð¾Ð¹ Ñ€Ð°Ð·Ñ€ÐµÐ·, ÐµÑÐ»Ð¸ ÑÑ‹Ñ€Ð¾Ð¹ Ñ€ÐµÐ· Ð½Ðµ ÑƒÐ´Ð°Ð»ÑÑ
   const box = boundingBox(poly);
   const axis: Axis = box.maxX - box.minX > box.maxY - box.minY ? 'x' : 'y';
   const center = axis === 'x' ? (box.minX + box.maxX) * 0.5 : (box.minY + box.maxY) * 0.5;
@@ -241,7 +241,7 @@ function splitUntil(
   const maxAttempts = targetCount * 20;
   while (polygons.length < targetCount && attempts < maxAttempts) {
     attempts += 1;
-    // выбираем самый крупный полигон, чтобы деление было устойчивым
+    // Ð²Ñ‹Ð±Ð¸Ñ€Ð°ÐµÐ¼ ÑÐ°Ð¼Ñ‹Ð¹ ÐºÑ€ÑƒÐ¿Ð½Ñ‹Ð¹ Ð¿Ð¾Ð»Ð¸Ð³Ð¾Ð½, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð±Ñ‹Ð»Ð¾ ÑƒÑÑ‚Ð¾Ð¹Ñ‡Ð¸Ð²Ñ‹Ð¼
     const areas = polygons.map((p) => polygonArea(p));
     let idx = 0;
     for (let i = 1; i < areas.length; i += 1) {
@@ -256,7 +256,7 @@ function splitUntil(
     }
   }
 
-  // Гарантия минимального числа шардов: если не добились minGuaranteed, режем грубо по центру крупнейшие
+  // Ð“Ð°Ñ€Ð°Ð½Ñ‚Ð¸Ñ Ð¼Ð¸Ð½Ð¸Ð¼Ð°Ð»ÑŒÐ½Ð¾Ð³Ð¾ Ñ‡Ð¸ÑÐ»Ð° ÑˆÐ°Ñ€Ð´Ð¾Ð²: ÐµÑÐ»Ð¸ Ð½Ðµ Ð´Ð¾Ð±Ð¸Ð»Ð¸ÑÑŒ minGuaranteed, Ñ€ÐµÐ¶ÐµÐ¼ Ð³Ñ€ÑƒÐ±Ð¾ Ð¿Ð¾ Ñ†ÐµÐ½Ñ‚Ñ€Ñƒ ÐºÑ€ÑƒÐ¿Ð½ÐµÐ¹ÑˆÐ¸Ðµ
   while (polygons.length < minGuaranteed) {
     const areas = polygons.map((p) => polygonArea(p));
     let idx = 0;
@@ -298,7 +298,7 @@ function generateSeedPoints(rnd: () => number): Vector2[] {
       points.push(new Vector2(clamp(baseX + jx, -0.5, 0.5), clamp(baseY + jy, -0.5, 0.5)));
     }
   }
-  // пара любых внутренних точек для более хаотичных осей
+  // Ð¿Ð°Ñ€Ð° Ð»ÑŽÐ±Ñ‹Ñ… Ð²Ð½ÑƒÑ‚Ñ€ÐµÐ½Ð½Ð¸Ñ… Ñ‚Ð¾Ñ‡ÐµÐº Ð´Ð»Ñ Ð±Ð¾Ð»ÐµÐµ Ñ…Ð°Ð¾Ñ‚Ð¸Ñ‡Ð½Ñ‹Ñ… Ð¾ÑÐµÐ¹
   const extras = 3;
   for (let i = 0; i < extras; i += 1) {
     points.push(new Vector2(-0.45 + rnd() * 0.9, -0.45 + rnd() * 0.9));
@@ -327,18 +327,18 @@ function polygonCentroid(vertices: Vector2[]): Vector2 {
 }
 
 export function computeDepthRange(
-  face: FaceId,
+  face: CubeFace,
   vertices: Vector2[],
   baseRange: DepthRange
 ): DepthRange {
   const centroid = polygonCentroid(vertices);
   const maxRadius = Math.SQRT2 * 0.5;
   const distance = clamp(centroid.length() / maxRadius, 0, 1);
-  const closeness = 1 - distance; // 1 = центр, 0 = край
+  const closeness = 1 - distance; // 1 = Ñ†ÐµÐ½Ñ‚Ñ€, 0 = ÐºÑ€Ð°Ð¹
   const span = baseRange.max - baseRange.min;
-  const spanFactor = 0.8 + 0.2 * closeness; // центр получает полный span, край ~80%
+  const spanFactor = 0.8 + 0.2 * closeness; // Ñ†ÐµÐ½Ñ‚Ñ€ Ð¿Ð¾Ð»ÑƒÑ‡Ð°ÐµÑ‚ Ð¿Ð¾Ð»Ð½Ñ‹Ð¹ span, ÐºÑ€Ð°Ð¹ ~80%
   const maxDepth = baseRange.min + span * spanFactor;
-  const minDepth = baseRange.min + span * spanFactor * 0.5; // половина от выбранного span, чтобы ближе к центру было толще
+  const minDepth = baseRange.min + span * spanFactor * 0.5; // Ð¿Ð¾Ð»Ð¾Ð²Ð¸Ð½Ð° Ð¾Ñ‚ Ð²Ñ‹Ð±Ñ€Ð°Ð½Ð½Ð¾Ð³Ð¾ span, Ñ‡Ñ‚Ð¾Ð±Ñ‹ Ð±Ð»Ð¸Ð¶Ðµ Ðº Ñ†ÐµÐ½Ñ‚Ñ€Ñƒ Ð±Ñ‹Ð»Ð¾ Ñ‚Ð¾Ð»Ñ‰Ðµ
   return {
     min: clamp(minDepth, baseRange.min, baseRange.max),
     max: clamp(maxDepth, baseRange.min, baseRange.max),
@@ -346,7 +346,7 @@ export function computeDepthRange(
 }
 
 function buildFacePolygons(
-  face: FaceId,
+  face: CubeFace,
   targetRange: FaceCountRange,
   minArea: number,
   rnd: () => number
@@ -359,7 +359,7 @@ function buildFacePolygons(
   return result;
 }
 
-function toTemplates(face: FaceId, polygons: Vector2[][], nextId: () => number): ShardTemplate[] {
+function toTemplates(face: CubeFace, polygons: Vector2[][], nextId: () => number): ShardTemplate[] {
   const depthRange = DEPTH_RANGES[face];
   return polygons.map((poly) => ({
     id: nextId(),
@@ -373,11 +373,11 @@ function toTemplates(face: FaceId, polygons: Vector2[][], nextId: () => number):
 }
 
 /**
- * Строит набор ShardTemplate для всех граней куба. Теперь используем хаотичные разрезы
- * (життерная сетка + псевдо-Voronoi-плоскости), чтобы уйти от прямоугольных кирпичей.
+ * Ð¡Ñ‚Ñ€Ð¾Ð¸Ñ‚ Ð½Ð°Ð±Ð¾Ñ€ ShardTemplate Ð´Ð»Ñ Ð²ÑÐµÑ… Ð³Ñ€Ð°Ð½ÐµÐ¹ ÐºÑƒÐ±Ð°. Ð¢ÐµÐ¿ÐµÑ€ÑŒ Ð¸ÑÐ¿Ð¾Ð»ÑŒÐ·ÑƒÐµÐ¼ Ñ…Ð°Ð¾Ñ‚Ð¸Ñ‡Ð½Ñ‹Ðµ Ñ€Ð°Ð·Ñ€ÐµÐ·Ñ‹
+ * (Ð¶Ð¸Ñ‚Ñ‚ÐµÑ€Ð½Ð°Ñ ÑÐµÑ‚ÐºÐ° + Ð¿ÑÐµÐ²Ð´Ð¾-Voronoi-Ð¿Ð»Ð¾ÑÐºÐ¾ÑÑ‚Ð¸), Ñ‡Ñ‚Ð¾Ð±Ñ‹ ÑƒÐ¹Ñ‚Ð¸ Ð¾Ñ‚ Ð¿Ñ€ÑÐ¼Ð¾ÑƒÐ³Ð¾Ð»ÑŒÐ½Ñ‹Ñ… ÐºÐ¸Ñ€Ð¿Ð¸Ñ‡ÐµÐ¹.
  */
 export function generateShardTemplates(options: ShardGenerationOptions = {}): ShardTemplate[] {
-  const counts: Record<FaceId, FaceCountRange> = {
+  const counts: Record<CubeFace, FaceCountRange> = {
     ...DEFAULT_FACE_COUNTS,
     ...(options.faceCounts ?? {}),
   };
@@ -389,7 +389,14 @@ export function generateShardTemplates(options: ShardGenerationOptions = {}): Sh
     return idCounter;
   };
 
-  const faces: FaceId[] = ['front', 'right', 'left', 'top', 'bottom', 'back'];
+  const faces: CubeFace[] = [
+    CubeFace.Front,
+    CubeFace.Right,
+    CubeFace.Left,
+    CubeFace.Top,
+    CubeFace.Bottom,
+    CubeFace.Back,
+  ];
   const all: ShardTemplate[] = [];
   faces.forEach((face) => {
     const polys = buildFacePolygons(face, counts[face], minArea, rnd);

@@ -3,6 +3,7 @@ import { Vector2 } from 'three';
 import { buildShardGeometry } from '../shardGeometryBuilder';
 import { ShardTemplate } from '../shardTemplate';
 import { FaceUvRect } from '../faceUvRect';
+import { CubeFace } from '../cubeSpace';
 
 function constantRng(value: number): () => number {
   return () => value;
@@ -10,9 +11,9 @@ function constantRng(value: number): () => number {
 
 const TRI_TEMPLATE: ShardTemplate = {
   id: 7,
-  face: 'front',
+  face: CubeFace.Front,
   polygon2D: {
-    face: 'front',
+    face: CubeFace.Front,
     vertices: [new Vector2(-0.2, -0.2), new Vector2(0.25, -0.1), new Vector2(0.1, 0.25)],
   },
   depthMin: 0.1,
@@ -49,13 +50,13 @@ describe('shardGeometryBuilder', () => {
   });
 
   it('applies custom face UV rects (universality)', () => {
-    const custom: Record<'front' | 'right' | 'left' | 'top' | 'bottom' | 'back', FaceUvRect> = {
-      front: { face: 'front', u0: 0.2, v0: 0.2, u1: 0.4, v1: 0.4 },
-      right: { face: 'right', u0: 0, v0: 0, u1: 1, v1: 1 },
-      left: { face: 'left', u0: 0, v0: 0, u1: 1, v1: 1 },
-      top: { face: 'top', u0: 0, v0: 0, u1: 1, v1: 1 },
-      bottom: { face: 'bottom', u0: 0, v0: 0, u1: 1, v1: 1 },
-      back: { face: 'back', u0: 0, v0: 0, u1: 1, v1: 1 },
+    const custom: Record<CubeFace, FaceUvRect> = {
+      [CubeFace.Front]: { face: CubeFace.Front, u0: 0.2, v0: 0.2, u1: 0.4, v1: 0.4 },
+      [CubeFace.Right]: { face: CubeFace.Right, u0: 0, v0: 0, u1: 1, v1: 1 },
+      [CubeFace.Left]: { face: CubeFace.Left, u0: 0, v0: 0, u1: 1, v1: 1 },
+      [CubeFace.Top]: { face: CubeFace.Top, u0: 0, v0: 0, u1: 1, v1: 1 },
+      [CubeFace.Bottom]: { face: CubeFace.Bottom, u0: 0, v0: 0, u1: 1, v1: 1 },
+      [CubeFace.Back]: { face: CubeFace.Back, u0: 0, v0: 0, u1: 1, v1: 1 },
     };
     const geom = buildShardGeometry(TRI_TEMPLATE, {
       random: constantRng(0.5),

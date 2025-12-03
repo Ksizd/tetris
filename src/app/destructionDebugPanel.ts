@@ -6,7 +6,7 @@ export interface DestructionDebugPanel {
   onShowSourceRegion?: () => void;
 }
 
-export type FragmentDebugFilter = 'all' | 'face' | 'gold' | 'dust';
+export type FragmentDebugFilter = 'all' | 'face' | 'gold' | 'dust' | 'fractureDebug';
 
 export interface DestructionDebugOptions {
   levels: number[];
@@ -95,7 +95,7 @@ export function createDestructionDebugPanel(options: DestructionDebugOptions): D
   const filterSelect = document.createElement('select');
   filterSelect.style.width = '100%';
   filterSelect.style.padding = '4px';
-  ['all', 'face', 'gold', 'dust'].forEach((key) => {
+  ['all', 'face', 'gold', 'dust', 'fractureDebug'].forEach((key) => {
     const opt = document.createElement('option');
     opt.value = key;
     opt.textContent = key;

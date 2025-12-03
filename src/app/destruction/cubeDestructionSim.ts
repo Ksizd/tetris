@@ -20,6 +20,7 @@ export interface FragmentUvRect {
 
 export interface Fragment {
   kind: FragmentKind;
+  shardId?: number;
   position: Vector3;
   velocity: Vector3;
   rotation: Quaternion;
@@ -55,6 +56,7 @@ export function createFragment(params: {
   uvRect?: FragmentUvRect;
   colorTint?: number;
   templateId?: number;
+  shardId?: number;
 }): Fragment {
   return {
     ...params,

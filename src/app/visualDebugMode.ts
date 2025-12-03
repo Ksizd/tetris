@@ -37,7 +37,7 @@ import { applyFragmentInstanceUpdates } from '../render/destruction/instanceUpda
 import { FragmentPhysicsConfig, DEFAULT_FRAGMENT_PHYSICS } from './destruction/fragmentSimulation';
 import { buildShardGeometryLibrary, makeFragmentFromTemplate } from './destruction/shardFragmentFactory';
 import { getDefaultShardTemplateSet } from './destruction/shardTemplateSet';
-import { FACE_NORMALS } from './destruction/cubeSpace';
+import { FACE_NORMALS, CubeFace } from './destruction/cubeSpace';
 import { FaceUvRect, DEFAULT_FACE_UV_RECTS } from './destruction/faceUvRect';
 
 type CameraMode = 'game' | 'inspect';
@@ -80,6 +80,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   let materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
   let destructionSim: DestructionSimulationState | null = null;
   let fragmentFilter: FragmentDebugFilter = 'all';
+  let fractureDebugGroup: THREE.Group | null = null;
   let showSourceRegion = false;
   let sourceRegionGroup: THREE.Group | null = null;
   let sourceOverlay: {
@@ -209,6 +210,87 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     return map;
   }
 
+  function buildFractureDebugGroup(ctx: RenderContext): THREE.Group | null {
+    if (!ctx.fragments) return null;
+    const group = new THREE.Group();
+    ctx.fragments.geometryLibrary.forEach((res) => {
+      const materialId = ctx.fragments.templateMaterial.get(res.templateId) ?? 'gold';
+      const material = ctx.fragments.materials[materialId];
+      const mesh = new THREE.Mesh(res.geometry, material);
+      mesh.name = `fracture-debug-${res.templateId}`;
+      mesh.userData.shardId = res.templateId;
+      mesh.userData.originalMaterial = material;
+      group.add(mesh);
+
+      const wire = new THREE.LineSegments(
+        new THREE.WireframeGeometry(res.geometry),
+        new THREE.LineBasicMaterial({ color: materialId === 'face' ? 0x44aaff : 0xffcc66 })
+      );
+      wire.name = `fracture-debug-wire-${res.templateId}`;
+      wire.userData.shardId = res.templateId;
+      group.add(wire);
+    });
+    return group;
+  }
+
+  function ensureFractureDebugGroup(ctx: RenderContext): void {
+    if (!fractureDebugGroup) {
+      fractureDebugGroup = buildFractureDebugGroup(ctx);
+      if (fractureDebugGroup) {
+        ctx.scene.add(fractureDebugGroup);
+      }
+    }
+    if (fractureDebugGroup) {
+      fractureDebugGroup.visible = true;
+    }
+  }
+
+  function removeFractureDebugGroup(ctx: RenderContext): void {
+    if (fractureDebugGroup) {
+      ctx.scene.remove(fractureDebugGroup);
+      fractureDebugGroup.traverse((obj) => {
+        if (obj.type === 'LineSegments') {
+          const line = obj as THREE.LineSegments;
+          line.geometry.dispose();
+          (line.material as THREE.Material).dispose();
+        } else if (obj.type === 'Mesh') {
+          const mesh = obj as THREE.Mesh;
+          if (mesh.geometry instanceof THREE.WireframeGeometry) {
+            mesh.geometry.dispose();
+          }
+        }
+      });
+    }
+    fractureDebugGroup = null;
+  }
+
+  function attachFractureHover(ctx: RenderContext): void {
+    const canvas = ctx.renderer.domElement;
+    const onMove = (ev: PointerEvent) => {
+      if (fragmentFilter !== 'fractureDebug' || !fractureDebugGroup) {
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, ctx.camera);
+      const hits = raycaster.intersectObjects(fractureDebugGroup.children, false);
+      const first = hits[0]?.object as THREE.Mesh | THREE.LineSegments | undefined;
+      const mesh =
+        (first as any as THREE.Mesh)?.isMesh
+          ? (first as THREE.Mesh)
+          : (first?.parent as THREE.Mesh | undefined);
+      if (mesh) {
+        mesh.userData.originalMaterial = mesh.userData.originalMaterial ?? mesh.material;
+      }
+      setHighlight(mesh ?? null);
+      if (mesh?.userData?.shardId !== undefined) {
+        console.info('[fracture-debug] shardId', mesh.userData.shardId);
+      }
+    };
+    canvas.addEventListener('pointermove', onMove);
+  }
+
   function renderFragmentInstances(
     ctx: RenderContext,
     sim: DestructionSimulationState | null
@@ -217,11 +299,17 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     if (!fragments) {
       return;
     }
+    const isFractureDebug = fragmentFilter === 'fractureDebug';
     fragments.meshesByTemplate.forEach((mesh) => {
       mesh.count = 0;
       mesh.visible = false;
       mesh.instanceMatrix.needsUpdate = true;
     });
+    if (isFractureDebug) {
+      ensureFractureDebugGroup(ctx);
+      return;
+    }
+    removeFractureDebugGroup(ctx);
     if (!sim) {
       return;
     }
@@ -250,6 +338,13 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     });
   }
 
+  function onFragmentFilterChange(filter: FragmentDebugFilter) {
+    fragmentFilter = filter;
+    if (fragmentFilter !== 'fractureDebug') {
+      removeFractureDebugGroup(renderCtx);
+    }
+  }
+
   function getFragmentPhysicsConfig(): FragmentPhysicsConfig {
     const base = DEFAULT_FRAGMENT_PHYSICS;
     return {
@@ -272,7 +367,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
           triggerDestruction(level);
         },
         onFilterChange: (filter) => {
-          fragmentFilter = filter;
+          onFragmentFilterChange(filter);
         },
         onShowSourceRegion: () => {
           showStaticSourceRegion(ctx);
@@ -291,6 +386,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     pendingRebuild = false;
     destructionSim = null;
     clearSourceRegionGroup();
+    removeFractureDebugGroup(renderCtx);
 
     disposeRenderResources(renderCtx);
     const overrides = controlStateToOverrides(controlState, cameraOrientation);
@@ -547,7 +643,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
-       if (tpl.face === 'front') {
+       if (tpl.face === CubeFace.Front) {
          const verts = tpl.polygon2D.vertices.map((v) => ({
            x: v.x,
            y: v.y,
@@ -563,6 +659,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     cameraMode = 'inspect';
     switchToInspect();
     console.info('[visual debug] source region view enabled');
+    attachFractureHover(renderCtx);
   }
 }
 

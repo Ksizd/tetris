@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Vector2 } from 'three';
 import { computeDepthRange, generateShardTemplates, DepthRange } from '../shardTemplateGenerator';
 import { validateShardTemplate } from '../shardTemplate';
-import { FaceId } from '../cubeSpace';
+import { CubeFace } from '../cubeSpace';
 
 function makeRng(seed: number): () => number {
   let state = seed >>> 0;
@@ -16,17 +16,17 @@ describe('shardTemplateGenerator', () => {
   it('generates shards for all faces within expected counts and validation', () => {
     const rnd = makeRng(1234);
     const shards = generateShardTemplates({ random: rnd });
-    const byFace = new Map<FaceId, number>();
+    const byFace = new Map<CubeFace, number>();
     shards.forEach((s) => byFace.set(s.face, (byFace.get(s.face) ?? 0) + 1));
 
-    expect(byFace.get('front')).toBeGreaterThanOrEqual(6);
-    expect(byFace.get('front')).toBeLessThanOrEqual(12);
-    ['right', 'left', 'top', 'bottom'].forEach((face) => {
-      const count = byFace.get(face as FaceId) ?? 0;
+    expect(byFace.get(CubeFace.Front)).toBeGreaterThanOrEqual(6);
+    expect(byFace.get(CubeFace.Front)).toBeLessThanOrEqual(12);
+    [CubeFace.Right, CubeFace.Left, CubeFace.Top, CubeFace.Bottom].forEach((face) => {
+      const count = byFace.get(face) ?? 0;
       expect(count).toBeGreaterThanOrEqual(4);
       expect(count).toBeLessThanOrEqual(8);
     });
-    const backCount = byFace.get('back') ?? 0;
+    const backCount = byFace.get(CubeFace.Back) ?? 0;
     expect(backCount).toBeGreaterThanOrEqual(3);
     expect(backCount).toBeLessThanOrEqual(5);
 
@@ -42,8 +42,8 @@ describe('shardTemplateGenerator', () => {
     const base: DepthRange = { min: 0.1, max: 0.5 };
     const centerPoly = [new Vector2(-0.1, -0.1), new Vector2(0.1, -0.1), new Vector2(0.1, 0.1), new Vector2(-0.1, 0.1)];
     const edgePoly = [new Vector2(0.3, 0.3), new Vector2(0.5, 0.3), new Vector2(0.5, 0.5), new Vector2(0.3, 0.5)];
-    const centerDepth = computeDepthRange('front', centerPoly, base);
-    const edgeDepth = computeDepthRange('front', edgePoly, base);
+    const centerDepth = computeDepthRange(CubeFace.Front, centerPoly, base);
+    const edgeDepth = computeDepthRange(CubeFace.Front, edgePoly, base);
     expect(centerDepth.max).toBeGreaterThan(edgeDepth.max);
     expect(centerDepth.min).toBeGreaterThan(edgeDepth.min);
   });

@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Vector2 } from 'three';
+import { CubeFace } from '../cubeSpace';
 import { ShardTemplate, validateShardTemplate } from '../shardTemplate';
 
 function makeValidTemplate(): ShardTemplate {
   return {
     id: 1,
-    face: 'front',
+    face: CubeFace.Front,
     polygon2D: {
-      face: 'front',
+      face: CubeFace.Front,
       vertices: [new Vector2(-0.2, -0.2), new Vector2(0.3, -0.1), new Vector2(0.1, 0.25)],
     },
     depthMin: 0.1,

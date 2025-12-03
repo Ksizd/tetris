@@ -10,6 +10,7 @@ export interface FragmentInstanceUpdate {
   uvRect?: { u0: number; v0: number; u1: number; v1: number };
   colorTint?: number;
   templateId?: number;
+  shardId?: number;
   materialId?: FragmentMaterialId;
 }
 
@@ -29,6 +30,7 @@ export function buildFragmentInstanceUpdates(
     uvRect: fragment.uvRect,
     colorTint: fragment.colorTint,
     templateId: fragment.templateId,
+    shardId: fragment.shardId,
     materialId: fragment.materialId,
   }));
 }

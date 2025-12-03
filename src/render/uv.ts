@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { CubeFace } from '../app/destruction/cubeSpace';
+import { DEFAULT_CUBE_UV_LAYOUT } from '../app/destruction/faceUvRect';
 
 /**
  * Applies consistent 0..1 UVs to all faces of a BoxGeometry to avoid mirrored tiles.
@@ -65,7 +67,7 @@ export function applyMahjongUVLayout(geometry: THREE.BufferGeometry): THREE.Buff
     pos.fromBufferAttribute(positions, i);
     normal.fromBufferAttribute(normals, i);
     const plane = resolvePlane(normal);
-    const region = plane === 'front' ? FRONT_REGION : SIDE_REGION;
+    const region = plane === CubeFace.Front ? FRONT_REGION : SIDE_REGION;
     const { u, v } = projectToPlane(pos, size, half, plane);
 
     uv.push(mapRange(u, region.u), mapRange(v, region.v));
@@ -80,7 +82,7 @@ export function applyMahjongUVLayout(geometry: THREE.BufferGeometry): THREE.Buff
   return geometry;
 }
 
-type Plane = 'front' | 'back' | 'left' | 'right' | 'top' | 'bottom';
+type Plane = CubeFace;
 
 interface Range {
   min: number;
@@ -92,15 +94,15 @@ interface Region {
   v: Range;
 }
 
-const FRONT_REGION: Region = {
-  u: { min: 0.08, max: 0.92 },
-  v: { min: 0.55, max: 0.95 },
-};
+function rectToRegion(rect: { u0: number; u1: number; v0: number; v1: number }): Region {
+  return {
+    u: { min: rect.u0, max: rect.u1 },
+    v: { min: rect.v0, max: rect.v1 },
+  };
+}
 
-const SIDE_REGION: Region = {
-  u: { min: 0.08, max: 0.92 },
-  v: { min: 0.05, max: 0.45 },
-};
+const FRONT_REGION: Region = rectToRegion(DEFAULT_CUBE_UV_LAYOUT.faces[CubeFace.Front]);
+const SIDE_REGION: Region = rectToRegion(DEFAULT_CUBE_UV_LAYOUT.faces[CubeFace.Right]);
 
 function resolvePlane(normal: THREE.Vector3): Plane {
   const ax = Math.abs(normal.x);
@@ -108,12 +110,12 @@ function resolvePlane(normal: THREE.Vector3): Plane {
   const az = Math.abs(normal.z);
 
   if (az >= ax && az >= ay) {
-    return normal.z >= 0 ? 'front' : 'back';
+    return normal.z >= 0 ? CubeFace.Front : CubeFace.Back;
   }
   if (ax >= ay && ax >= az) {
-    return normal.x >= 0 ? 'right' : 'left';
+    return normal.x >= 0 ? CubeFace.Right : CubeFace.Left;
   }
-  return normal.y >= 0 ? 'top' : 'bottom';
+  return normal.y >= 0 ? CubeFace.Top : CubeFace.Bottom;
 }
 
 function projectToPlane(
@@ -123,20 +125,20 @@ function projectToPlane(
   plane: Plane
 ): { u: number; v: number } {
   switch (plane) {
-    case 'front':
-    case 'back':
+    case CubeFace.Front:
+    case CubeFace.Back:
       return {
         u: (pos.x + half.x) / size.x,
         v: (pos.y + half.y) / size.y,
       };
-    case 'right':
-    case 'left':
+    case CubeFace.Right:
+    case CubeFace.Left:
       return {
         u: (pos.z + half.z) / size.z,
         v: (pos.y + half.y) / size.y,
       };
-    case 'top':
-    case 'bottom':
+    case CubeFace.Top:
+    case CubeFace.Bottom:
     default:
       return {
         u: (pos.x + half.x) / size.x,

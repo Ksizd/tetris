@@ -1,11 +1,11 @@
 import { Vector2, Vector3 } from 'three';
-import { FaceId, FACE_NORMALS } from './cubeSpace';
+import { CubeFace, FACE_NORMALS } from './cubeSpace';
 import { ShardTemplate } from './shardTemplate';
 import { DEFAULT_FACE_UV_RECTS, FaceUvRect } from './faceUvRect';
 
 export interface ShardGeometry {
   templateId: number;
-  face: FaceId;
+  face: CubeFace;
   positions: Vector3[];
   indices: number[];
   normals: Vector3[]; // optional: precomputed per-vertex normals; if empty, caller can compute
@@ -18,7 +18,7 @@ export interface ShardGeometry {
 
 export interface ShardGeometryBuildOptions {
   random?: () => number;
-  faceUvRects?: Record<FaceId, FaceUvRect>;
+  faceUvRects?: Record<CubeFace, FaceUvRect>;
   sideNoiseRadius?: number; // perturbation magnitude for back vertices to break perfect prisms
 }
 
@@ -29,46 +29,46 @@ interface FaceBasis {
   normal: Vector3;
 }
 
-const FACE_BASIS: Record<FaceId, FaceBasis> = {
-  front: {
+const FACE_BASIS: Record<CubeFace, FaceBasis> = {
+  [CubeFace.Front]: {
     origin: new Vector3(0, 0, 0.5),
     u: new Vector3(1, 0, 0),
     v: new Vector3(0, 1, 0),
-    normal: FACE_NORMALS.front.clone(),
+    normal: FACE_NORMALS[CubeFace.Front].clone(),
   },
-  back: {
+  [CubeFace.Back]: {
     origin: new Vector3(0, 0, -0.5),
     u: new Vector3(-1, 0, 0),
     v: new Vector3(0, 1, 0),
-    normal: FACE_NORMALS.back.clone(),
+    normal: FACE_NORMALS[CubeFace.Back].clone(),
   },
-  right: {
+  [CubeFace.Right]: {
     origin: new Vector3(0.5, 0, 0),
     u: new Vector3(0, 0, -1),
     v: new Vector3(0, 1, 0),
-    normal: FACE_NORMALS.right.clone(),
+    normal: FACE_NORMALS[CubeFace.Right].clone(),
   },
-  left: {
+  [CubeFace.Left]: {
     origin: new Vector3(-0.5, 0, 0),
     u: new Vector3(0, 0, 1),
     v: new Vector3(0, 1, 0),
-    normal: FACE_NORMALS.left.clone(),
+    normal: FACE_NORMALS[CubeFace.Left].clone(),
   },
-  top: {
+  [CubeFace.Top]: {
     origin: new Vector3(0, 0.5, 0),
     u: new Vector3(1, 0, 0),
     v: new Vector3(0, 0, -1),
-    normal: FACE_NORMALS.top.clone(),
+    normal: FACE_NORMALS[CubeFace.Top].clone(),
   },
-  bottom: {
+  [CubeFace.Bottom]: {
     origin: new Vector3(0, -0.5, 0),
     u: new Vector3(1, 0, 0),
     v: new Vector3(0, 0, 1),
-    normal: FACE_NORMALS.bottom.clone(),
+    normal: FACE_NORMALS[CubeFace.Bottom].clone(),
   },
 };
 
-export function getFaceBasis(face: FaceId): FaceBasis {
+export function getFaceBasis(face: CubeFace): FaceBasis {
   const b = FACE_BASIS[face];
   return {
     origin: b.origin.clone(),
@@ -102,7 +102,7 @@ function ensureCCW(vertices: Vector2[]): Vector2[] {
   return signedArea2D(vertices) < 0 ? [...vertices].reverse() : vertices;
 }
 
-function projectToFace(face: FaceId, vertex: Vector2, depth: number): Vector3 {
+function projectToFace(face: CubeFace, vertex: Vector2, depth: number): Vector3 {
   const basis = FACE_BASIS[face];
   const pos = basis.origin.clone();
   pos.addScaledVector(basis.u, vertex.x);
@@ -128,7 +128,7 @@ function randomVectorInSphere(radius: number, rnd: () => number): Vector3 {
   return v.set(0, 0, 0);
 }
 
-function applySideNoiseToBack(vertices: Vector3[], face: FaceId, radius: number, rnd: () => number) {
+function applySideNoiseToBack(vertices: Vector3[], face: CubeFace, radius: number, rnd: () => number) {
   if (radius <= 0) {
     return;
   }
@@ -147,7 +147,7 @@ function applySideNoiseToBack(vertices: Vector3[], face: FaceId, radius: number,
 function buildNormals(
   positions: Vector3[],
   indices: number[],
-  face: FaceId,
+  face: CubeFace,
   backOffset: number,
   frontVertexCount: number
 ): Vector3[] {
@@ -185,7 +185,7 @@ function toUnitSquare(v: Vector2): { sx: number; sy: number } {
   return { sx: (v.x + 0.5) / 1.0, sy: (v.y + 0.5) / 1.0 };
 }
 
-function buildUVs(face: FaceId, polygon: Vector2[], rects: Record<FaceId, FaceUvRect>): Vector2[] {
+function buildUVs(face: CubeFace, polygon: Vector2[], rects: Record<CubeFace, FaceUvRect>): Vector2[] {
   const rect = rects[face];
   const uvs: Vector2[] = [];
   polygon.forEach((v) => {

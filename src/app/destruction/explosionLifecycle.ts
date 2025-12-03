@@ -14,7 +14,7 @@ import { FRAGMENT_KIND_INITIAL_CONFIG } from './fragmentKindConfig';
 import { getDefaultShardTemplateSet } from './shardTemplateSet';
 import { computeShardLocalCenter } from './shardVolumeMap';
 import { DEFAULT_FACE_UV_RECTS } from './faceUvRect';
-import { FaceId } from './cubeSpace';
+import { CubeFace } from './cubeSpace';
 
 function getSlotForCube(row: RowDestructionSim, cubeIndex: number): CubeExplosionSlot | null {
   return row.explosions.find((slot) => slot.cubeIndex === cubeIndex) ?? null;
@@ -68,11 +68,11 @@ function jitterQuaternion(maxAngleRad: number): Quaternion {
   return new Quaternion().setFromAxisAngle(axis, angle);
 }
 
-function computeUvRectForPolygon(face: FaceId, vertices: Vector3[]): Fragment['uvRect'] | undefined {
-  if (face !== 'front') {
+function computeUvRectForPolygon(face: CubeFace, vertices: Vector3[]): Fragment['uvRect'] | undefined {
+  if (face !== CubeFace.Front) {
     return undefined;
   }
-  const rect = DEFAULT_FACE_UV_RECTS.front;
+  const rect = DEFAULT_FACE_UV_RECTS[CubeFace.Front];
   let u0 = Infinity;
   let u1 = -Infinity;
   let v0 = Infinity;
@@ -134,6 +134,7 @@ function spawnFragmentsForCubeV1(
 
     const fragment = createFragment({
       kind: tpl.kind,
+      shardId: tpl.id,
       position,
       velocity,
       rotation,
@@ -163,7 +164,7 @@ function spawnFragmentsFromShardTemplates(
   const towerCenter = new Vector3(0, 0, 0);
   const templates = getDefaultShardTemplateSet().templates;
   templates.forEach((tpl) => {
-    const kind: FragmentKind = tpl.face === 'front' ? 'faceShard' : 'edgeShard';
+    const kind: FragmentKind = tpl.face === CubeFace.Front ? 'faceShard' : 'edgeShard';
     const kindConfig = FRAGMENT_KIND_INITIAL_CONFIG[kind];
     const localCenter = computeShardLocalCenter(tpl);
     const worldCenter = cube.worldPos.clone().add(
@@ -190,7 +191,7 @@ function spawnFragmentsFromShardTemplates(
     const scaleJitter = randomInRange(kindConfig.scaleJitter[0], kindConfig.scaleJitter[1]);
     const scale = new Vector3(1, 1, 1).multiplyScalar(scaleJitter);
     const colorTint = randomInRange(kindConfig.colorTint[0], kindConfig.colorTint[1]);
-    const materialId: Fragment['materialId'] = tpl.face === 'front' ? 'face' : 'gold';
+    const materialId: Fragment['materialId'] = tpl.face === CubeFace.Front ? 'face' : 'gold';
     const uvRect = computeUvRectForPolygon(
       tpl.face,
       tpl.polygon2D.vertices.map((v) => new Vector3(v.x, v.y, 0))
@@ -213,6 +214,7 @@ function spawnFragmentsFromShardTemplates(
         uvRect,
         colorTint,
         templateId: tpl.id,
+        shardId: tpl.id,
       })
     );
   });

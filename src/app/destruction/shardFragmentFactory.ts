@@ -9,6 +9,7 @@ import {
   computeShardLocalCenter,
   isShardSurfaceBiased,
 } from './shardVolumeMap';
+import { CubeFace } from './cubeSpace';
 
 export interface ShardGeometryResource {
   templateId: number;
@@ -21,7 +22,7 @@ export interface ShardGeometryResource {
 export type ShardGeometryLibrary = Map<number, ShardGeometryResource>;
 
 export interface ShardGeometryBuildParams extends ShardGeometryBuildOptions {
-  faceUvRects?: Record<string, FaceUvRect>;
+  faceUvRects?: Record<CubeFace, FaceUvRect>;
 }
 
 export function buildShardGeometryLibrary(
@@ -32,7 +33,7 @@ export function buildShardGeometryLibrary(
   set.templates.forEach((tpl) => {
     const geomData = buildShardGeometry(tpl, {
       random: options.random,
-      faceUvRects: options.faceUvRects as Record<any, FaceUvRect> | undefined,
+      faceUvRects: options.faceUvRects,
     });
     const geometry = new BufferGeometry();
     const positions = new Float32Array(geomData.positions.length * 3);

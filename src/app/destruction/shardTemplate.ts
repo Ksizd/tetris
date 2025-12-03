@@ -1,23 +1,17 @@
 import { Vector2 } from 'three';
-import { FaceId, CUBE_LOCAL_MIN, CUBE_LOCAL_MAX } from './cubeSpace';
+import { CubeFace, CUBE_LOCAL_MIN, CUBE_LOCAL_MAX } from './cubeSpace';
 
-/**
- * 2D-полигон на плоскости грани. Координаты в локе грани:
- * используем диапазон [-0.5, 0.5]×[-0.5, 0.5], совпадающий с локом куба.
- */
 export interface FacePolygon2D {
-  face: FaceId;
-  vertices: Vector2[]; // минимум три вершины, упорядочены по обходу
+  face: CubeFace;
+  vertices: Vector2[]; // polygon in local face space within [-0.5, 0.5]^2
 }
 
-/**
- * Шаблон осколка: 2D-полигон + глубина экструдирования внутрь куба.
- */
+// Template describing a shard extruded from a face polygon with depth along the face normal.
 export interface ShardTemplate {
   id: number;
-  face: FaceId; // базовая грань, из которой "вырезан" осколок
+  face: CubeFace;
   polygon2D: FacePolygon2D;
-  depthMin: number; // [0..1] относительно толщины куба (0 = поверхность грани)
+  depthMin: number; // [0..1] relative depth from the face into the cube
   depthMax: number; // [0..1], >= depthMin
 }
 
@@ -35,9 +29,6 @@ export interface ShardValidationResult {
   reason?: string;
 }
 
-/**
- * Быстрая валидация шаблона: глубина в [0,1], depthMin <= depthMax, полигон не вырожден и лежит в квадранте грани.
- */
 export function validateShardTemplate(template: ShardTemplate): ShardValidationResult {
   if (!Number.isFinite(template.id)) {
     return { valid: false, reason: 'id must be finite number' };
