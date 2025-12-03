@@ -10,6 +10,7 @@ import { completeLineDestructionIfFinished } from '../simulationManager';
 import { GameState } from '../../../core/state/gameState';
 import { createInitialGameState } from '../../../core/state/initialState';
 import { ULTRA_DESTRUCTION_PRESET } from '../destructionPresets';
+import { DEFAULT_DESTRUCTION_QUALITY } from '../destructionQuality';
 
 function makeRow(started: boolean): RowDestructionSim {
   const cubes: CubeVisual[] = [
@@ -22,6 +23,7 @@ function makeRow(started: boolean): RowDestructionSim {
     allCubesExploded: false,
     cubeSize: { sx: 1, sy: 1, sz: 1 },
     preset: ULTRA_DESTRUCTION_PRESET,
+    quality: DEFAULT_DESTRUCTION_QUALITY,
   };
 }
 

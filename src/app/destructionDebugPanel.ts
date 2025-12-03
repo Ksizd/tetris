@@ -3,6 +3,7 @@ export interface DestructionDebugPanel {
   getSelectedLevel: () => number | null;
   setLevels: (levels: number[]) => void;
   getFragmentFilter: () => FragmentDebugFilter;
+  onShowSourceRegion?: () => void;
 }
 
 export type FragmentDebugFilter = 'all' | 'face' | 'gold' | 'dust';
@@ -11,6 +12,7 @@ export interface DestructionDebugOptions {
   levels: number[];
   onDestroy: (level: number) => void;
   onFilterChange?: (filter: FragmentDebugFilter) => void;
+  onShowSourceRegion?: () => void;
 }
 
 /**
@@ -108,6 +110,23 @@ export function createDestructionDebugPanel(options: DestructionDebugOptions): D
   container.appendChild(levelSelect);
   container.appendChild(destroyBtn);
   container.appendChild(filterSelect);
+
+  const sourceRegionBtn = document.createElement('button');
+  sourceRegionBtn.textContent = 'Show source region (static)';
+  sourceRegionBtn.style.width = '100%';
+  sourceRegionBtn.style.padding = '6px';
+  sourceRegionBtn.style.marginTop = '8px';
+  sourceRegionBtn.style.background = '#4d82ff';
+  sourceRegionBtn.style.color = '#fff';
+  sourceRegionBtn.style.border = 'none';
+  sourceRegionBtn.style.borderRadius = '6px';
+  sourceRegionBtn.style.cursor = 'pointer';
+  sourceRegionBtn.style.fontWeight = 'bold';
+  sourceRegionBtn.addEventListener('click', () => {
+    options.onShowSourceRegion?.();
+  });
+  container.appendChild(sourceRegionBtn);
+
   document.body.appendChild(container);
 
   return {
@@ -121,5 +140,6 @@ export function createDestructionDebugPanel(options: DestructionDebugOptions): D
       rebuildOptions();
     },
     getFragmentFilter: () => filterSelect.value as FragmentDebugFilter,
+    onShowSourceRegion: options.onShowSourceRegion,
   };
 }

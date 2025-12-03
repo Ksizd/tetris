@@ -3,6 +3,7 @@ import { createLineDestructionScenario } from '../lineDestructionScenario';
 import { createCubeExplosionSlot, RowDestructionSim } from '../rowDestructionSim';
 import { CubeVisual } from '../../../render';
 import { ULTRA_DESTRUCTION_PRESET } from '../destructionPresets';
+import { DEFAULT_DESTRUCTION_QUALITY } from '../destructionQuality';
 
 describe('LineDestructionScenario', () => {
   it('creates scenario with copied levels and empty perLevel map', () => {
@@ -26,6 +27,7 @@ describe('LineDestructionScenario', () => {
       allCubesExploded: false,
       cubeSize: { sx: 1, sy: 1, sz: 1 },
       preset: ULTRA_DESTRUCTION_PRESET,
+      quality: DEFAULT_DESTRUCTION_QUALITY,
     };
     scenario.perLevel.set(1, rowSim);
 

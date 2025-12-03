@@ -11,6 +11,10 @@ import { generateAngularVelocity } from './fragmentAngular';
 import { composeInitialVelocity } from './fragmentVelocity';
 import { CUBE_FRAGMENT_PATTERNS, CubeFragmentPattern } from './fragmentPattern';
 import { FRAGMENT_KIND_INITIAL_CONFIG } from './fragmentKindConfig';
+import { getDefaultShardTemplateSet } from './shardTemplateSet';
+import { computeShardLocalCenter } from './shardVolumeMap';
+import { DEFAULT_FACE_UV_RECTS } from './faceUvRect';
+import { FaceId } from './cubeSpace';
 
 function getSlotForCube(row: RowDestructionSim, cubeIndex: number): CubeExplosionSlot | null {
   return row.explosions.find((slot) => slot.cubeIndex === cubeIndex) ?? null;
@@ -64,7 +68,29 @@ function jitterQuaternion(maxAngleRad: number): Quaternion {
   return new Quaternion().setFromAxisAngle(axis, angle);
 }
 
-function spawnFragmentsForCube(
+function computeUvRectForPolygon(face: FaceId, vertices: Vector3[]): Fragment['uvRect'] | undefined {
+  if (face !== 'front') {
+    return undefined;
+  }
+  const rect = DEFAULT_FACE_UV_RECTS.front;
+  let u0 = Infinity;
+  let u1 = -Infinity;
+  let v0 = Infinity;
+  let v1 = -Infinity;
+  vertices.forEach((v) => {
+    const sx = v.x + 0.5;
+    const sy = v.y + 0.5;
+    const u = rect.u0 + sx * (rect.u1 - rect.u0);
+    const vv = rect.v0 + (1 - sy) * (rect.v1 - rect.v0);
+    u0 = Math.min(u0, u);
+    u1 = Math.max(u1, u);
+    v0 = Math.min(v0, vv);
+    v1 = Math.max(v1, vv);
+  });
+  return { u0, u1, v0, v1 };
+}
+
+function spawnFragmentsForCubeV1(
   cube: RowDestructionSim['cubes'][number],
   cubeSize: RowDestructionSim['cubeSize'],
   pattern: CubeFragmentPattern,
@@ -128,11 +154,76 @@ function spawnFragmentsForCube(
   return fragments;
 }
 
+function spawnFragmentsFromShardTemplates(
+  cube: RowDestructionSim['cubes'][number],
+  cubeSize: RowDestructionSim['cubeSize'],
+  preset: RowDestructionSim['preset']
+): Fragment[] {
+  const fragments: Fragment[] = [];
+  const towerCenter = new Vector3(0, 0, 0);
+  const templates = getDefaultShardTemplateSet().templates;
+  templates.forEach((tpl) => {
+    const kind: FragmentKind = tpl.face === 'front' ? 'faceShard' : 'edgeShard';
+    const kindConfig = FRAGMENT_KIND_INITIAL_CONFIG[kind];
+    const localCenter = computeShardLocalCenter(tpl);
+    const worldCenter = cube.worldPos.clone().add(
+      new Vector3(localCenter.x * cubeSize.sx, localCenter.y * cubeSize.sy, localCenter.z * cubeSize.sz)
+    );
+    const radialSpeed =
+      randomInRange(preset.radialSpeed.min, preset.radialSpeed.max) *
+      randomInRange(kindConfig.radialSpeed[0], kindConfig.radialSpeed[1]);
+    const tangentialSpeed =
+      randomInRange(preset.tangentialSpeed.min, preset.tangentialSpeed.max) *
+      randomInRange(kindConfig.tangentialSpeed[0], kindConfig.tangentialSpeed[1]);
+    const velocity = composeInitialVelocity(cube.worldPos, towerCenter, {
+      radialSpeed,
+      tangentialSpeed,
+    }).add(
+      new Vector3(
+        0,
+        randomInRange(preset.verticalSpeed.min, preset.verticalSpeed.max) *
+          randomInRange(kindConfig.verticalSpeed[0], kindConfig.verticalSpeed[1]),
+        0
+      )
+    );
+    const rotation = jitterQuaternion(kindConfig.rotationJitterRad);
+    const scaleJitter = randomInRange(kindConfig.scaleJitter[0], kindConfig.scaleJitter[1]);
+    const scale = new Vector3(1, 1, 1).multiplyScalar(scaleJitter);
+    const colorTint = randomInRange(kindConfig.colorTint[0], kindConfig.colorTint[1]);
+    const materialId: Fragment['materialId'] = tpl.face === 'front' ? 'face' : 'gold';
+    const uvRect = computeUvRectForPolygon(
+      tpl.face,
+      tpl.polygon2D.vertices.map((v) => new Vector3(v.x, v.y, 0))
+    );
+
+    fragments.push(
+      createFragment({
+        kind,
+        position: worldCenter,
+        velocity,
+        rotation,
+        scale,
+        angularVelocity: generateAngularVelocity(materialId),
+        lifetimeMs: Math.floor(
+          randomInRange(preset.lifetimeMs.min, preset.lifetimeMs.max) *
+            randomInRange(kindConfig.lifetimeMs[0], kindConfig.lifetimeMs[1])
+        ),
+        instanceId: fragments.length,
+        materialId,
+        uvRect,
+        colorTint,
+        templateId: tpl.id,
+      })
+    );
+  });
+  return fragments;
+}
+
 function createFragmentsForCube(row: RowDestructionSim, cubeIndex: number): Fragment[] {
   const cube = row.cubes[cubeIndex];
   const preset = row.preset;
-  const pattern = pickPattern();
-  return spawnFragmentsForCube(cube, row.cubeSize, pattern, preset);
+  // Всегда используем шардовые шаблоны (ultra_v2) для любых уровней качества.
+  return spawnFragmentsFromShardTemplates(cube, row.cubeSize, preset);
 }
 
 /**

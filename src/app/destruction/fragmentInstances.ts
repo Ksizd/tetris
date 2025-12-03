@@ -1,5 +1,5 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
-import { Fragment } from './cubeDestructionSim';
+import { Fragment, FragmentMaterialId } from './cubeDestructionSim';
 
 export interface FragmentInstanceUpdate {
   instanceId: number;
@@ -9,6 +9,8 @@ export interface FragmentInstanceUpdate {
   fade: number;
   uvRect?: { u0: number; v0: number; u1: number; v1: number };
   colorTint?: number;
+  templateId?: number;
+  materialId?: FragmentMaterialId;
 }
 
 /**
@@ -26,6 +28,8 @@ export function buildFragmentInstanceUpdates(
     fade: fragment.fade,
     uvRect: fragment.uvRect,
     colorTint: fragment.colorTint,
+    templateId: fragment.templateId,
+    materialId: fragment.materialId,
   }));
 }
 

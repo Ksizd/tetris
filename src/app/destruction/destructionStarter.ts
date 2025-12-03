@@ -7,6 +7,7 @@ import { buildLinearExplosionWave } from './waveBuilder';
 import { createCubeExplosionSlot, RowDestructionSim } from './rowDestructionSim';
 import { createDestructionSimulationState, DestructionSimulationState } from './destructionSimulationState';
 import { ULTRA_DESTRUCTION_PRESET, DestructionPreset } from './destructionPresets';
+import { DEFAULT_DESTRUCTION_QUALITY, DestructionQuality } from './destructionQuality';
 
 export interface StartLineDestructionParams {
   board: Board;
@@ -15,6 +16,7 @@ export interface StartLineDestructionParams {
   startedAtMs: number;
   delayBetweenCubesMs?: number;
   preset?: DestructionPreset;
+  destructionQuality?: DestructionQuality;
 }
 
 export interface StartLineDestructionResult {
@@ -48,7 +50,8 @@ function buildRowSimulation(
   level: number,
   startedAtMs: number,
   delayBetweenCubesMs: number,
-  preset: DestructionPreset
+  preset: DestructionPreset,
+  quality: DestructionQuality
 ): RowDestructionSim {
   const cubes = collectCubesForLevel(board, mapper, level);
   const explosions =
@@ -71,6 +74,7 @@ function buildRowSimulation(
       sz: mapper.getBlockDepth(),
     },
     preset,
+    quality,
   };
 }
 
@@ -80,6 +84,7 @@ export function startLineDestructionFromBoard(
   const { board, mapper, levels, startedAtMs } = params;
   const delayBetweenCubesMs = params.delayBetweenCubesMs ?? DEFAULT_DELAY_MS;
   const preset = params.preset ?? ULTRA_DESTRUCTION_PRESET;
+  const destructionQuality = params.destructionQuality ?? DEFAULT_DESTRUCTION_QUALITY;
   if (delayBetweenCubesMs <= 0) {
     throw new Error('delayBetweenCubesMs must be positive');
   }
@@ -91,7 +96,15 @@ export function startLineDestructionFromBoard(
   const scenario = createLineDestructionScenario(normalizedLevels, startedAtMs);
 
   normalizedLevels.forEach((level) => {
-    const row = buildRowSimulation(board, mapper, level, startedAtMs, delayBetweenCubesMs, preset);
+    const row = buildRowSimulation(
+      board,
+      mapper,
+      level,
+      startedAtMs,
+      delayBetweenCubesMs,
+      preset,
+      destructionQuality
+    );
     scenario.perLevel.set(level, row);
   });
 

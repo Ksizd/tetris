@@ -170,7 +170,7 @@ export function createRenderContext(
   scene.add(activePieceInstanced.mesh);
 
   const fragments = createFragmentInstancedMeshes(renderConfig.boardDimensions, renderConfig.board);
-  Object.values(fragments.meshes).forEach((mesh) => scene.add(mesh));
+  fragments.meshesByTemplate.forEach((mesh) => scene.add(mesh));
 
   const shadowCatcher = createShadowCatcher(renderConfig.board);
   scene.add(shadowCatcher);
@@ -456,9 +456,12 @@ export function disposeRenderResources(ctx: RenderContext): void {
   ctx.activePiece.geometry.dispose();
   disposeMaterials(ctx.activePiece.material);
   if (ctx.fragments) {
-    Object.values(ctx.fragments.geometries).forEach((geom) => geom.dispose());
+    ctx.fragments.meshesByTemplate.forEach((mesh) => {
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+      mesh.dispose();
+    });
     Object.values(ctx.fragments.materials).forEach((mat) => mat.dispose());
-    Object.values(ctx.fragments.meshes).forEach((mesh) => mesh.dispose());
   }
   disposeMeshes(ctx.boardPlaceholder);
   ctx.environment?.dispose();

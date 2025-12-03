@@ -4,6 +4,7 @@ import { RowDestructionSim, createCubeExplosionSlot } from '../rowDestructionSim
 import { CubeVisual } from '../../../render';
 import { Vector3 } from 'three';
 import { ULTRA_DESTRUCTION_PRESET } from '../destructionPresets';
+import { DEFAULT_DESTRUCTION_QUALITY } from '../destructionQuality';
 
 function makeRowSim(): RowDestructionSim {
   const cubes: CubeVisual[] = [
@@ -17,6 +18,7 @@ function makeRowSim(): RowDestructionSim {
     allCubesExploded: false,
     cubeSize: { sx: 1, sy: 1, sz: 1 },
     preset: ULTRA_DESTRUCTION_PRESET,
+    quality: DEFAULT_DESTRUCTION_QUALITY,
   };
 }
 

@@ -5,6 +5,7 @@ import { CubeVisual } from '../../../render';
 import { Vector3 } from 'three';
 import { startCubeExplosion } from '../explosionLifecycle';
 import { ULTRA_DESTRUCTION_PRESET } from '../destructionPresets';
+import { DEFAULT_DESTRUCTION_QUALITY } from '../destructionQuality';
 
 function makeRow(): RowDestructionSim {
   const cubes: CubeVisual[] = [
@@ -18,6 +19,7 @@ function makeRow(): RowDestructionSim {
     allCubesExploded: false,
     cubeSize: { sx: 1, sy: 1, sz: 1 },
     preset: ULTRA_DESTRUCTION_PRESET,
+    quality: DEFAULT_DESTRUCTION_QUALITY,
   };
 }
 

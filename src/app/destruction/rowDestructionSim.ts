@@ -1,5 +1,6 @@
 import { CubeVisual } from '../../render';
 import { DestructionPreset } from './destructionPresets';
+import { DestructionQuality } from './destructionQuality';
 
 /**
  * Симуляция разрушения одного уровня: содержит отсортированные по окружности кубы,
@@ -12,6 +13,7 @@ export interface RowDestructionSim {
   allCubesExploded: boolean;
   cubeSize: { sx: number; sy: number; sz: number };
   preset: DestructionPreset;
+  quality: DestructionQuality;
 }
 
 export interface CubeExplosionSlot {

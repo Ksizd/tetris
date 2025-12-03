@@ -1,28 +1,28 @@
 import * as THREE from 'three';
 import { BoardDimensions } from '../../core/types';
 import { BoardRenderConfig } from '../boardConfig';
-import { createBeveledBoxGeometry } from '../beveledBoxGeometry';
 import { FragmentMaterialId } from '../../app/destruction/cubeDestructionSim';
 import { createMahjongMaterialMaps, createMahjongTileTexture } from '../textures';
+import { getDefaultShardTemplateSet } from '../../app/destruction/shardTemplateSet';
+import {
+  buildShardGeometryLibrary,
+  ShardGeometryLibrary,
+  ShardGeometryResource,
+} from '../../app/destruction/shardFragmentFactory';
+import { DEFAULT_FACE_UV_RECTS } from '../../app/destruction/faceUvRect';
 
 export interface FragmentInstancedResources {
-  meshes: Record<FragmentMaterialId, THREE.InstancedMesh>;
-  geometries: {
-    shard: THREE.BufferGeometry;
-    face: THREE.BufferGeometry;
-    edge: THREE.BufferGeometry;
-    core: THREE.BufferGeometry;
-    dust: THREE.BufferGeometry;
-  };
+  meshesByTemplate: Map<number, THREE.InstancedMesh>;
+  templateMaterial: Map<number, FragmentMaterialId>;
   materials: Record<FragmentMaterialId, THREE.MeshStandardMaterial>;
-  capacity: number;
+  geometryLibrary: ShardGeometryLibrary;
+  capacityPerTemplate: number;
   supportsUvRect: boolean;
 }
 
 const GOLD_BASE_COLOR = 0xf2c14b;
 const GOLD_INNER_COLOR = 0xb88934;
 const GOLD_DUST_COLOR = 0xf7d98c;
-const DEFAULT_FACE_UV_SIZE = 1;
 
 function createFaceFragmentMaterial(
   tileTexture: THREE.Texture,
@@ -178,27 +178,43 @@ function createDustMaterial(): THREE.MeshStandardMaterial {
   });
 }
 
-function createFaceShardGeometry(params: {
-  width: number;
-  height: number;
-  depth: number;
-  uvScale?: { u: number; v: number };
-}): THREE.BufferGeometry {
-  const { width, height, depth, uvScale } = params;
-  const box = new THREE.BoxGeometry(width, height, depth);
-  // Ensure front face uses full [0,1] UV so later we can slice subrects via attributes/patterns.
-  const uScale = uvScale?.u ?? DEFAULT_FACE_UV_SIZE;
-  const vScale = uvScale?.v ?? DEFAULT_FACE_UV_SIZE;
-  const uv = box.getAttribute('uv');
-  if (uv) {
-    for (let i = 0; i < uv.count; i += 1) {
-      const u = uv.getX(i) * uScale;
-      const v = uv.getY(i) * vScale;
-      uv.setXY(i, u, v);
-    }
-    uv.needsUpdate = true;
+function createInstancedMeshForTemplate(
+  tpl: ShardGeometryResource,
+  material: THREE.Material,
+  capacity: number
+): THREE.InstancedMesh {
+  const mesh = new THREE.InstancedMesh(tpl.geometry, material, capacity);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const tintArray = new Float32Array(capacity * 4);
+  for (let i = 0; i < capacity; i += 1) {
+    tintArray[i * 4] = 1;
+    tintArray[i * 4 + 1] = 1;
+    tintArray[i * 4 + 2] = 1;
+    tintArray[i * 4 + 3] = 1;
   }
-  return box;
+  const tintAttr = new THREE.InstancedBufferAttribute(tintArray, 4);
+  tintAttr.setUsage(THREE.DynamicDrawUsage);
+  mesh.geometry.setAttribute('instanceTint', tintAttr);
+
+  if (tpl.materialHint === 'face') {
+    const uvArray = new Float32Array(capacity * 4);
+    for (let i = 0; i < capacity; i += 1) {
+      uvArray[i * 4] = 0;
+      uvArray[i * 4 + 1] = 0;
+      uvArray[i * 4 + 2] = 1;
+      uvArray[i * 4 + 3] = 1;
+    }
+    const uvAttr = new THREE.InstancedBufferAttribute(uvArray, 4);
+    uvAttr.setUsage(THREE.DynamicDrawUsage);
+    mesh.geometry.setAttribute('instanceUvRect', uvAttr);
+  }
+
+  mesh.count = 0;
+  mesh.frustumCulled = false;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.name = `fragment-template-${tpl.templateId}`;
+  return mesh;
 }
 
 export function createFragmentInstancedMeshes(
@@ -206,42 +222,10 @@ export function createFragmentInstancedMeshes(
   board: BoardRenderConfig,
   maxFragmentsPerCube = 32
 ): FragmentInstancedResources {
-  const capacity = dimensions.width * dimensions.height * maxFragmentsPerCube;
-  const baseSize = Math.max(0.18, board.blockSize * 0.35);
-  const shardGeometry = createBeveledBoxGeometry({
-    width: baseSize * 1.1,
-    height: baseSize * 0.75,
-    depth: Math.max(baseSize * 0.9, board.blockDepth * 0.45),
-    radius: baseSize * 0.12,
-    smoothness: 2,
-  });
-  const faceGeometry = createFaceShardGeometry({
-    width: baseSize * 1.05,
-    height: baseSize * 1.05,
-    depth: Math.max(baseSize * 0.18, board.blockDepth * 0.12),
-  });
-  const edgeGeometry = createBeveledBoxGeometry({
-    width: baseSize * 1.3,
-    height: baseSize * 0.4,
-    depth: Math.max(baseSize * 0.28, board.blockDepth * 0.18),
-    radius: baseSize * 0.1,
-    smoothness: 2,
-  });
-  const coreGeometry = createBeveledBoxGeometry({
-    width: baseSize * 1.45,
-    height: baseSize * 1.2,
-    depth: Math.max(baseSize * 1.35, board.blockDepth * 0.85),
-    radius: baseSize * 0.16,
-    smoothness: 2,
-  });
-  const dustGeometry = createBeveledBoxGeometry({
-    width: baseSize * 0.32,
-    height: baseSize * 0.32,
-    depth: Math.max(baseSize * 0.22, board.blockDepth * 0.14),
-    radius: baseSize * 0.06,
-    smoothness: 1,
-  });
-
+  const templateSet = getDefaultShardTemplateSet();
+  const geometryLibrary = buildShardGeometryLibrary(templateSet, { faceUvRects: DEFAULT_FACE_UV_RECTS });
+  const totalCapacity = dimensions.width * dimensions.height * maxFragmentsPerCube;
+  const capacityPerTemplate = Math.max(8, Math.ceil(totalCapacity / Math.max(1, geometryLibrary.size)));
   const tileTexture = createMahjongTileTexture();
   const atlasSize =
     typeof tileTexture.image === 'object' && tileTexture.image && 'width' in tileTexture.image
@@ -256,50 +240,24 @@ export function createFragmentInstancedMeshes(
     dust: createDustMaterial(),
   };
 
-  const meshes = Object.entries(materials).reduce(
-    (acc, [key, material]) => {
-      const useGeometry =
-        key === 'face'
-          ? faceGeometry
-          : key === 'gold'
-            ? edgeGeometry
-            : key === 'inner'
-              ? coreGeometry
-              : dustGeometry;
-      const mesh = new THREE.InstancedMesh(useGeometry, material, capacity);
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      const tintArray = new Float32Array(capacity * 4);
-      tintArray.fill(1);
-      const tintAttr = new THREE.InstancedBufferAttribute(tintArray, 4);
-      tintAttr.setUsage(THREE.DynamicDrawUsage);
-      mesh.geometry.setAttribute('instanceTint', tintAttr);
-      if (key === 'face') {
-        const uvRect = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
-        uvRect.setUsage(THREE.DynamicDrawUsage);
-        mesh.geometry.setAttribute('instanceUvRect', uvRect);
-      }
-      mesh.count = 0;
-      mesh.frustumCulled = false;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      mesh.name = `fragments-${key}`;
-      acc[key as FragmentMaterialId] = mesh;
-      return acc;
-    },
-    {} as Record<FragmentMaterialId, THREE.InstancedMesh>
-  );
+  const meshesByTemplate: Map<number, THREE.InstancedMesh> = new Map();
+  const templateMaterial: Map<number, FragmentMaterialId> = new Map();
+
+  geometryLibrary.forEach((tpl) => {
+    const materialId: FragmentMaterialId = tpl.materialHint ?? 'gold';
+    const material = materials[materialId];
+    const mesh = createInstancedMeshForTemplate(tpl, material, capacityPerTemplate);
+    mesh.name = `fragment-template-${tpl.templateId}-${materialId}`;
+    meshesByTemplate.set(tpl.templateId, mesh);
+    templateMaterial.set(tpl.templateId, materialId);
+  });
 
   return {
-    meshes,
-    geometries: {
-      shard: shardGeometry,
-      face: faceGeometry,
-      edge: edgeGeometry,
-      core: coreGeometry,
-      dust: dustGeometry,
-    },
+    meshesByTemplate,
+    templateMaterial,
     materials,
-    capacity,
+    geometryLibrary,
+    capacityPerTemplate,
     supportsUvRect: true,
   };
 }

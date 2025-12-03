@@ -35,6 +35,10 @@ import { FragmentInstanceUpdate } from './destruction/fragmentInstances';
 import { FragmentMaterialId } from './destruction/cubeDestructionSim';
 import { applyFragmentInstanceUpdates } from '../render/destruction/instanceUpdater';
 import { FragmentPhysicsConfig, DEFAULT_FRAGMENT_PHYSICS } from './destruction/fragmentSimulation';
+import { buildShardGeometryLibrary, makeFragmentFromTemplate } from './destruction/shardFragmentFactory';
+import { getDefaultShardTemplateSet } from './destruction/shardTemplateSet';
+import { FACE_NORMALS } from './destruction/cubeSpace';
+import { FaceUvRect, DEFAULT_FACE_UV_RECTS } from './destruction/faceUvRect';
 
 type CameraMode = 'game' | 'inspect';
 
@@ -76,6 +80,17 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   let materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
   let destructionSim: DestructionSimulationState | null = null;
   let fragmentFilter: FragmentDebugFilter = 'all';
+  let showSourceRegion = false;
+  let sourceRegionGroup: THREE.Group | null = null;
+  let sourceOverlay: {
+    container: HTMLDivElement;
+    canvas: HTMLCanvasElement;
+    polygons: { id: number; vertices: { x: number; y: number }[] }[];
+    rect: FaceUvRect;
+  } | null = null;
+  let highlightedMesh: THREE.Mesh | null = null;
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
   const cameraOrientation = extractCameraOrientation(renderCtx.renderConfig);
   let cameraMode: CameraMode = ultra2Lab ? 'inspect' : 'game';
   let gameRotationAngle = 0;
@@ -164,26 +179,30 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     });
   }
 
-  function collectFragmentUpdates(
+  function collectFragmentUpdatesByTemplate(
     sim: DestructionSimulationState
-  ): Record<FragmentMaterialId, FragmentInstanceUpdate[]> {
-    const map: Record<FragmentMaterialId, FragmentInstanceUpdate[]> = {
-      gold: [],
-      face: [],
-      inner: [],
-      dust: [],
-    };
+  ): Map<number, { materialId: FragmentMaterialId; updates: FragmentInstanceUpdate[] }> {
+    const map = new Map<number, { materialId: FragmentMaterialId; updates: FragmentInstanceUpdate[] }>();
     sim.activeCubes.forEach((cubeSim) => {
       cubeSim.fragments.forEach((fragment) => {
-        const updates = map[fragment.materialId];
+        const templateId = fragment.templateId ?? -1;
+        const bucket =
+          map.get(templateId) ??
+          (() => {
+            const created = { materialId: fragment.materialId, updates: [] as FragmentInstanceUpdate[] };
+            map.set(templateId, created);
+            return created;
+          })();
+        const updates = bucket.updates;
         updates.push({
           instanceId: updates.length,
           position: fragment.position.clone(),
           rotation: fragment.rotation.clone(),
           scale: fragment.scale.clone(),
           fade: fragment.fade,
-          uvRect: fragment.uvRect,
           colorTint: fragment.colorTint,
+          templateId,
+          materialId: fragment.materialId,
         });
       });
     });
@@ -198,34 +217,35 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     if (!fragments) {
       return;
     }
+    fragments.meshesByTemplate.forEach((mesh) => {
+      mesh.count = 0;
+      mesh.visible = false;
+      mesh.instanceMatrix.needsUpdate = true;
+    });
     if (!sim) {
-      Object.values(fragments.meshes).forEach((mesh) => {
-        mesh.count = 0;
-        mesh.instanceMatrix.needsUpdate = true;
-      });
       return;
     }
-    const updatesByMat = collectFragmentUpdates(sim);
-    const mats: FragmentMaterialId[] =
-      fragmentFilter === 'all'
-        ? ['gold', 'face', 'inner', 'dust']
-        : fragmentFilter === 'gold'
-          ? ['gold', 'inner']
-          : [fragmentFilter];
-    (['gold', 'face', 'inner', 'dust'] as const).forEach((mat) => {
-      const mesh = fragments.meshes[mat];
-      if (!mats.includes(mat)) {
-        mesh.count = 0;
-        mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) {
-          mesh.instanceColor.needsUpdate = true;
-        }
+    const updatesByTemplate = collectFragmentUpdatesByTemplate(sim);
+    const isMaterialAllowed = (mat: FragmentMaterialId) => {
+      if (fragmentFilter === 'all') return true;
+      if (fragmentFilter === 'gold') return mat === 'gold' || mat === 'inner';
+      return mat === fragmentFilter;
+    };
+    updatesByTemplate.forEach((entry, templateId) => {
+      const mesh = fragments.meshesByTemplate.get(templateId);
+      if (!mesh) {
         return;
       }
-      const updates = updatesByMat[mat];
-      const capped = updates.slice(0, fragments.capacity);
+      const matId = fragments.templateMaterial.get(templateId) ?? entry.materialId;
+      if (!isMaterialAllowed(matId)) {
+        mesh.count = 0;
+        mesh.visible = false;
+        return;
+      }
+      const capped = entry.updates.slice(0, fragments.capacityPerTemplate);
       mesh.count = capped.length;
-      const base = fragments.materials[mat].color;
+      mesh.visible = true;
+      const base = fragments.materials[matId].color;
       applyFragmentInstanceUpdates(mesh, capped, { r: base.r, g: base.g, b: base.b });
     });
   }
@@ -254,6 +274,9 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
         onFilterChange: (filter) => {
           fragmentFilter = filter;
         },
+        onShowSourceRegion: () => {
+          showStaticSourceRegion(ctx);
+        },
       });
       attachPanelDisposalOnUnload(() => destructionPanel?.dispose());
     } else {
@@ -267,6 +290,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     }
     pendingRebuild = false;
     destructionSim = null;
+    clearSourceRegionGroup();
 
     disposeRenderResources(renderCtx);
     const overrides = controlStateToOverrides(controlState, cameraOrientation);
@@ -293,7 +317,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     const now = performance.now();
     const dt = Math.max(0, now - lastFrameTime);
     lastFrameTime = now;
-    if (destructionSim) {
+    if (destructionSim && !showSourceRegion) {
       const withStarts = launchScheduledExplosions(destructionSim, now);
       const stepped = stepDestructionSimulations(withStarts.state, dt, getFragmentPhysicsConfig());
       destructionSim = stepped.state;
@@ -339,6 +363,207 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     cameraMode = 'inspect';
     switchToInspect(createCloseupPlacement(renderCtx));
   });
+
+  function restoreMeshMaterial(mesh: THREE.Mesh) {
+    const orig = mesh.userData.originalMaterial as THREE.Material | undefined;
+    if (orig) {
+      mesh.material = orig;
+    }
+  }
+
+  function setHighlight(mesh: THREE.Mesh | null) {
+    if (mesh === highlightedMesh) {
+      return;
+    }
+    if (highlightedMesh) {
+      restoreMeshMaterial(highlightedMesh);
+    }
+    highlightedMesh = mesh;
+    if (mesh) {
+      const highlightMat = new THREE.MeshBasicMaterial({ color: 0xfff38a, wireframe: true });
+      mesh.material = highlightMat;
+    }
+  }
+
+  function attachHoverHighlight(ctx: RenderContext): void {
+    const canvas = ctx.renderer.domElement;
+    const onMove = (ev: PointerEvent) => {
+      if (!showSourceRegion || !sourceRegionGroup) {
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(pointer, ctx.camera);
+      const hits = raycaster.intersectObjects(sourceRegionGroup.children, false);
+      const mesh = (hits[0]?.object as THREE.Mesh | undefined) ?? null;
+      setHighlight(mesh);
+      const tplId = mesh?.userData.templateId as number | undefined;
+      if (sourceOverlay) {
+        drawOverlay(sourceOverlay, tplId);
+      }
+    };
+    canvas.addEventListener('pointermove', onMove);
+    window.addEventListener(
+      'beforeunload',
+      () => {
+        canvas.removeEventListener('pointermove', onMove);
+      },
+      { once: true }
+    );
+  }
+
+  function buildSourceOverlay(polygons: { id: number; vertices: { x: number; y: number }[] }[]) {
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.right = '12px';
+    container.style.bottom = '12px';
+    container.style.width = '220px';
+    container.style.height = '220px';
+    container.style.background = 'rgba(10,10,12,0.85)';
+    container.style.border = '1px solid rgba(255,255,255,0.12)';
+    container.style.borderRadius = '8px';
+    container.style.zIndex = '2100';
+    container.style.boxShadow = '0 4px 12px rgba(0,0,0,0.35)';
+    const label = document.createElement('div');
+    label.textContent = 'Front face UV map';
+    label.style.color = '#d6d6d6';
+    label.style.fontSize = '12px';
+    label.style.fontFamily = 'sans-serif';
+    label.style.padding = '6px 8px 2px';
+    container.appendChild(label);
+    const canvas = document.createElement('canvas');
+    canvas.width = 220;
+    canvas.height = 180;
+    canvas.style.display = 'block';
+    canvas.style.margin = '0 auto 6px';
+    container.appendChild(canvas);
+    document.body.appendChild(container);
+    drawOverlay({ container, canvas, polygons, rect: DEFAULT_FACE_UV_RECTS.front }, null);
+    return { container, canvas, polygons, rect: DEFAULT_FACE_UV_RECTS.front };
+  }
+
+  function drawOverlay(
+    overlay: {
+      container: HTMLDivElement;
+      canvas: HTMLCanvasElement;
+      polygons: { id: number; vertices: { x: number; y: number }[] }[];
+      rect: FaceUvRect;
+    },
+    highlightId: number | null | undefined
+  ) {
+    const ctx2d = overlay.canvas.getContext('2d');
+    if (!ctx2d) return;
+    ctx2d.clearRect(0, 0, overlay.canvas.width, overlay.canvas.height);
+    const pad = 10;
+    const w = overlay.canvas.width - pad * 2;
+    const h = overlay.canvas.height - pad * 2;
+    ctx2d.strokeStyle = '#4d82ff';
+    ctx2d.lineWidth = 1;
+    ctx2d.strokeRect(pad, pad, w, h);
+    overlay.polygons.forEach((poly) => {
+      const isHl = poly.id === highlightId;
+      ctx2d.beginPath();
+      poly.vertices.forEach((v, idx) => {
+        const sx = pad + (v.x + 0.5) * w;
+        const sy = pad + (1 - (v.y + 0.5)) * h;
+        if (idx === 0) ctx2d.moveTo(sx, sy);
+        else ctx2d.lineTo(sx, sy);
+      });
+      ctx2d.closePath();
+      ctx2d.strokeStyle = isHl ? '#ffed8a' : '#9fb4ff';
+      ctx2d.lineWidth = isHl ? 2 : 1;
+      if (isHl) {
+        ctx2d.fillStyle = 'rgba(255, 237, 138, 0.2)';
+        ctx2d.fill();
+      }
+      ctx2d.stroke();
+    });
+  }
+  function clearSourceRegionGroup(): void {
+    if (sourceRegionGroup) {
+      renderCtx.scene.remove(sourceRegionGroup);
+      sourceRegionGroup.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh) {
+          mesh.geometry?.dispose();
+        }
+      });
+      sourceRegionGroup = null;
+    }
+    showSourceRegion = false;
+    if (sourceOverlay) {
+      sourceOverlay.container.remove();
+      sourceOverlay = null;
+    }
+    if (highlightedMesh) {
+      restoreMeshMaterial(highlightedMesh);
+      highlightedMesh = null;
+    }
+  }
+
+  function showStaticSourceRegion(ctx: RenderContext): void {
+    clearSourceRegionGroup();
+    destructionSim = null;
+    renderFragmentInstances(ctx, null);
+    let lib;
+    const templateSet = getDefaultShardTemplateSet();
+    try {
+      lib = buildShardGeometryLibrary(templateSet);
+    } catch (err) {
+      console.error('[visual debug] failed to build shard geometry library', err);
+      return;
+    }
+    const group = new THREE.Group();
+    const size = {
+      sx: ctx.renderConfig.board.blockSize,
+      sy: ctx.renderConfig.board.blockSize,
+      sz: ctx.renderConfig.board.blockDepth,
+    };
+    const cubeWorldPos = new THREE.Vector3(0, ctx.renderConfig.board.blockSize * 1.25, 0);
+    const offsetBase = size.sx * 0.14;
+    const polygons2D: { id: number; vertices: { x: number; y: number }[] }[] = [];
+    templateSet.templates.forEach((tpl) => {
+      const frag = makeFragmentFromTemplate({
+        templateId: tpl.id,
+        cubeWorldPos,
+        cubeSize: size,
+        geometryLib: lib,
+      });
+      const normal = FACE_NORMALS[tpl.face].clone();
+      const jitter = new THREE.Vector3(
+        (Math.random() - 0.5) * size.sx * 0.08,
+        (Math.random() - 0.5) * size.sy * 0.08,
+        (Math.random() - 0.5) * size.sz * 0.08
+      );
+      const offsetPos = frag.worldCenter.clone().add(normal.multiplyScalar(offsetBase)).add(jitter);
+      const mesh = new THREE.Mesh(frag.geometry, ctx.fragments.materials[frag.materialId]);
+       mesh.userData.templateId = tpl.id;
+       mesh.userData.originalMaterial = mesh.material;
+      mesh.matrixAutoUpdate = false;
+      const m = frag.matrix.clone();
+      m.setPosition(offsetPos);
+      mesh.applyMatrix4(m);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+       if (tpl.face === 'front') {
+         const verts = tpl.polygon2D.vertices.map((v) => ({
+           x: v.x,
+           y: v.y,
+         }));
+         polygons2D.push({ id: tpl.id, vertices: verts });
+       }
+    });
+    ctx.scene.add(group);
+    sourceRegionGroup = group;
+    sourceOverlay = buildSourceOverlay(polygons2D);
+    attachHoverHighlight(ctx);
+    showSourceRegion = true;
+    cameraMode = 'inspect';
+    switchToInspect();
+    console.info('[visual debug] source region view enabled');
+  }
 }
 
 function createStaticSnapshot(dimensions: BoardDimensions): GameState {

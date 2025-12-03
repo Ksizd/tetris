@@ -32,6 +32,7 @@ export interface Fragment {
   materialId: FragmentMaterialId;
   uvRect?: FragmentUvRect;
   colorTint?: number;
+  templateId?: number;
 }
 
 export interface CubeDestructionSim {
@@ -53,6 +54,7 @@ export function createFragment(params: {
   materialId: FragmentMaterialId;
   uvRect?: FragmentUvRect;
   colorTint?: number;
+  templateId?: number;
 }): Fragment {
   return {
     ...params,
