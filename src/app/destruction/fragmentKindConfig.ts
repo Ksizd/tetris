@@ -8,6 +8,8 @@ export interface FragmentKindInitialConfig {
   scaleJitter: [number, number]; // multiplier
   rotationJitterRad: number; // max random angle in radians
   colorTint: [number, number]; // multiplier
+  linearDragMultiplier: number;
+  angularDragMultiplier: number;
 }
 
 export const FRAGMENT_KIND_INITIAL_CONFIG: Record<FragmentKind, FragmentKindInitialConfig> = {
@@ -19,6 +21,8 @@ export const FRAGMENT_KIND_INITIAL_CONFIG: Record<FragmentKind, FragmentKindInit
     scaleJitter: [0.9, 1.1],
     rotationJitterRad: 0.18,
     colorTint: [0.95, 1.05],
+    linearDragMultiplier: 1,
+    angularDragMultiplier: 1,
   },
   edgeShard: {
     radialSpeed: [0.8, 0.95],
@@ -28,6 +32,8 @@ export const FRAGMENT_KIND_INITIAL_CONFIG: Record<FragmentKind, FragmentKindInit
     scaleJitter: [0.9, 1.12],
     rotationJitterRad: 0.22,
     colorTint: [0.94, 1.06],
+    linearDragMultiplier: 0.95,
+    angularDragMultiplier: 1,
   },
   coreShard: {
     radialSpeed: [0.6, 0.8],
@@ -37,6 +43,8 @@ export const FRAGMENT_KIND_INITIAL_CONFIG: Record<FragmentKind, FragmentKindInit
     scaleJitter: [0.92, 1.18],
     rotationJitterRad: 0.25,
     colorTint: [0.92, 1.05],
+    linearDragMultiplier: 0.75,
+    angularDragMultiplier: 0.8,
   },
   dust: {
     radialSpeed: [1.1, 1.3],
@@ -46,5 +54,7 @@ export const FRAGMENT_KIND_INITIAL_CONFIG: Record<FragmentKind, FragmentKindInit
     scaleJitter: [0.85, 1.15],
     rotationJitterRad: 0.5,
     colorTint: [0.98, 1.08],
+    linearDragMultiplier: 1.35,
+    angularDragMultiplier: 1.2,
   },
 };

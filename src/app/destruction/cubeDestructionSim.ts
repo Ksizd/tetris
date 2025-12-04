@@ -28,6 +28,10 @@ export interface Fragment {
   angularVelocity: Vector3;
   ageMs: number;
   lifetimeMs: number;
+  mass: number;
+  linearDrag?: number;
+  angularDrag?: number;
+  restFadeMs?: number;
   fade: number;
   instanceId: number;
   materialId: FragmentMaterialId;
@@ -57,10 +61,16 @@ export function createFragment(params: {
   colorTint?: number;
   templateId?: number;
   shardId?: number;
+  mass?: number;
+  linearDrag?: number;
+  angularDrag?: number;
+  restFadeMs?: number;
 }): Fragment {
   return {
     ...params,
     ageMs: 0,
+    mass: params.mass ?? 1,
+    restFadeMs: params.restFadeMs ?? 0,
     fade: 1,
   };
 }

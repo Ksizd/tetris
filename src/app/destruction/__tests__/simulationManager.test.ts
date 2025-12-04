@@ -62,7 +62,7 @@ describe('simulationManager', () => {
 
     const { state: next } = stepDestructionSimulations(state, 16, {
       gravity: new Vector3(0, 0, 0),
-      drag: 0,
+      linearDrag: 0,
       angularDrag: 0,
       fadeStart: 0.7,
       fadeEnd: 1.0,

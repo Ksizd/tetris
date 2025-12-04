@@ -9,6 +9,7 @@ export interface AngularSpeedRange {
 export interface AngularVelocityConfig {
   ranges?: Partial<Record<FragmentMaterialId, AngularSpeedRange>>;
   randomFn?: () => number;
+  mass?: number;
 }
 
 const DEFAULT_ANGULAR_RANGES: Record<FragmentMaterialId, AngularSpeedRange> = {
@@ -61,5 +62,10 @@ export function generateAngularVelocity(
   config: AngularVelocityConfig = {}
 ): Vector3 {
   const range = config.ranges?.[materialId] ?? DEFAULT_ANGULAR_RANGES[materialId];
-  return randomVectorWithinSphere(range, config.randomFn ?? Math.random);
+  const mass = Math.max(0.05, config.mass ?? 1);
+  const scale = 1 / Math.pow(mass, 0.35); // heavier -> slower spin
+  return randomVectorWithinSphere(
+    { min: range.min * scale, max: range.max * scale },
+    config.randomFn ?? Math.random
+  );
 }

@@ -12,9 +12,10 @@ import { composeInitialVelocity } from './fragmentVelocity';
 import { CUBE_FRAGMENT_PATTERNS, CubeFragmentPattern } from './fragmentPattern';
 import { FRAGMENT_KIND_INITIAL_CONFIG } from './fragmentKindConfig';
 import { getDefaultShardTemplateSet } from './shardTemplateSet';
-import { computeShardLocalCenter } from './shardVolumeMap';
+import { computeShardLocalCenter, computePolygonArea2D } from './shardVolumeMap';
 import { DEFAULT_FACE_UV_RECTS } from './faceUvRect';
 import { CubeFace } from './cubeSpace';
+import { PHYSICS_DEFAULTS } from './destructionPresets';
 
 function getSlotForCube(row: RowDestructionSim, cubeIndex: number): CubeExplosionSlot | null {
   return row.explosions.find((slot) => slot.cubeIndex === cubeIndex) ?? null;
@@ -90,6 +91,31 @@ function computeUvRectForPolygon(face: CubeFace, vertices: Vector3[]): Fragment[
   return { u0, u1, v0, v1 };
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+const MASS_DENSITY = 1;
+const MASS_MIN = 0.05;
+const MASS_MAX = 5;
+
+function effectiveMass(volumeEstimate: number): number {
+  const mass = volumeEstimate * MASS_DENSITY;
+  return clamp(mass, MASS_MIN, MASS_MAX);
+}
+
+function estimatePatternVolume(kind: FragmentKind, scale: Vector3): number {
+  const base = scale.x * scale.y * scale.z;
+  const thickness = kind === 'dust' ? 0.2 : kind === 'faceShard' ? 0.35 : 0.6;
+  return Math.max(0.001, base * thickness);
+}
+
+function estimateTemplateVolume(poly: Vector3[], depthMax: number): number {
+  const verts2D = poly.map((p) => new Vector3(p.x, p.y, 0));
+  const area = computePolygonArea2D(verts2D);
+  return Math.max(0.001, area * Math.max(0.05, depthMax));
+}
+
 function spawnFragmentsForCubeV1(
   cube: RowDestructionSim['cubes'][number],
   cubeSize: RowDestructionSim['cubeSize'],
@@ -98,6 +124,8 @@ function spawnFragmentsForCubeV1(
 ): Fragment[] {
   const fragments: Fragment[] = [];
   const towerCenter = new Vector3(0, 0, 0);
+  const baseLinearDrag = preset.linearDrag ?? PHYSICS_DEFAULTS.linearDrag;
+  const baseAngularDrag = preset.angularDrag ?? PHYSICS_DEFAULTS.angularDrag;
   const materialByKind: Record<FragmentKind, Fragment['materialId']> = {
     faceShard: 'face',
     edgeShard: 'gold',
@@ -108,29 +136,36 @@ function spawnFragmentsForCubeV1(
   for (const tpl of pattern) {
     const kindConfig = FRAGMENT_KIND_INITIAL_CONFIG[tpl.kind];
     const position = toWorldPosition(cube.worldPos, cubeSize, tpl.localPosition);
-    const radialSpeed =
-      randomInRange(preset.radialSpeed.min, preset.radialSpeed.max) *
-      randomInRange(kindConfig.radialSpeed[0], kindConfig.radialSpeed[1]);
-    const tangentialSpeed =
-      randomInRange(preset.tangentialSpeed.min, preset.tangentialSpeed.max) *
-      randomInRange(kindConfig.tangentialSpeed[0], kindConfig.tangentialSpeed[1]);
-    const velocity = composeInitialVelocity(cube.worldPos, towerCenter, {
-      radialSpeed,
-      tangentialSpeed,
-    }).add(
-      new Vector3(
-        0,
-        randomInRange(preset.verticalSpeed.min, preset.verticalSpeed.max) *
-          randomInRange(kindConfig.verticalSpeed[0], kindConfig.verticalSpeed[1]),
-        0
-      )
-    );
-
     const rotation = tpl.localRotation.clone().multiply(jitterQuaternion(kindConfig.rotationJitterRad));
     const scaleJitter = randomInRange(kindConfig.scaleJitter[0], kindConfig.scaleJitter[1]);
     const scale = tpl.localScale.clone().multiplyScalar(scaleJitter);
     const colorTint = randomInRange(kindConfig.colorTint[0], kindConfig.colorTint[1]);
     const materialId = materialByKind[tpl.kind];
+    const volumeEstimate = estimatePatternVolume(tpl.kind, scale);
+    const mass = effectiveMass(volumeEstimate);
+    const radialSpeed =
+      randomInRange(preset.radialSpeed.min, preset.radialSpeed.max) *
+      randomInRange(kindConfig.radialSpeed[0], kindConfig.radialSpeed[1]);
+    const tangentialBase =
+      randomInRange(preset.tangentialSpeed.min, preset.tangentialSpeed.max) *
+      randomInRange(kindConfig.tangentialSpeed[0], kindConfig.tangentialSpeed[1]);
+    const angle = Math.atan2(position.z, position.x);
+    const waveDir = Math.sign(Math.sin(angle)) || 1;
+    const tangentialSpeed = tangentialBase * (0.8 + 0.2 * Math.cos(angle));
+    const upSpeed =
+      randomInRange(preset.verticalSpeed.min, preset.verticalSpeed.max) *
+      randomInRange(kindConfig.verticalSpeed[0], kindConfig.verticalSpeed[1]);
+    const velocity = composeInitialVelocity(cube.worldPos, towerCenter, {
+      radialSpeed,
+      tangentialSpeed,
+      upSpeed,
+      mass,
+      waveDirectionSign: waveDir,
+      jitterStrength: 0.08,
+      jitterAngleRad: Math.PI / 20,
+    });
+    const linearDrag = Math.max(0, baseLinearDrag * kindConfig.linearDragMultiplier);
+    const angularDrag = Math.max(0, baseAngularDrag * kindConfig.angularDragMultiplier);
 
     const fragment = createFragment({
       kind: tpl.kind,
@@ -139,7 +174,7 @@ function spawnFragmentsForCubeV1(
       velocity,
       rotation,
       scale,
-      angularVelocity: generateAngularVelocity(materialId),
+      angularVelocity: generateAngularVelocity(materialId, { mass }),
       lifetimeMs: Math.floor(
         randomInRange(preset.lifetimeMs.min, preset.lifetimeMs.max) *
           randomInRange(kindConfig.lifetimeMs[0], kindConfig.lifetimeMs[1])
@@ -148,6 +183,9 @@ function spawnFragmentsForCubeV1(
       materialId,
       uvRect: tpl.uvRect,
       colorTint,
+      mass,
+      linearDrag,
+      angularDrag,
     });
     fragments.push(fragment);
   }
@@ -162,6 +200,8 @@ function spawnFragmentsFromShardTemplates(
 ): Fragment[] {
   const fragments: Fragment[] = [];
   const towerCenter = new Vector3(0, 0, 0);
+  const baseLinearDrag = preset.linearDrag ?? PHYSICS_DEFAULTS.linearDrag;
+  const baseAngularDrag = preset.angularDrag ?? PHYSICS_DEFAULTS.angularDrag;
   const templates = getDefaultShardTemplateSet().templates;
   templates.forEach((tpl) => {
     const kind: FragmentKind = tpl.face === CubeFace.Front ? 'faceShard' : 'edgeShard';
@@ -170,23 +210,33 @@ function spawnFragmentsFromShardTemplates(
     const worldCenter = cube.worldPos.clone().add(
       new Vector3(localCenter.x * cubeSize.sx, localCenter.y * cubeSize.sy, localCenter.z * cubeSize.sz)
     );
+    const depthMax = tpl.layers?.[tpl.layers.length - 1]?.depth ?? tpl.depthMax;
+    const volumeEstimate = estimateTemplateVolume(
+      tpl.polygon2D.vertices.map((v) => new Vector3(v.x, v.y, 0)),
+      depthMax
+    );
+    const mass = effectiveMass(volumeEstimate);
     const radialSpeed =
       randomInRange(preset.radialSpeed.min, preset.radialSpeed.max) *
       randomInRange(kindConfig.radialSpeed[0], kindConfig.radialSpeed[1]);
-    const tangentialSpeed =
+    const tangentialBase =
       randomInRange(preset.tangentialSpeed.min, preset.tangentialSpeed.max) *
       randomInRange(kindConfig.tangentialSpeed[0], kindConfig.tangentialSpeed[1]);
+    const angle = Math.atan2(worldCenter.z, worldCenter.x);
+    const waveDir = Math.sign(Math.sin(angle)) || 1;
+    const tangentialSpeed = tangentialBase * (0.8 + 0.2 * Math.cos(angle));
+    const upSpeed =
+      randomInRange(preset.verticalSpeed.min, preset.verticalSpeed.max) *
+      randomInRange(kindConfig.verticalSpeed[0], kindConfig.verticalSpeed[1]);
     const velocity = composeInitialVelocity(cube.worldPos, towerCenter, {
       radialSpeed,
       tangentialSpeed,
-    }).add(
-      new Vector3(
-        0,
-        randomInRange(preset.verticalSpeed.min, preset.verticalSpeed.max) *
-          randomInRange(kindConfig.verticalSpeed[0], kindConfig.verticalSpeed[1]),
-        0
-      )
-    );
+      upSpeed,
+      mass,
+      waveDirectionSign: waveDir,
+      jitterStrength: 0.08,
+      jitterAngleRad: Math.PI / 20,
+    });
     const rotation = jitterQuaternion(kindConfig.rotationJitterRad);
     const scaleJitter = randomInRange(kindConfig.scaleJitter[0], kindConfig.scaleJitter[1]);
     const scale = new Vector3(1, 1, 1).multiplyScalar(scaleJitter);
@@ -197,6 +247,9 @@ function spawnFragmentsFromShardTemplates(
       tpl.polygon2D.vertices.map((v) => new Vector3(v.x, v.y, 0))
     );
 
+    const linearDrag = Math.max(0, baseLinearDrag * kindConfig.linearDragMultiplier);
+    const angularDrag = Math.max(0, baseAngularDrag * kindConfig.angularDragMultiplier);
+
     fragments.push(
       createFragment({
         kind,
@@ -204,7 +257,7 @@ function spawnFragmentsFromShardTemplates(
         velocity,
         rotation,
         scale,
-        angularVelocity: generateAngularVelocity(materialId),
+        angularVelocity: generateAngularVelocity(materialId, { mass }),
         lifetimeMs: Math.floor(
           randomInRange(preset.lifetimeMs.min, preset.lifetimeMs.max) *
             randomInRange(kindConfig.lifetimeMs[0], kindConfig.lifetimeMs[1])
@@ -215,6 +268,9 @@ function spawnFragmentsFromShardTemplates(
         colorTint,
         templateId: tpl.id,
         shardId: tpl.id,
+        mass,
+        linearDrag,
+        angularDrag,
       })
     );
   });

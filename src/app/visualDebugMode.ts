@@ -35,6 +35,7 @@ import { FragmentInstanceUpdate } from './destruction/fragmentInstances';
 import { FragmentMaterialId } from './destruction/cubeDestructionSim';
 import { applyFragmentInstanceUpdates } from '../render/destruction/instanceUpdater';
 import { FragmentPhysicsConfig, DEFAULT_FRAGMENT_PHYSICS } from './destruction/fragmentSimulation';
+import { ULTRA_DESTRUCTION_PRESET } from './destruction/destructionPresets';
 import { buildShardGeometryLibrary, makeFragmentFromTemplate } from './destruction/shardFragmentFactory';
 import { getDefaultShardTemplateSet } from './destruction/shardTemplateSet';
 import { FACE_NORMALS, CubeFace } from './destruction/cubeSpace';
@@ -156,12 +157,36 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
 
   let pendingRebuild = false;
   let destructionPanel: DestructionDebugPanel | null = null;
+  let physicsTuning = { explosionStrength: 1, gravityScale: 1, dragScale: 1 };
   function triggerDestruction(level: number) {
+    physicsTuning = destructionPanel?.getPhysicsOverrides?.() ?? physicsTuning;
     const started = startLineDestructionFromBoard({
       board: snapshot.board,
       mapper: renderCtx.mapper,
       levels: [level],
       startedAtMs: performance.now(),
+      preset: {
+        ...ULTRA_DESTRUCTION_PRESET,
+        radialSpeed: {
+          min: ULTRA_DESTRUCTION_PRESET.radialSpeed.min * physicsTuning.explosionStrength,
+          max: ULTRA_DESTRUCTION_PRESET.radialSpeed.max * physicsTuning.explosionStrength,
+        },
+        tangentialSpeed: {
+          min: ULTRA_DESTRUCTION_PRESET.tangentialSpeed.min * physicsTuning.explosionStrength,
+          max: ULTRA_DESTRUCTION_PRESET.tangentialSpeed.max * physicsTuning.explosionStrength,
+        },
+        verticalSpeed: {
+          min: ULTRA_DESTRUCTION_PRESET.verticalSpeed.min * physicsTuning.explosionStrength,
+          max: ULTRA_DESTRUCTION_PRESET.verticalSpeed.max * physicsTuning.explosionStrength,
+        },
+        linearDrag: ULTRA_DESTRUCTION_PRESET.linearDrag,
+        angularDrag: ULTRA_DESTRUCTION_PRESET.angularDrag,
+        gravityScale: ULTRA_DESTRUCTION_PRESET.gravityScale,
+        floorRestitution: ULTRA_DESTRUCTION_PRESET.floorRestitution,
+        wallRestitution: ULTRA_DESTRUCTION_PRESET.wallRestitution,
+        floorFriction: ULTRA_DESTRUCTION_PRESET.floorFriction,
+        wallFriction: ULTRA_DESTRUCTION_PRESET.wallFriction,
+      },
     });
     destructionSim = started.simulation;
     console.log('[visual debug] StartLineDestruction', started.event, {
@@ -347,8 +372,13 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
 
   function getFragmentPhysicsConfig(): FragmentPhysicsConfig {
     const base = DEFAULT_FRAGMENT_PHYSICS;
+    const tuning = destructionPanel?.getPhysicsOverrides?.() ?? physicsTuning;
+    physicsTuning = tuning;
     return {
       ...base,
+      gravity: base.gravity.clone().multiplyScalar(tuning.gravityScale ?? 1),
+      linearDrag: base.linearDrag * (tuning.dragScale ?? 1),
+      angularDrag: base.angularDrag * (tuning.dragScale ?? 1),
       floor: { floorY: 0, minBounceSpeed: 0.8, bounceFactor: 0.35, smallOffset: 0.002 },
       radiusLimit: {
         center: new THREE.Vector3(0, 0, 0),

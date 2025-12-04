@@ -4,9 +4,16 @@ export interface DestructionDebugPanel {
   setLevels: (levels: number[]) => void;
   getFragmentFilter: () => FragmentDebugFilter;
   onShowSourceRegion?: () => void;
+  getPhysicsOverrides: () => PhysicsOverrides;
 }
 
 export type FragmentDebugFilter = 'all' | 'face' | 'gold' | 'dust' | 'fractureDebug';
+
+export interface PhysicsOverrides {
+  explosionStrength: number;
+  gravityScale: number;
+  dragScale: number;
+}
 
 export interface DestructionDebugOptions {
   levels: number[];
@@ -127,6 +134,47 @@ export function createDestructionDebugPanel(options: DestructionDebugOptions): D
   });
   container.appendChild(sourceRegionBtn);
 
+  const tuning: PhysicsOverrides = {
+    explosionStrength: 1,
+    gravityScale: 1,
+    dragScale: 1,
+  };
+
+  function addSlider(label: string, min: number, max: number, step: number, value: number, onChange: (v: number) => void) {
+    const wrapper = document.createElement('div');
+    wrapper.style.marginTop = '8px';
+    const lbl = document.createElement('label');
+    lbl.textContent = `${label}: ${value.toFixed(2)}`;
+    lbl.style.display = 'block';
+    lbl.style.marginBottom = '2px';
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = min.toString();
+    input.max = max.toString();
+    input.step = step.toString();
+    input.value = value.toString();
+    input.style.width = '100%';
+    input.addEventListener('input', () => {
+      const num = Number.parseFloat(input.value);
+      if (!Number.isFinite(num)) return;
+      onChange(num);
+      lbl.textContent = `${label}: ${num.toFixed(2)}`;
+    });
+    wrapper.appendChild(lbl);
+    wrapper.appendChild(input);
+    container.appendChild(wrapper);
+  }
+
+  addSlider('Explosion strength', 0.1, 3, 0.05, tuning.explosionStrength, (v) => {
+    tuning.explosionStrength = v;
+  });
+  addSlider('Gravity scale', 0.3, 2, 0.02, tuning.gravityScale, (v) => {
+    tuning.gravityScale = v;
+  });
+  addSlider('Drag scale', 0, 3, 0.05, tuning.dragScale, (v) => {
+    tuning.dragScale = v;
+  });
+
   document.body.appendChild(container);
 
   return {
@@ -141,5 +189,6 @@ export function createDestructionDebugPanel(options: DestructionDebugOptions): D
     },
     getFragmentFilter: () => filterSelect.value as FragmentDebugFilter,
     onShowSourceRegion: options.onShowSourceRegion,
+    getPhysicsOverrides: () => ({ ...tuning }),
   };
 }
