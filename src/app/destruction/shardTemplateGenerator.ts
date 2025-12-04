@@ -29,15 +29,15 @@ const DEFAULT_FACE_COUNTS: Record<CubeFace, FaceCountRange> = {
   [CubeFace.Back]: { min: 9, max: 16 },
 };
 
-const DEFAULT_MIN_AREA = 0.0055; // denser shard tessellation with ~0.5% face area minima
+const DEFAULT_MIN_AREA = 0.0075; // dense shard tessellation with ~0.75% face area minima
 
 const DEPTH_RANGES: Record<CubeFace, DepthRange> = {
-  [CubeFace.Front]: { min: 0.035, max: 0.22 },
-  [CubeFace.Right]: { min: 0.095, max: 0.36 },
-  [CubeFace.Left]: { min: 0.095, max: 0.36 },
-  [CubeFace.Top]: { min: 0.12, max: 0.4 },
-  [CubeFace.Bottom]: { min: 0.12, max: 0.4 },
-  [CubeFace.Back]: { min: 0.165, max: 0.46 },
+  [CubeFace.Front]: { min: 0.05, max: 0.26 },
+  [CubeFace.Right]: { min: 0.12, max: 0.42 },
+  [CubeFace.Left]: { min: 0.12, max: 0.42 },
+  [CubeFace.Top]: { min: 0.145, max: 0.44 },
+  [CubeFace.Bottom]: { min: 0.145, max: 0.44 },
+  [CubeFace.Back]: { min: 0.19, max: 0.5 },
 };
 
 function randomInt(min: number, max: number, rnd: () => number): number {
@@ -56,6 +56,13 @@ function polygonArea(vertices: Vector2[]): number {
     area += a.x * b.y - b.x * a.y;
   }
   return Math.abs(area) * 0.5;
+}
+
+function randomDepth(min: number, max: number, rnd: () => number): number {
+  if (max < min) {
+    return min;
+  }
+  return min + (max - min) * rnd();
 }
 
 function boundingBox(vertices: Vector2[]): { minX: number; maxX: number; minY: number; maxY: number } {
@@ -326,6 +333,41 @@ function polygonCentroid(vertices: Vector2[]): Vector2 {
   return new Vector2(cx * factor, cy * factor);
 }
 
+function ensureCCW(vertices: Vector2[]): Vector2[] {
+  const signed = vertices.reduce((acc, v, idx) => {
+    const next = vertices[(idx + 1) % vertices.length];
+    return acc + v.x * next.y - next.x * v.y;
+  }, 0);
+  return signed < 0 ? [...vertices].reverse() : vertices;
+}
+
+function clampToFace(v: Vector2): Vector2 {
+  return new Vector2(clamp(v.x, -0.5, 0.5), clamp(v.y, -0.5, 0.5));
+}
+
+function subdivideWithMidpoints(vertices: Vector2[]): Vector2[] {
+  const out: Vector2[] = [];
+  for (let i = 0; i < vertices.length; i += 1) {
+    const v = vertices[i];
+    const next = vertices[(i + 1) % vertices.length];
+    const mid = v.clone().add(next).multiplyScalar(0.5);
+    out.push(v.clone());
+    out.push(mid);
+  }
+  return out;
+}
+
+function perturbPolygon2D(base: Vector2[], rnd: () => number, intensity: number, scaleRange: [number, number]): Vector2[] {
+  const center = polygonCentroid(base);
+  const scale = scaleRange[0] + (scaleRange[1] - scaleRange[0]) * rnd();
+  return base.map((v) => {
+    const dir = v.clone().sub(center);
+    const scaled = center.clone().add(dir.multiplyScalar(scale));
+    const jitter = new Vector2((rnd() * 2 - 1) * intensity, (rnd() * 2 - 1) * intensity);
+    return clampToFace(scaled.add(jitter));
+  });
+}
+
 export function computeDepthRange(
   face: CubeFace,
   vertices: Vector2[],
@@ -345,6 +387,55 @@ export function computeDepthRange(
   };
 }
 
+function buildLayeredPolygons(
+  base: Vector2[],
+  depthRange: DepthRange,
+  rnd: () => number
+): { layers: { depth: number; polygon: Vector2[] }[]; depthMin: number; depthMax: number } {
+  const front = ensureCCW(subdivideWithMidpoints(base));
+  const layerCount = 3 + Math.floor(rnd() * 2); // 3..4 layers total (including front)
+  const maxDepth = randomDepth(depthRange.min, depthRange.max, rnd);
+  const step = maxDepth / Math.max(1, layerCount - 1);
+  const depths: number[] = [0];
+  for (let i = 1; i < layerCount; i += 1) {
+    if (i === layerCount - 1) {
+      depths.push(maxDepth);
+      break;
+    }
+    const jitter = 0.65 + rnd() * 0.9;
+    const next = Math.min(maxDepth, depths[i - 1] + step * jitter);
+    depths.push(next);
+  }
+
+  const layers: { depth: number; polygon: Vector2[] }[] = [];
+  layers.push({ depth: 0, polygon: front });
+  const center = polygonCentroid(front);
+  for (let i = 1; i < depths.length; i += 1) {
+    const depth = depths[i];
+    const depthRatio = maxDepth > 0 ? depth / maxDepth : 0;
+    const intensity = 0.02 + depthRatio * 0.055;
+    const scaleJitter: [number, number] = [0.78, 1.22];
+    const perturbed = ensureCCW(
+      perturbPolygon2D(
+        front.map((v) => v.clone()),
+        rnd,
+        intensity,
+        scaleJitter
+      ).map((p) => {
+        // slight radial bias to avoid collapsing
+        const dir = p.clone().sub(center);
+        const radial = dir.length() > 1e-5 ? dir.normalize().multiplyScalar(intensity * 0.6 * (rnd() * 2 - 1)) : dir;
+        return clampToFace(p.add(radial));
+      })
+    );
+    layers.push({ depth, polygon: perturbed });
+  }
+
+  const depthMin = 0;
+  const depthMax = Math.max(...depths);
+  return { layers, depthMin, depthMax };
+}
+
 function buildFacePolygons(
   face: CubeFace,
   targetRange: FaceCountRange,
@@ -359,17 +450,25 @@ function buildFacePolygons(
   return result;
 }
 
-function toTemplates(face: CubeFace, polygons: Vector2[][], nextId: () => number): ShardTemplate[] {
+function toTemplates(
+  face: CubeFace,
+  polygons: Vector2[][],
+  nextId: () => number,
+  rnd: () => number
+): ShardTemplate[] {
   const depthRange = DEPTH_RANGES[face];
-  return polygons.map((poly) => ({
-    id: nextId(),
-    face,
-    polygon2D: { face, vertices: poly.map((v) => v.clone()) },
-    ...(() => {
-      const dr = computeDepthRange(face, poly, depthRange);
-      return { depthMin: dr.min, depthMax: dr.max };
-    })(),
-  }));
+  return polygons.map((poly) => {
+    const dr = computeDepthRange(face, poly, depthRange);
+    const layered = buildLayeredPolygons(poly, dr, rnd);
+    return {
+      id: nextId(),
+      face,
+      polygon2D: { face, vertices: ensureCCW(poly).map((v) => v.clone()) },
+      depthMin: layered.depthMin,
+      depthMax: layered.depthMax,
+      layers: layered.layers.map((layer) => ({ depth: layer.depth, polygon: layer.polygon.map((v) => v.clone()) })),
+    };
+  });
 }
 
 /**
@@ -400,7 +499,7 @@ export function generateShardTemplates(options: ShardGenerationOptions = {}): Sh
   const all: ShardTemplate[] = [];
   faces.forEach((face) => {
     const polys = buildFacePolygons(face, counts[face], minArea, rnd);
-    const templates = toTemplates(face, polys, nextId);
+    const templates = toTemplates(face, polys, nextId, rnd);
     templates.forEach((tpl) => {
       const v = validateShardTemplate(tpl);
       if (v.valid) {

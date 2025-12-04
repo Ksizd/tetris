@@ -15,6 +15,9 @@ export interface ShardGeometry {
   depthFront: number;
   depthBack: number;
   depthBacks: number[];
+  layerDepths: number[];
+  layerOffsets: number[];
+  layerCount: number;
 }
 
 export interface ShardGeometryBuildOptions {
@@ -206,6 +209,36 @@ function buildUVs(face: CubeFace, polygon: Vector2[], rects: Record<CubeFace, Fa
   return uvs;
 }
 
+function clonePolygon(poly: Vector2[]): Vector2[] {
+  return poly.map((v) => v.clone());
+}
+
+function alignLayerVertexCounts(layers: { depth: number; polygon: Vector2[] }[]): { depth: number; polygon: Vector2[] }[] {
+  if (layers.length === 0) {
+    return layers;
+  }
+  const target = layers.reduce((max, layer) => Math.max(max, layer.polygon.length), 0);
+  return layers.map((layer) => {
+    let poly = [...layer.polygon];
+    while (poly.length < target) {
+      const extended: Vector2[] = [];
+      for (let i = 0; i < poly.length; i += 1) {
+        const v = poly[i];
+        const next = poly[(i + 1) % poly.length];
+        extended.push(v.clone());
+        if (extended.length < target) {
+          extended.push(v.clone().add(next).multiplyScalar(0.5));
+        }
+      }
+      poly = extended;
+    }
+    if (poly.length > target) {
+      poly = poly.slice(0, target);
+    }
+    return { depth: layer.depth, polygon: ensureCCW(poly) };
+  });
+}
+
 export function buildShardGeometry(
   template: ShardTemplate,
   options: ShardGeometryBuildOptions = {}
@@ -214,54 +247,115 @@ export function buildShardGeometry(
   const faceUvRects = options.faceUvRects ?? DEFAULT_FACE_UV_RECTS;
   const sideNoiseRadius = options.sideNoiseRadius ?? 0.045;
   const depthFront = 0;
-  const ccw = ensureCCW(template.polygon2D.vertices);
-  const depthsBack = ccw.map(() => randomDepth(template.depthMin, template.depthMax, rnd));
-  const depthBack = depthsBack.length > 0 ? Math.max(...depthsBack) : 0;
 
-  const front: Vector3[] = ccw.map((v) => projectToFace(template.face, v, depthFront));
-  const back: Vector3[] = ccw.map((v, i) => projectToFace(template.face, v, depthsBack[i]));
-  applySideNoiseToBack(back, template.face, sideNoiseRadius, rnd);
-  const faceUVs = buildUVs(template.face, ccw, faceUvRects);
-  const uvs = [...faceUVs, ...faceUVs.map((uv) => uv.clone())];
+  const hasDeepLayers = Array.isArray(template.layers) && (template.layers?.length ?? 0) > 1;
+  const basePoly = ensureCCW(template.polygon2D.vertices);
 
-  const positions = [...front, ...back];
-  const n = front.length;
-  const backOffset = n;
+  let layerPolys: { depth: number; polygon: Vector2[] }[];
+  let depthBacks: number[];
+
+  if (hasDeepLayers) {
+    const sortedLayers = [...(template.layers ?? [])].sort((a, b) => a.depth - b.depth);
+    const normalized = sortedLayers.map((layer, idx) => ({
+      depth: idx === 0 ? 0 : layer.depth, // ensure front depth is exactly 0
+      polygon: ensureCCW(clonePolygon(layer.polygon)),
+    }));
+    layerPolys = alignLayerVertexCounts(normalized);
+    const lastDepth = layerPolys[layerPolys.length - 1]?.depth ?? template.depthMax;
+    const lastCount = layerPolys[layerPolys.length - 1]?.polygon.length ?? basePoly.length;
+    depthBacks = Array.from({ length: lastCount }, () => lastDepth);
+  } else {
+    const depthsBackPerVertex = basePoly.map(() => randomDepth(template.depthMin, template.depthMax, rnd));
+    const depthBack = depthsBackPerVertex.length > 0 ? Math.max(...depthsBackPerVertex) : 0;
+    layerPolys = [
+      { depth: depthFront, polygon: basePoly },
+      { depth: depthBack, polygon: basePoly },
+    ];
+    depthBacks = depthsBackPerVertex;
+  }
+
+  // enforce consistent vertex counts across layers for stable side stitching
+  layerPolys = alignLayerVertexCounts(layerPolys);
+
+  const positions: Vector3[] = [];
+  const uvs: Vector2[] = [];
+  const layerOffsets: number[] = [];
+  const layerDepths: number[] = [];
+
+  layerPolys.forEach((layer, idx) => {
+    const offset = positions.length;
+    layerOffsets.push(offset);
+    layerDepths.push(layer.depth);
+    const verts3D = layer.polygon.map((v) => projectToFace(template.face, v, layer.depth));
+    if (!hasDeepLayers && idx === layerPolys.length - 1 && depthBacks.length === layer.polygon.length) {
+      const basis = FACE_BASIS[template.face];
+      verts3D.forEach((p, i) => {
+        const targetDepth = depthBacks[i];
+        const delta = targetDepth - layer.depth;
+        if (Math.abs(delta) > 1e-5) {
+          p.addScaledVector(basis.normal, -delta);
+        }
+      });
+    }
+    // apply noise only on the deepest layer when using simple two-layer prism fallback
+    if (idx === layerPolys.length - 1 && sideNoiseRadius > 0 && !hasDeepLayers) {
+      applySideNoiseToBack(verts3D, template.face, sideNoiseRadius, rnd);
+    }
+    positions.push(...verts3D);
+    const layerUvs =
+      idx === 0 ? buildUVs(template.face, layer.polygon, faceUvRects) : layer.polygon.map(() => new Vector2(0, 0));
+    uvs.push(...layerUvs);
+  });
+
   const indices: number[] = [];
+  const frontVertexCount = layerPolys[0]?.polygon.length ?? 0;
+  const backOffset = layerOffsets[layerOffsets.length - 1] ?? 0;
+  const backVertexCount = layerPolys[layerPolys.length - 1]?.polygon.length ?? 0;
 
-  // front face (CCW, outward = face normal)
-  for (let i = 1; i < n - 1; i += 1) {
+  // front face
+  for (let i = 1; i < frontVertexCount - 1; i += 1) {
     indices.push(0, i, i + 1);
   }
 
-  // back face (same winding produces outward = face normal because basis satisfies u x v = normal)
-  for (let i = 1; i < n - 1; i += 1) {
+  // back face (last layer)
+  for (let i = 1; i < backVertexCount - 1; i += 1) {
     indices.push(backOffset, backOffset + i + 1, backOffset + i);
   }
 
-  // sides
-  for (let i = 0; i < n; i += 1) {
-    const next = (i + 1) % n;
-    const a = i;
-    const b = next;
-    const c = backOffset + next;
-    const d = backOffset + i;
-    // Winding must keep outward normals; swap b<->c to avoid backface culling on sides.
-    indices.push(a, c, b);
-    indices.push(a, d, c);
+  // sides between consecutive layers
+  for (let layerIdx = 0; layerIdx < layerPolys.length - 1; layerIdx += 1) {
+    const current = layerPolys[layerIdx];
+    const next = layerPolys[layerIdx + 1];
+    const count = Math.min(current.polygon.length, next.polygon.length);
+    const offsetA = layerOffsets[layerIdx];
+    const offsetB = layerOffsets[layerIdx + 1];
+    for (let i = 0; i < count; i += 1) {
+      const nextI = (i + 1) % count;
+      const a = offsetA + i;
+      const b = offsetA + nextI;
+      const c = offsetB + nextI;
+      const d = offsetB + i;
+      indices.push(a, c, b);
+      indices.push(a, d, c);
+    }
   }
+
+  const depthBack = layerDepths[layerDepths.length - 1] ?? template.depthMax;
 
   return {
     templateId: template.id,
     face: template.face,
     positions,
     indices,
-    normals: buildNormals(positions, indices, template.face, backOffset, n),
+    normals: buildNormals(positions, indices, template.face, backOffset, frontVertexCount),
     uvs,
-    frontVertexCount: n,
+    frontVertexCount,
     backVertexOffset: backOffset,
     depthFront,
     depthBack,
-    depthBacks: depthsBack,
+    depthBacks,
+    layerDepths,
+    layerOffsets,
+    layerCount: layerPolys.length,
   };
 }

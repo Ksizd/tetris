@@ -35,6 +35,14 @@ describe('shardTemplateGenerator', () => {
       expect(res.valid).toBe(true);
       expect(tpl.depthMin).toBeGreaterThanOrEqual(0);
       expect(tpl.depthMax).toBeLessThanOrEqual(1);
+      expect(tpl.layers && tpl.layers.length).toBeGreaterThan(1);
+      expect(tpl.layers?.[0].depth).toBeCloseTo(0);
+      tpl.layers?.forEach((layer, idx) => {
+        expect(layer.polygon.length).toBeGreaterThanOrEqual(3);
+        if (idx > 0) {
+          expect(layer.depth).toBeGreaterThanOrEqual(tpl.layers![idx - 1].depth - 1e-6);
+        }
+      });
     });
   });
 

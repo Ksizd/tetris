@@ -29,6 +29,51 @@ const TRI_TEMPLATE: ShardTemplate = {
   depthMax: 0.3,
 };
 
+const LAYERED_TEMPLATE: ShardTemplate = {
+  id: 9,
+  face: CubeFace.Front,
+  polygon2D: {
+    face: CubeFace.Front,
+    vertices: [
+      new Vector2(-0.22, -0.18),
+      new Vector2(0.24, -0.16),
+      new Vector2(0.2, 0.2),
+      new Vector2(-0.18, 0.22),
+    ],
+  },
+  depthMin: 0.08,
+  depthMax: 0.35,
+  layers: [
+    {
+      depth: 0,
+      polygon: [
+        new Vector2(-0.22, -0.18),
+        new Vector2(0.24, -0.16),
+        new Vector2(0.2, 0.2),
+        new Vector2(-0.18, 0.22),
+      ],
+    },
+    {
+      depth: 0.18,
+      polygon: [
+        new Vector2(-0.16, -0.22),
+        new Vector2(0.26, -0.08),
+        new Vector2(0.16, 0.18),
+        new Vector2(-0.22, 0.28),
+      ],
+    },
+    {
+      depth: 0.34,
+      polygon: [
+        new Vector2(-0.1, -0.2),
+        new Vector2(0.2, -0.06),
+        new Vector2(0.14, 0.14),
+        new Vector2(-0.24, 0.18),
+      ],
+    },
+  ],
+};
+
 describe('shardGeometryBuilder', () => {
   it('builds closed geometry with front on cube surface and varied back inset', () => {
     const geom = buildShardGeometry(TRI_TEMPLATE, {
@@ -84,5 +129,25 @@ describe('shardGeometryBuilder', () => {
     expect(uv.x).toBeLessThanOrEqual(0.4);
     expect(uv.y).toBeGreaterThanOrEqual(0.2);
     expect(uv.y).toBeLessThanOrEqual(0.4);
+  });
+
+  it('builds multi-layer geometry with differing cross-sections', () => {
+    const geom = buildShardGeometry(LAYERED_TEMPLATE, { sideNoiseRadius: 0 });
+    expect(geom.layerCount).toBe(3);
+    const n = LAYERED_TEMPLATE.layers?.[0].polygon.length ?? 0;
+    expect(geom.positions.length).toBe(n * geom.layerCount);
+    const front = geom.positions.slice(0, n);
+    const back = geom.positions.slice(geom.backVertexOffset, geom.backVertexOffset + n);
+    // front stays on z=+0.5
+    front.forEach((p) => expect(p.z).toBeCloseTo(0.5));
+    // back inset with varied xy compared to front (not just translation along normal)
+    const diffSet = new Set(
+      back.map((p, i) => {
+        const f = front[i];
+        return `${(p.x - f.x).toFixed(3)}_${(p.y - f.y).toFixed(3)}`;
+      })
+    );
+    expect(diffSet.size).toBeGreaterThan(1);
+    expect(geom.layerOffsets.length).toBe(geom.layerCount);
   });
 });

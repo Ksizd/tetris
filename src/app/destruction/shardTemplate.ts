@@ -6,6 +6,11 @@ export interface FacePolygon2D {
   vertices: Vector2[]; // polygon in local face space within [-0.5, 0.5]^2
 }
 
+export interface ShardLayer2D {
+  depth: number; // depth along face normal (front = 0, increasing inward)
+  polygon: Vector2[];
+}
+
 // Template describing a shard extruded from a face polygon with depth along the face normal.
 export interface ShardTemplate {
   id: number;
@@ -13,6 +18,7 @@ export interface ShardTemplate {
   polygon2D: FacePolygon2D;
   depthMin: number; // [0..1] relative depth from the face into the cube
   depthMax: number; // [0..1], >= depthMin
+  layers?: ShardLayer2D[]; // optional deep fracture layers; layer[0] should match polygon2D at depth 0
 }
 
 function isVertexInCubeRange(v: Vector2): boolean {
@@ -22,6 +28,32 @@ function isVertexInCubeRange(v: Vector2): boolean {
     v.y >= CUBE_LOCAL_MIN &&
     v.y <= CUBE_LOCAL_MAX
   );
+}
+
+function validateLayers(layers: ShardLayer2D[] | undefined): ShardValidationResult {
+  if (!layers || layers.length === 0) {
+    return { valid: true };
+  }
+  if (!Number.isFinite(layers[0].depth) || Math.abs(layers[0].depth) > 1e-4) {
+    return { valid: false, reason: 'layer[0] depth must be 0 for the front face' };
+  }
+  for (let i = 0; i < layers.length; i += 1) {
+    const layer = layers[i];
+    if (!Number.isFinite(layer.depth) || layer.depth < 0) {
+      return { valid: false, reason: `layer ${i} depth must be non-negative` };
+    }
+    if (!layer.polygon || layer.polygon.length < 3) {
+      return { valid: false, reason: `layer ${i} polygon must have at least 3 vertices` };
+    }
+    const outside = layer.polygon.find((v) => !isVertexInCubeRange(v));
+    if (outside) {
+      return { valid: false, reason: `layer ${i} polygon must lie within cube local square [-0.5,0.5]` };
+    }
+    if (i > 0 && layer.depth < layers[i - 1].depth - 1e-6) {
+      return { valid: false, reason: 'layer depths must be non-decreasing from front to back' };
+    }
+  }
+  return { valid: true };
 }
 
 export interface ShardValidationResult {
@@ -46,6 +78,10 @@ export function validateShardTemplate(template: ShardTemplate): ShardValidationR
   const outside = verts.find((v) => !isVertexInCubeRange(v));
   if (outside) {
     return { valid: false, reason: 'polygon vertices must lie within cube local square [-0.5,0.5]' };
+  }
+  const layersResult = validateLayers(template.layers);
+  if (!layersResult.valid) {
+    return layersResult;
   }
   return { valid: true };
 }
