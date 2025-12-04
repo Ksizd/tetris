@@ -19,16 +19,16 @@ describe('shardTemplateGenerator', () => {
     const byFace = new Map<CubeFace, number>();
     shards.forEach((s) => byFace.set(s.face, (byFace.get(s.face) ?? 0) + 1));
 
-    expect(byFace.get(CubeFace.Front)).toBeGreaterThanOrEqual(6);
-    expect(byFace.get(CubeFace.Front)).toBeLessThanOrEqual(12);
+    expect(byFace.get(CubeFace.Front)).toBeGreaterThanOrEqual(18);
+    expect(byFace.get(CubeFace.Front)).toBeLessThanOrEqual(32);
     [CubeFace.Right, CubeFace.Left, CubeFace.Top, CubeFace.Bottom].forEach((face) => {
       const count = byFace.get(face) ?? 0;
-      expect(count).toBeGreaterThanOrEqual(4);
-      expect(count).toBeLessThanOrEqual(8);
+      expect(count).toBeGreaterThanOrEqual(12);
+      expect(count).toBeLessThanOrEqual(24);
     });
     const backCount = byFace.get(CubeFace.Back) ?? 0;
-    expect(backCount).toBeGreaterThanOrEqual(3);
-    expect(backCount).toBeLessThanOrEqual(5);
+    expect(backCount).toBeGreaterThanOrEqual(9);
+    expect(backCount).toBeLessThanOrEqual(16);
 
     shards.forEach((tpl) => {
       const res = validateShardTemplate(tpl);
