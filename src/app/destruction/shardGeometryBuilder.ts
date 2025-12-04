@@ -239,8 +239,9 @@ export function buildShardGeometry(
     const b = next;
     const c = backOffset + next;
     const d = backOffset + i;
-    indices.push(a, b, c);
-    indices.push(a, c, d);
+    // Winding must keep outward normals; swap b<->c to avoid backface culling on sides.
+    indices.push(a, c, b);
+    indices.push(a, d, c);
   }
 
   return {

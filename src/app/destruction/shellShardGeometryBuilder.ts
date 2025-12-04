@@ -79,8 +79,9 @@ export function buildShellShardGeometry(
     const b = next;
     const c = backOffset + next;
     const d = backOffset + i;
-    indices.push(a, b, c);
-    indices.push(a, c, d);
+    // Keep outward winding for side quads to avoid backface culling.
+    indices.push(a, c, b);
+    indices.push(a, d, c);
   }
 
   const uvs = [...buildUVs(template.face, ccw, faceUvRects), ...buildUVs(template.face, ccw, faceUvRects)];
