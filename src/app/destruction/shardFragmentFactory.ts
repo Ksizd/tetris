@@ -23,6 +23,7 @@ export type ShardGeometryLibrary = Map<number, ShardGeometryResource>;
 
 export interface ShardGeometryBuildParams extends ShardGeometryBuildOptions {
   faceUvRects?: Record<CubeFace, FaceUvRect>;
+  flatShading?: boolean;
 }
 
 export function buildShardGeometryLibrary(
@@ -57,6 +58,19 @@ export function buildShardGeometryLibrary(
     geometry.setAttribute('normal', new BufferAttribute(normals, 3));
     geometry.setAttribute('uv', new BufferAttribute(uvs, 2));
     geometry.setIndex(geomData.indices);
+    if (options.flatShading) {
+      const nonIndexed = geometry.toNonIndexed();
+      nonIndexed.computeVertexNormals();
+      geometry.dispose();
+      lib.set(tpl.id, {
+        templateId: tpl.id,
+        geometry: nonIndexed,
+        localCenter: computeShardLocalCenter(tpl),
+        materialHint: isShardSurfaceBiased(tpl) ? 'face' : 'gold',
+        localVolume: computePolygonArea2D(tpl.polygon2D.vertices) * Math.max(0, tpl.depthMax - tpl.depthMin),
+      });
+      return;
+    }
     geometry.computeBoundingSphere();
     geometry.computeBoundingBox();
 

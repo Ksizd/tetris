@@ -173,21 +173,17 @@ function buildNormals(
     const b = positions[ib];
     const c = positions[ic];
     const n = computeFaceNormal(a, b, c);
-    normals[ia].add(n);
-    normals[ib].add(n);
-    normals[ic].add(n);
+    normals[ia] = n.clone();
+    normals[ib] = n.clone();
+    normals[ic] = n.clone();
   }
 
-  normals.forEach((n) => n.normalize());
-
-  // Ensure front normals align strictly with face normal (for consistent lighting on "visible" side).
   const faceNormal = FACE_NORMALS[face];
   for (let i = 0; i < frontVertexCount; i += 1) {
-    normals[i].copy(faceNormal);
+    normals[i] = faceNormal.clone();
   }
-  // Back normals point inward (opposite face normal) to reduce lighting; they will be smoothened by normalization above.
   for (let i = backOffset; i < backOffset + frontVertexCount; i += 1) {
-    normals[i].copy(faceNormal).multiplyScalar(-1);
+    normals[i] = faceNormal.clone().multiplyScalar(-1);
   }
 
   return normals;

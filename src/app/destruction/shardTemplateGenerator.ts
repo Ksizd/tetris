@@ -413,8 +413,8 @@ function buildLayeredPolygons(
   for (let i = 1; i < depths.length; i += 1) {
     const depth = depths[i];
     const depthRatio = maxDepth > 0 ? depth / maxDepth : 0;
-    const intensity = 0.02 + depthRatio * 0.055;
-    const scaleJitter: [number, number] = [0.78, 1.22];
+    const intensity = 0.015 + depthRatio * 0.035;
+    const scaleJitter: [number, number] = [0.8, 1.18];
     const perturbed = ensureCCW(
       perturbPolygon2D(
         front.map((v) => v.clone()),

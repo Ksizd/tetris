@@ -41,6 +41,7 @@ function createFaceFragmentMaterial(
     transparent: true,
     opacity: 1,
     vertexColors: false,
+    flatShading: true,
   });
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader =
@@ -86,6 +87,7 @@ function createGoldFragmentMaterialOuter(
     transparent: true,
     opacity: 1,
     vertexColors: false,
+    flatShading: true,
     onBeforeCompile: (shader) => {
       shader.vertexShader =
         'attribute vec4 instanceTint;\n' +
@@ -123,6 +125,7 @@ function createGoldFragmentMaterialInner(
     transparent: true,
     opacity: 1,
     vertexColors: false,
+    flatShading: true,
     onBeforeCompile: (shader) => {
       shader.vertexShader =
         'attribute vec4 instanceTint;\n' +
@@ -155,6 +158,7 @@ function createDustMaterial(): THREE.MeshStandardMaterial {
     transparent: true,
     opacity: 1,
     vertexColors: false,
+    flatShading: true,
     onBeforeCompile: (shader) => {
       shader.vertexShader =
         'attribute vec4 instanceTint;\n' +
