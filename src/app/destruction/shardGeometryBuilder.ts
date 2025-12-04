@@ -14,6 +14,7 @@ export interface ShardGeometry {
   backVertexOffset: number;
   depthFront: number;
   depthBack: number;
+  depthBacks: number[];
 }
 
 export interface ShardGeometryBuildOptions {
@@ -117,17 +118,6 @@ function computeFaceNormal(a: Vector3, b: Vector3, c: Vector3): Vector3 {
   return ab.cross(ac).normalize();
 }
 
-function randomVectorInSphere(radius: number, rnd: () => number): Vector3 {
-  let v = new Vector3();
-  for (let i = 0; i < 6; i += 1) {
-    v.set(rnd() * 2 - 1, rnd() * 2 - 1, rnd() * 2 - 1);
-    if (v.lengthSq() <= 1) {
-      return v.multiplyScalar(radius);
-    }
-  }
-  return v.set(0, 0, 0);
-}
-
 function applySideNoiseToBack(vertices: Vector3[], face: CubeFace, radius: number, rnd: () => number) {
   if (radius <= 0) {
     return;
@@ -135,11 +125,30 @@ function applySideNoiseToBack(vertices: Vector3[], face: CubeFace, radius: numbe
   const basis = FACE_BASIS[face];
   const minInset = 0.01;
   vertices.forEach((p) => {
-    p.add(randomVectorInSphere(radius, rnd));
-    const rel = p.clone().sub(basis.origin);
-    const depth = -rel.dot(basis.normal);
+    const du = (rnd() * 2 - 1) * radius;
+    const dv = (rnd() * 2 - 1) * radius;
+    const dn = (rnd() * 2 - 1) * radius;
+
+    p.addScaledVector(basis.u, du);
+    p.addScaledVector(basis.v, dv);
+    p.addScaledVector(basis.normal, dn);
+
+    const relNormal = p.clone().sub(basis.origin);
+    const depth = -relNormal.dot(basis.normal);
     if (depth < minInset) {
       p.addScaledVector(basis.normal, -(minInset - depth));
+    }
+    const rel = p.clone().sub(basis.origin);
+    const uCoord = rel.dot(basis.u);
+    const vCoord = rel.dot(basis.v);
+    const clampToFace = (value: number) => Math.max(-0.5 + minInset, Math.min(0.5 - minInset, value));
+    const clampedU = clampToFace(uCoord);
+    const clampedV = clampToFace(vCoord);
+    if (clampedU !== uCoord) {
+      p.addScaledVector(basis.u, clampedU - uCoord);
+    }
+    if (clampedV !== vCoord) {
+      p.addScaledVector(basis.v, clampedV - vCoord);
     }
   });
 }
@@ -205,14 +214,12 @@ export function buildShardGeometry(
   const faceUvRects = options.faceUvRects ?? DEFAULT_FACE_UV_RECTS;
   const sideNoiseRadius = options.sideNoiseRadius ?? 0.045;
   const depthFront = 0;
-  const depthBack = Math.max(
-    randomDepth(template.depthMin, template.depthMax, rnd),
-    randomDepth(template.depthMin, template.depthMax, rnd)
-  );
-
   const ccw = ensureCCW(template.polygon2D.vertices);
+  const depthsBack = ccw.map(() => randomDepth(template.depthMin, template.depthMax, rnd));
+  const depthBack = depthsBack.length > 0 ? Math.max(...depthsBack) : 0;
+
   const front: Vector3[] = ccw.map((v) => projectToFace(template.face, v, depthFront));
-  const back: Vector3[] = ccw.map((v) => projectToFace(template.face, v, depthBack));
+  const back: Vector3[] = ccw.map((v, i) => projectToFace(template.face, v, depthsBack[i]));
   applySideNoiseToBack(back, template.face, sideNoiseRadius, rnd);
   const faceUVs = buildUVs(template.face, ccw, faceUvRects);
   const uvs = [...faceUVs, ...faceUVs.map((uv) => uv.clone())];
@@ -255,5 +262,6 @@ export function buildShardGeometry(
     backVertexOffset: backOffset,
     depthFront,
     depthBack,
+    depthBacks: depthsBack,
   };
 }

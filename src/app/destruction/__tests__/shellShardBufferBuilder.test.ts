@@ -5,6 +5,10 @@ import { buildShellShardGeometry } from '../shellShardGeometryBuilder';
 import { ShellShardTemplate } from '../shellShardTemplate';
 import { buildShellShardBuffer, makeShellShardInstance } from '../shellShardBufferBuilder';
 
+function constantRng(value: number): () => number {
+  return () => value;
+}
+
 function makeTemplate(): ShellShardTemplate {
   return {
     id: 1,
@@ -24,7 +28,11 @@ function makeTemplate(): ShellShardTemplate {
 describe('shellShardBufferBuilder', () => {
   it('builds buffer geometry and instance matrix', () => {
     const tpl = makeTemplate();
-    const geom = buildShellShardGeometry(tpl);
+    const geom = buildShellShardGeometry(tpl, {
+      random: constantRng(0.5),
+      depthJitter: 0,
+      backNoiseRadius: 0,
+    });
     const buffer = buildShellShardBuffer(geom, tpl);
     expect(buffer.geometry.getAttribute('position').count).toBe(geom.positions.length);
     const instance = makeShellShardInstance(buffer, new Vector3(1, 2, 3), { sx: 2, sy: 2, sz: 2 }, 'face');

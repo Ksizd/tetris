@@ -9,6 +9,15 @@ function constantRng(value: number): () => number {
   return () => value;
 }
 
+function sequenceRng(values: number[]): () => number {
+  let idx = 0;
+  return () => {
+    const value = values[idx % values.length];
+    idx += 1;
+    return value;
+  };
+}
+
 const TRI_TEMPLATE: ShardTemplate = {
   id: 7,
   face: CubeFace.Front,
@@ -21,20 +30,27 @@ const TRI_TEMPLATE: ShardTemplate = {
 };
 
 describe('shardGeometryBuilder', () => {
-  it('builds closed geometry with front on cube surface and back inset', () => {
-    const geom = buildShardGeometry(TRI_TEMPLATE, { random: constantRng(0.5), sideNoiseRadius: 0 });
+  it('builds closed geometry with front on cube surface and varied back inset', () => {
+    const geom = buildShardGeometry(TRI_TEMPLATE, {
+      random: sequenceRng([0.2, 0.8, 0.4, 0.6]),
+      sideNoiseRadius: 0,
+    });
     expect(geom.positions.length).toBe(6);
     expect(geom.indices.length).toBeGreaterThan(0);
     // front vertices lie on z=+0.5 for front face
     geom.positions.slice(0, 3).forEach((p) => expect(p.z).toBeCloseTo(0.5));
-    // back vertices shifted inward along -Z
-    const backDepth = TRI_TEMPLATE.depthMin + (TRI_TEMPLATE.depthMax - TRI_TEMPLATE.depthMin) * 0.5;
-    geom.positions.slice(3).forEach((p) => {
-      expect(p.z).toBeCloseTo(0.5 - backDepth);
+    // back vertices shifted inward along -Z with per-vertex variation
+    const backDepths = geom.positions.slice(3).map((p) => 0.5 - p.z);
+    backDepths.forEach((depth) => {
+      expect(depth).toBeGreaterThanOrEqual(TRI_TEMPLATE.depthMin - 1e-6);
+      expect(depth).toBeLessThanOrEqual(TRI_TEMPLATE.depthMax + 1e-6);
     });
-    // normals on front align with +Z, back with -Z
+    expect(new Set(backDepths.map((d) => d.toFixed(3))).size).toBeGreaterThan(1);
+    expect(geom.depthBacks).toHaveLength(3);
+    expect(geom.depthBack).toBeCloseTo(Math.max(...backDepths));
+    // normals on front align with +Z, back point inward
     geom.normals.slice(0, 3).forEach((n) => expect(n.z).toBeCloseTo(1));
-    geom.normals.slice(3).forEach((n) => expect(n.z).toBeCloseTo(-1));
+    geom.normals.slice(3).forEach((n) => expect(n.z).toBeLessThan(0));
     // UVs respect front face rect (0.08..0.92 x 0.55..0.95) and invert sy
     const uv = geom.uvs[0];
     expect(uv.x).toBeGreaterThanOrEqual(0.08);
