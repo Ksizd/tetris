@@ -18,7 +18,7 @@ export interface DestructionPreset {
  */
 export const ULTRA_DESTRUCTION_PRESET: DestructionPreset = {
   fragmentCount: { min: 16, max: 32 },
-  lifetimeMs: { min: 1200, max: 2000 },
+  lifetimeMs: { min: 2200, max: 3600 },
   radialSpeed: { min: 6, max: 14 }, // хватает, чтобы улететь дальше 1-2 кубиков радиально
   tangentialSpeed: { min: 2, max: 8 },
   verticalSpeed: { min: -2, max: 6 },
@@ -36,3 +36,4 @@ export const LOW_DESTRUCTION_PRESET: DestructionPreset = {
   verticalSpeed: { min: -1, max: 3 },
   fullPhysics: false,
 };
+
