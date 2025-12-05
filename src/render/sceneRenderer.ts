@@ -3,14 +3,31 @@ import { renderBoard } from './boardRenderer';
 import { renderActivePiece } from './activePieceRenderer';
 import { RenderContext } from './renderer';
 import { canMove } from '../core/collision';
+import { applyFragmentInstanceUpdates } from './destruction/instanceUpdater';
+import { FragmentInstancedResources } from './destruction/fragmentInstancedMesh';
+import { FragmentBucket } from '../app/destruction/destructionRuntime';
 
 export type SceneRenderContext = Pick<
   RenderContext,
-  'board' | 'activePiece' | 'mapper' | 'renderConfig'
+  'board' | 'activePiece' | 'mapper' | 'renderConfig' | 'fragments'
 >;
 
-export function renderScene(ctx: SceneRenderContext, snapshot: Readonly<GameState>): void {
-  renderBoard({ board: snapshot.board, instanced: ctx.board, mapper: ctx.mapper });
+export interface SceneDestructionPayload {
+  hiddenCells?: Set<string>;
+  fragmentBuckets?: Map<number, FragmentBucket>;
+}
+
+export function renderScene(
+  ctx: SceneRenderContext,
+  snapshot: Readonly<GameState>,
+  destruction?: SceneDestructionPayload
+): void {
+  renderBoard({
+    board: snapshot.board,
+    instanced: ctx.board,
+    mapper: ctx.mapper,
+    hiddenCells: destruction?.hiddenCells,
+  });
   const offsetY = computeActivePieceOffset(snapshot, ctx.renderConfig.board.verticalSpacing);
   renderActivePiece({
     piece: snapshot.currentPiece,
@@ -18,6 +35,7 @@ export function renderScene(ctx: SceneRenderContext, snapshot: Readonly<GameStat
     mapper: ctx.mapper,
     offsetY,
   });
+  renderFragments(ctx.fragments ?? null, destruction?.fragmentBuckets);
 }
 
 function computeActivePieceOffset(snapshot: Readonly<GameState>, verticalSpacing: number): number {
@@ -37,4 +55,44 @@ function computeActivePieceOffset(snapshot: Readonly<GameState>, verticalSpacing
   }
   const t = Math.min(1, Math.max(0, fallProgressMs / fallIntervalMs));
   return -t * verticalSpacing;
+}
+
+function renderFragments(
+  resources: FragmentInstancedResources | null,
+  buckets?: Map<number, FragmentBucket>
+): void {
+  if (!resources || buckets === undefined) {
+    return;
+  }
+  resources.meshesByTemplate.forEach((mesh) => {
+    mesh.count = 0;
+    mesh.visible = false;
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+  if (!buckets || buckets.size === 0) {
+    return;
+  }
+
+  buckets.forEach((bucket, templateId) => {
+    const mesh = resources.meshesByTemplate.get(templateId);
+    if (!mesh) {
+      return;
+    }
+    const matId = resources.templateMaterial.get(templateId) ?? bucket.materialId;
+    const base = resources.materials[matId]?.color;
+    if (!base) {
+      return;
+    }
+    const capped = bucket.updates.slice(0, resources.capacityPerTemplate);
+    mesh.count = capped.length;
+    mesh.visible = capped.length > 0;
+    if (capped.length === 0) {
+      return;
+    }
+    applyFragmentInstanceUpdates(mesh, capped, {
+      r: base.r,
+      g: base.g,
+      b: base.b,
+    });
+  });
 }

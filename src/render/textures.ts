@@ -25,6 +25,12 @@ const GLYPH_DATA_URL =
 
 let cachedGlyphImage: HTMLImageElement | null = null;
 
+export interface TileMaterials {
+  face: THREE.MeshStandardMaterial;
+  goldOuter: THREE.MeshStandardMaterial;
+  goldInner?: THREE.MeshStandardMaterial;
+}
+
 export function createMahjongTileTexture(size = DEFAULT_TILE_SIZE): THREE.Texture {
   if (typeof document === 'undefined') {
     const data = new Uint8Array([
@@ -150,6 +156,54 @@ export function createMahjongMaterialMaps(size = DEFAULT_TILE_SIZE): MahjongMate
   });
 
   return { roughnessMap, metalnessMap, aoMap };
+}
+
+/**
+ * Returns canonical tile materials (front face + gold sides) built from the mahjong atlas.
+ * Both active piece and locked blocks should rely on this to avoid visual mismatches.
+ */
+export function createCanonicalTileMaterials(atlasSize: number = DEFAULT_TILE_SIZE): TileMaterials {
+  const tileTexture = createMahjongTileTexture(atlasSize);
+  const effectiveSize =
+    typeof tileTexture.image === 'object' && tileTexture.image && 'width' in tileTexture.image
+      ? (tileTexture.image as { width?: number }).width ?? atlasSize
+      : atlasSize;
+  const { roughnessMap, metalnessMap, aoMap } = createMahjongMaterialMaps(effectiveSize);
+
+  const face = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: tileTexture,
+    roughness: 0.22,
+    metalness: 0.04,
+    roughnessMap,
+    metalnessMap,
+    aoMap,
+    envMapIntensity: 0.9,
+  });
+
+  const goldOuter = new THREE.MeshStandardMaterial({
+    color: GOLD_BASE_COLOR,
+    map: tileTexture,
+    roughness: 0.28,
+    metalness: 1.0,
+    roughnessMap,
+    metalnessMap,
+    aoMap,
+    envMapIntensity: 1.8,
+  });
+
+  const goldInner = new THREE.MeshStandardMaterial({
+    color: 0xb88934,
+    map: tileTexture,
+    roughness: 0.36,
+    metalness: 0.85,
+    roughnessMap,
+    metalnessMap,
+    aoMap,
+    envMapIntensity: 1.25,
+  });
+
+  return { face, goldOuter, goldInner };
 }
 
 function drawAtlas(

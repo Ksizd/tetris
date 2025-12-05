@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { BoardRenderConfig } from './boardConfig';
 import { createBeveledBoxGeometry } from './beveledBoxGeometry';
 import { applyMahjongUVLayout } from './uv';
-import { createMahjongMaterialMaps, createMahjongTileTexture } from './textures';
+import { createCanonicalTileMaterials } from './textures';
 import { MaterialConfig } from './renderConfig';
 
 export interface ActivePieceInstancedResources {
@@ -44,37 +44,12 @@ export function createActivePieceInstancedMesh(
     smoothness: 3,
   });
   applyMahjongUVLayout(geometry);
-  const tileTexture = createMahjongTileTexture();
-  const { roughnessMap, metalnessMap, aoMap } = createMahjongMaterialMaps(
-    tileTexture.image.width ?? 1024
-  );
   tagFrontGroup(geometry);
-  const frontMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    map: tileTexture,
-    roughness: materialConfig.front.roughness,
-    metalness: materialConfig.front.metalness,
-    roughnessMap,
-    metalnessMap,
-    aoMap,
-    emissive: materialConfig.front.emissive ?? 0x000000,
-    emissiveIntensity: materialConfig.front.emissiveIntensity ?? 0,
-    envMapIntensity: materialConfig.front.envMapIntensity,
-  });
-  const sideMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf2c14b,
-    map: tileTexture,
-    roughness: materialConfig.side.roughness,
-    metalness: materialConfig.side.metalness,
-    roughnessMap,
-    metalnessMap,
-    aoMap,
-    emissive: materialConfig.side.emissive ?? 0x000000,
-    emissiveIntensity: materialConfig.side.emissiveIntensity ?? 0,
-    envMapIntensity: materialConfig.side.envMapIntensity,
-  });
+  const canonical = createCanonicalTileMaterials();
+  applyMaterialOverrides(canonical.face, materialConfig.front);
+  applyMaterialOverrides(canonical.goldOuter, materialConfig.side);
 
-  const materials = [frontMaterial, sideMaterial];
+  const materials = [canonical.face, canonical.goldOuter];
   const mesh = new THREE.InstancedMesh(geometry, materials, ACTIVE_PIECE_CAPACITY);
   mesh.material = materials;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -95,4 +70,28 @@ function tagFrontGroup(geometry: THREE.BufferGeometry): void {
   geometry.groups.forEach((group, idx) => {
     group.materialIndex = idx === FRONT_GROUP_INDEX ? 0 : 1;
   });
+}
+
+function applyMaterialOverrides(
+  material: THREE.MeshStandardMaterial,
+  overrides?: MaterialConfig['front']
+): void {
+  if (!overrides) {
+    return;
+  }
+  if (overrides.roughness !== undefined) {
+    material.roughness = overrides.roughness;
+  }
+  if (overrides.metalness !== undefined) {
+    material.metalness = overrides.metalness;
+  }
+  if (overrides.envMapIntensity !== undefined) {
+    material.envMapIntensity = overrides.envMapIntensity;
+  }
+  if (overrides.emissive !== undefined) {
+    material.emissive = new THREE.Color(overrides.emissive);
+  }
+  if (overrides.emissiveIntensity !== undefined) {
+    material.emissiveIntensity = overrides.emissiveIntensity;
+  }
 }

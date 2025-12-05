@@ -1,6 +1,7 @@
 import { createRenderContext, resizeRenderer, renderFrame, renderScene } from './render';
 import { updateCameraMotion } from './render/cameraMotion';
 import { GameController } from './app/gameController';
+import { GameEventType } from './app/events';
 import { KeyboardInput } from './input/keyboardInput';
 import { HudView, mapGameStateToHudData } from './ui/hud';
 import { OverlayView } from './ui/overlay';
@@ -8,6 +9,13 @@ import { mapGameStatusToUIState } from './ui/uiState';
 import { isVisualDebugModeEnabled, startVisualDebugMode } from './app/visualDebugMode';
 import { isTextureProbeEnabled, startTextureProbe } from './app/textureProbe';
 import { QualityLevel, RenderConfigOverrides } from './render/renderConfig';
+import {
+  clearDestruction,
+  createDestructionOrchestratorState,
+  startDestructionFromEvent,
+  stepDestruction,
+} from './app/destruction/destructionRuntime';
+import { completeLineDestructionIfFinished } from './app/destruction/simulationManager';
 
 const canvas = document.getElementById('render-canvas') as HTMLCanvasElement | null;
 
@@ -52,6 +60,7 @@ if (isTextureProbeEnabled()) {
     onStart: () => controller.startNewGame(),
     onRestart: () => controller.startNewGame(),
   });
+  let destructionState = createDestructionOrchestratorState();
 
   let lastTimestamp = performance.now();
 
@@ -59,8 +68,38 @@ if (isTextureProbeEnabled()) {
     const deltaMs = timestamp - lastTimestamp;
     lastTimestamp = timestamp;
 
-    const snapshot = controller.update(deltaMs);
-    renderScene(renderCtx, snapshot);
+    let snapshot = controller.update(deltaMs);
+    controller.getEvents().forEach((event) => {
+      if (event.type === GameEventType.StartLineDestruction) {
+        destructionState = startDestructionFromEvent(
+          destructionState,
+          snapshot.board,
+          renderCtx.mapper,
+          event.clearedLevels,
+          timestamp
+        );
+      }
+    });
+
+    const destructionStep = stepDestruction(destructionState, deltaMs, timestamp);
+    destructionState = destructionStep.state;
+    let destructionPayload = {
+      hiddenCells: destructionStep.hiddenCells,
+      fragmentBuckets: destructionStep.fragmentsByTemplate,
+    };
+    if (destructionStep.finished && destructionState.simulation) {
+      const completion = completeLineDestructionIfFinished(snapshot, destructionState.simulation);
+      if (completion.completed) {
+        snapshot = controller.applyExternalState(completion.game);
+        destructionState = clearDestruction(destructionState);
+        destructionPayload = {
+          hiddenCells: new Set(),
+          fragmentBuckets: new Map(),
+        };
+      }
+    }
+
+    renderScene(renderCtx, snapshot, destructionPayload);
     updateCameraMotion(renderCtx, timestamp);
     renderFrame(renderCtx, deltaMs);
     hud.render(mapGameStateToHudData(snapshot));

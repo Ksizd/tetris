@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig, createBoardRenderConfig } from './boardConfig';
-import { createMahjongMaterialMaps, createMahjongTileTexture } from './textures';
+import { createCanonicalTileMaterials } from './textures';
 import { applyMahjongUVLayout } from './uv';
 import { createBeveledBoxGeometry } from './beveledBoxGeometry';
 import { MaterialConfig } from './renderConfig';
@@ -33,27 +33,14 @@ export function createBoardInstancedMesh(
     smoothness: 3,
   });
   applyMahjongUVLayout(geometry);
-  const tileTexture = createMahjongTileTexture();
-  const { roughnessMap, metalnessMap, aoMap } = createMahjongMaterialMaps(
-    tileTexture.image.width ?? 1024
-  );
   tagFrontGroup(geometry);
-
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xffffff,
-    map: tileTexture,
-    roughness: materials.front.roughness,
-    metalness: materials.front.metalness,
-    roughnessMap,
-    metalnessMap,
-    aoMap,
-    envMapIntensity: materials.front.envMapIntensity,
-    emissive: materials.front.emissive ?? 0x000000,
-    emissiveIntensity: materials.front.emissiveIntensity ?? 0,
-  });
+  const canonical = createCanonicalTileMaterials();
+  applyMaterialOverrides(canonical.face, materials.front);
+  applyMaterialOverrides(canonical.goldOuter, materials.side);
 
   const capacity = dimensions.width * dimensions.height;
-  const mesh = new THREE.InstancedMesh(geometry, material, capacity);
+  const materialArray = [canonical.face, canonical.goldOuter];
+  const mesh = new THREE.InstancedMesh(geometry, materialArray, capacity);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   mesh.count = 0;
   mesh.frustumCulled = false; // cylindrical layout; bounding sphere would need per-instance updates later
@@ -61,7 +48,7 @@ export function createBoardInstancedMesh(
   mesh.receiveShadow = true;
   mesh.name = 'boardBlocksInstanced';
 
-  return { mesh, geometry, material, capacity };
+  return { mesh, geometry, material: materialArray, capacity };
 }
 
 function tagFrontGroup(geometry: THREE.BufferGeometry): void {
@@ -72,4 +59,28 @@ function tagFrontGroup(geometry: THREE.BufferGeometry): void {
   geometry.groups.forEach((group, idx) => {
     group.materialIndex = idx === FRONT_GROUP_INDEX ? 0 : 1;
   });
+}
+
+function applyMaterialOverrides(
+  material: THREE.MeshStandardMaterial,
+  overrides?: MaterialConfig['front']
+): void {
+  if (!overrides) {
+    return;
+  }
+  if (overrides.roughness !== undefined) {
+    material.roughness = overrides.roughness;
+  }
+  if (overrides.metalness !== undefined) {
+    material.metalness = overrides.metalness;
+  }
+  if (overrides.envMapIntensity !== undefined) {
+    material.envMapIntensity = overrides.envMapIntensity;
+  }
+  if (overrides.emissive !== undefined) {
+    material.emissive = new THREE.Color(overrides.emissive);
+  }
+  if (overrides.emissiveIntensity !== undefined) {
+    material.emissiveIntensity = overrides.emissiveIntensity;
+  }
 }

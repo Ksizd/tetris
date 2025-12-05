@@ -31,7 +31,7 @@ export class GameController {
     this.lastEvents = [];
     this.flushCommands();
     this.state = tickGame(this.state, deltaTimeMs);
-    this.collectEvents(prevState, this.state);
+    this.collectEvents(prevState, this.state, this.lastEvents);
     return this.getSnapshot();
   }
 
@@ -49,6 +49,19 @@ export class GameController {
     this.state = { ...initial, timing, gameStatus: GameStatus.Running };
   }
 
+  /**
+   * Applies an external state transition (e.g. after finishing destruction animation)
+   * and appends the corresponding events to the current frame.
+   */
+  applyExternalState(nextState: GameState): Readonly<GameState> {
+    const prevState = this.state;
+    const additional: GameEvent[] = [];
+    this.collectEvents(prevState, nextState, additional);
+    this.state = nextState;
+    this.lastEvents = [...this.lastEvents, ...additional];
+    return this.getSnapshot();
+  }
+
   private flushCommands(): void {
     if (this.pendingCommands.length === 0) {
       return;
@@ -62,9 +75,9 @@ export class GameController {
     }
   }
 
-  private collectEvents(prev: GameState, current: GameState): void {
+  private collectEvents(prev: GameState, current: GameState, bucket: GameEvent[]): void {
     if (prev.currentPiece && !current.currentPiece) {
-      this.lastEvents.push({ type: GameEventType.PieceLocked });
+      bucket.push({ type: GameEventType.PieceLocked });
     }
 
     const hadNoClearing = prev.clearingLayers.length === 0;
@@ -73,7 +86,7 @@ export class GameController {
       hadNoClearing &&
       current.gameStatus === GameStatus.Clearing;
     if (startedClearing) {
-      this.lastEvents.push({
+      bucket.push({
         type: GameEventType.StartLineDestruction,
         clearedLevels: current.clearingLayers,
       });
@@ -81,11 +94,11 @@ export class GameController {
 
     const spawned = !prev.currentPiece && !!current.currentPiece;
     if (spawned) {
-      this.lastEvents.push({ type: GameEventType.NewPieceSpawned });
+      bucket.push({ type: GameEventType.NewPieceSpawned });
     }
 
     if (prev.gameStatus !== current.gameStatus && current.gameStatus === 'game_over') {
-      this.lastEvents.push({ type: GameEventType.GameOver });
+      bucket.push({ type: GameEventType.GameOver });
     }
   }
 }
