@@ -7,6 +7,8 @@ import { startLineDestructionFromBoard } from './destructionStarter';
 import { launchScheduledExplosions } from './orchestrator';
 import { stepDestructionSimulations } from './simulationManager';
 import { getHiddenCubeIds } from './visualMask';
+import { DestructionPreset, ULTRA_DESTRUCTION_PRESET } from './destructionPresets';
+import { DEFAULT_ANGULAR_DRAG, DEFAULT_FRAGMENT_PHYSICS, DEFAULT_LINEAR_DRAG } from './fragmentSimulation';
 
 export interface DestructionOrchestratorState {
   simulation: DestructionSimulationState | null;
@@ -28,6 +30,12 @@ export function createDestructionOrchestratorState(): DestructionOrchestratorSta
   return { simulation: null };
 }
 
+const GAME_TUNING = {
+  explosionStrength: 0.2,
+  gravityScale: 1.0,
+  dragScale: 1.5,
+};
+
 export function startDestructionFromEvent(
   state: DestructionOrchestratorState,
   board: Board,
@@ -43,6 +51,7 @@ export function startDestructionFromEvent(
     mapper,
     levels,
     startedAtMs,
+    preset: buildGamePreset(ULTRA_DESTRUCTION_PRESET),
   });
   return { simulation: started.simulation };
 }
@@ -57,7 +66,10 @@ export function stepDestruction(
   }
 
   const withStarts = launchScheduledExplosions(state.simulation, nowMs);
-  const stepped = stepDestructionSimulations(withStarts.state, dtMs);
+  const stepped = stepDestructionSimulations(withStarts.state, dtMs, {
+    ...DEFAULT_FRAGMENT_PHYSICS,
+    gravity: DEFAULT_FRAGMENT_PHYSICS.gravity.clone().multiplyScalar(GAME_TUNING.gravityScale),
+  });
   const nextSim = stepped.state;
 
   const fragmentsByTemplate = collectFragmentBuckets(nextSim);
@@ -123,4 +135,22 @@ function collectFragmentBuckets(sim: DestructionSimulationState): Map<number, Fr
     });
   });
   return map;
+}
+
+function scaleRange(range: DestructionPreset['radialSpeed'], factor: number): DestructionPreset['radialSpeed'] {
+  return { min: range.min * factor, max: range.max * factor };
+}
+
+function buildGamePreset(base: DestructionPreset): DestructionPreset {
+  const strength = GAME_TUNING.explosionStrength;
+  const dragScale = GAME_TUNING.dragScale;
+  return {
+    ...base,
+    radialSpeed: scaleRange(base.radialSpeed, strength),
+    tangentialSpeed: scaleRange(base.tangentialSpeed, strength),
+    verticalSpeed: scaleRange(base.verticalSpeed, strength),
+    linearDrag: (base.linearDrag ?? DEFAULT_LINEAR_DRAG) * dragScale,
+    angularDrag: (base.angularDrag ?? DEFAULT_ANGULAR_DRAG) * dragScale,
+    gravityScale: GAME_TUNING.gravityScale,
+  };
 }
