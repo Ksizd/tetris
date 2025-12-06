@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig, createBoardRenderConfig } from './boardConfig';
-import { createCanonicalTileMaterials } from './textures';
+import { createCanonicalTileMaterials, getMahjongTileTexture } from './textures';
 import { applyMahjongUVLayout } from './uv';
 import { createBeveledBoxGeometry } from './beveledBoxGeometry';
 import { MaterialConfig } from './renderConfig';
@@ -34,6 +34,7 @@ export function createBoardInstancedMesh(
   });
   applyMahjongUVLayout(geometry);
   tagFrontGroup(geometry);
+  getMahjongTileTexture(); // prefetch cached texture
   const canonical = createCanonicalTileMaterials();
   applyMaterialOverrides(canonical.face, materials.front);
   applyMaterialOverrides(canonical.goldOuter, materials.side);

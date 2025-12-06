@@ -28,6 +28,25 @@ describe('Integration: controller + domain', () => {
     expect(ctrl.getEvents().some((e) => e.type === GameEventType.PieceLocked)).toBe(true);
   });
 
+  it('gravity-only drop lands then locks with support', () => {
+    const ctrl = controllerWithPiece({ x: 0, y: 3 });
+    // advance enough time to fall step-by-step
+    ctrl.update(ctrl.getSnapshot().timing.fallIntervalMs * 4);
+    const snap = ctrl.getSnapshot();
+    expect(snap.currentPiece).toBeNull();
+    expect(ctrl.getEvents().some((e) => e.type === GameEventType.PieceLocked)).toBe(true);
+    const { width, height } = snap.board.getDimensions();
+    let minY = height;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        if (snap.board.getCell({ x, y }) === CellContent.Block) {
+          minY = Math.min(minY, y);
+        }
+      }
+    }
+    expect(minY).toBe(0); // lowest block rests on floor
+  });
+
   it('sequence triggers line destruction start event', () => {
     const base = createInitialGameState();
     const board = Board.createEmpty(base.board.getDimensions());

@@ -24,3 +24,10 @@ export function canRotate(board: Board, piece: ActivePiece, direction: RotationD
   };
   return canPlacePiece(board, rotated);
 }
+
+/**
+ * Returns true if the piece cannot move one cell down (y - 1) without collision.
+ */
+export function isGrounded(board: Board, piece: ActivePiece): boolean {
+  return !canMove(board, piece, 0, -1);
+}

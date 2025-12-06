@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { BoardDimensions } from '../../core/types';
 import { BoardRenderConfig } from '../boardConfig';
 import { FragmentMaterialId } from '../../app/destruction/cubeDestructionSim';
-import { createMahjongMaterialMaps, createMahjongTileTexture } from '../textures';
+import { createMahjongMaterialMaps, getMahjongTileTexture } from '../textures';
 import { getDefaultShardTemplateSet } from '../../app/destruction/shardTemplateSet';
 import {
   buildShardGeometryLibrary,
@@ -230,7 +230,7 @@ export function createFragmentInstancedMeshes(
   const geometryLibrary = buildShardGeometryLibrary(templateSet, { faceUvRects: DEFAULT_FACE_UV_RECTS });
   const totalCapacity = dimensions.width * dimensions.height * maxFragmentsPerCube;
   const capacityPerTemplate = Math.max(8, Math.ceil(totalCapacity / Math.max(1, geometryLibrary.size)));
-  const tileTexture = createMahjongTileTexture();
+  const tileTexture = getMahjongTileTexture();
   const atlasSize =
     typeof tileTexture.image === 'object' && tileTexture.image && 'width' in tileTexture.image
       ? (tileTexture.image as { width?: number }).width ?? 1024

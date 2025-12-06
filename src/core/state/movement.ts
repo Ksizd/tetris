@@ -45,16 +45,7 @@ export function tryMovePiece(state: GameState, move: MoveRequest): MoveResult {
   }
 
   const overlapping = blocks.filter((cell) => {
-    if (state.board.getCell(cell) !== CellContent.Empty) {
-      return true;
-    }
-    if (piece.position.y === 0 && cell.y - 1 >= 0) {
-      const below = { x: cell.x, y: cell.y - 1 };
-      if (state.board.getCell(below) !== CellContent.Empty) {
-        return true;
-      }
-    }
-    return false;
+    return state.board.getCell(cell) !== CellContent.Empty;
   });
   if (overlapping.length > 0) {
     return { state, moved: false, reason: 'occupied', cells: overlapping };

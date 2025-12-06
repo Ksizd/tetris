@@ -108,13 +108,12 @@ function applyLockMoveUpdate(
     ...result.state,
     fallState: {
       ...prevState.fallState,
+      landed: true,
       lockMovesCount,
+      lockTimeMs: LOCK_DELAY_MAX_MS,
     },
   };
-  if (
-    updated.fallState.lockMovesCount >= LOCK_MOVES_MAX ||
-    updated.fallState.lockTimeMs >= LOCK_DELAY_MAX_MS
-  ) {
+  if (updated.fallState.lockMovesCount >= LOCK_MOVES_MAX) {
     const locked = lockCurrentPiece({
       ...updated,
       timing: { ...updated.timing, fallProgressMs: 0 },
