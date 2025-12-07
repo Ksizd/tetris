@@ -34,4 +34,5 @@ export interface GameState {
   pieceQueue: PieceQueue;
   clearingLayers: number[];
   fallState: FallState;
+  spawnColumnHint?: number | null;
 }

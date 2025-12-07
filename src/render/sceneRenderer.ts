@@ -6,10 +6,18 @@ import { canMove } from '../core/collision';
 import { applyFragmentInstanceUpdates } from './destruction/instanceUpdater';
 import { FragmentInstancedResources } from './destruction/fragmentInstancedMesh';
 import { FragmentBucket } from '../app/destruction/destructionRuntime';
+import { updateGameCamera, CameraFollowState } from './cameraMotion';
 
 export type SceneRenderContext = Pick<
   RenderContext,
-  'board' | 'activePiece' | 'mapper' | 'renderConfig' | 'fragments'
+  | 'board'
+  | 'activePiece'
+  | 'mapper'
+  | 'renderConfig'
+  | 'fragments'
+  | 'camera'
+  | 'towerBounds'
+  | 'cameraBasePlacement'
 >;
 
 export interface SceneDestructionPayload {
@@ -20,8 +28,19 @@ export interface SceneDestructionPayload {
 export function renderScene(
   ctx: SceneRenderContext,
   snapshot: Readonly<GameState>,
-  destruction?: SceneDestructionPayload
+  destruction?: SceneDestructionPayload,
+  cameraFollow?: CameraFollowState | null,
+  deltaMs?: number
 ): void {
+  if (cameraFollow?.enabled) {
+    updateGameCamera(ctx.camera, ctx.cameraBasePlacement, ctx.towerBounds, cameraFollow, deltaMs ?? 0);
+    ctx.renderConfig.camera.position.copy(ctx.camera.position);
+    ctx.renderConfig.camera.target.set(
+      ctx.towerBounds.center.x,
+      ctx.cameraBasePlacement.target.y,
+      ctx.towerBounds.center.z
+    );
+  }
   renderBoard({
     board: snapshot.board,
     instanced: ctx.board,

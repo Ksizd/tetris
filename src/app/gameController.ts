@@ -5,6 +5,7 @@ import { tickGame } from '../core/state/tick';
 import { createInitialGameState, GameConfig } from '../core/state/initialState';
 import { GameEvent, GameEventType } from './events';
 import { GameStatus } from '../core/types';
+import { wrapX } from '../core/coords';
 
 /**
  * Application-layer controller: orchestrates domain state updates, input commands and exposes snapshots.
@@ -24,6 +25,12 @@ export class GameController {
 
   enqueueCommand(command: GameCommand): void {
     this.pendingCommands.push(command);
+  }
+
+  setSpawnColumnHint(columnIndex: number): void {
+    const width = this.state.board.getDimensions().width;
+    const wrapped = wrapX(Math.round(columnIndex), width);
+    this.state = { ...this.state, spawnColumnHint: wrapped };
   }
 
   update(deltaTimeMs: number): Readonly<GameState> {

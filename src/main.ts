@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { createRenderContext, resizeRenderer, renderFrame, renderScene } from './render';
 import { updateCameraMotion } from './render/cameraMotion';
 import { GameController } from './app/gameController';
@@ -9,6 +10,9 @@ import { mapGameStatusToUIState } from './ui/uiState';
 import { isVisualDebugModeEnabled, startVisualDebugMode } from './app/visualDebugMode';
 import { isTextureProbeEnabled, startTextureProbe } from './app/textureProbe';
 import { QualityLevel, RenderConfigOverrides } from './render/renderConfig';
+import { wrapX } from './core/coords';
+import { getWorldBlocks } from './core/piece';
+import { ActivePiece } from './core/types';
 import {
   clearDestruction,
   createDestructionOrchestratorState,
@@ -49,6 +53,14 @@ if (isTextureProbeEnabled()) {
     renderOverrides.quality = { level: quality };
   }
   const renderCtx = createRenderContext(canvas, renderOverrides);
+  const renderState = {
+    cameraFollow: {
+      enabled: renderCtx.renderConfig.cameraGameMode === 'followPiece',
+      columnIndex: deriveColumnFromCamera(renderCtx.renderConfig.boardDimensions.width, renderCtx.camera),
+      width: renderCtx.renderConfig.boardDimensions.width,
+      snap: false,
+    },
+  };
   const controller = new GameController();
   const keyboard = new KeyboardInput({
     onCommand: (command) => controller.enqueueCommand(command),
@@ -68,7 +80,10 @@ if (isTextureProbeEnabled()) {
     const deltaMs = timestamp - lastTimestamp;
     lastTimestamp = timestamp;
 
+    controller.setSpawnColumnHint(renderState.cameraFollow.columnIndex);
+
     let snapshot = controller.update(deltaMs);
+    let spawnSnap = false;
     controller.getEvents().forEach((event) => {
       if (event.type === GameEventType.StartLineDestruction) {
         destructionState = startDestructionFromEvent(
@@ -78,6 +93,9 @@ if (isTextureProbeEnabled()) {
           event.clearedLevels,
           timestamp
         );
+      }
+      if (event.type === GameEventType.NewPieceSpawned) {
+        spawnSnap = true;
       }
     });
 
@@ -99,8 +117,24 @@ if (isTextureProbeEnabled()) {
       }
     }
 
-    renderScene(renderCtx, snapshot, destructionPayload);
-    updateCameraMotion(renderCtx, timestamp);
+    const followColumn = snapshot.currentPiece
+      ? deriveColumnFromPiece(
+          snapshot.currentPiece,
+          renderCtx.renderConfig.boardDimensions.width,
+          renderCtx.renderConfig.boardDimensions.height
+        )
+      : renderState.cameraFollow.columnIndex;
+    renderState.cameraFollow = {
+      enabled: renderCtx.renderConfig.cameraGameMode === 'followPiece',
+      columnIndex: followColumn,
+      width: renderCtx.renderConfig.boardDimensions.width,
+      snap: spawnSnap,
+    };
+
+    renderScene(renderCtx, snapshot, destructionPayload, renderState.cameraFollow, deltaMs);
+    if (renderCtx.renderConfig.cameraGameMode !== 'followPiece') {
+      updateCameraMotion(renderCtx, timestamp);
+    }
     renderFrame(renderCtx, deltaMs);
     hud.render(mapGameStateToHudData(snapshot));
     overlay.render(mapGameStatusToUIState(snapshot.gameStatus));
@@ -125,4 +159,31 @@ function parseQualityFromUrl(search: string): QualityLevel | null {
     return 'ultra2';
   }
   return null;
+}
+
+function deriveColumnFromPiece(piece: ActivePiece, width: number, height: number): number {
+  const blocks = getWorldBlocks(piece, { width, height });
+  if (blocks.length === 0) {
+    return wrapX(piece.position.x, width);
+  }
+  let sumX = 0;
+  let sumZ = 0;
+  blocks.forEach((cell) => {
+    const angle = (2 * Math.PI * wrapX(cell.x, width)) / width;
+    sumX += Math.cos(angle);
+    sumZ += Math.sin(angle);
+  });
+  const angle = Math.atan2(sumZ, sumX);
+  return angleToColumnIndex(angle, width);
+}
+
+function deriveColumnFromCamera(width: number, camera: THREE.PerspectiveCamera): number {
+  const angle = Math.atan2(camera.position.z, camera.position.x);
+  return angleToColumnIndex(angle, width);
+}
+
+function angleToColumnIndex(angle: number, width: number): number {
+  const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  const column = Math.round((normalized / (2 * Math.PI)) * width) % width;
+  return wrapX(column, width);
 }

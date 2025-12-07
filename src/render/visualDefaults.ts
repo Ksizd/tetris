@@ -5,7 +5,7 @@ import {
   DEFAULT_CAMERA_HEIGHT_RATIO,
   DEFAULT_TARGET_HEIGHT_RATIO,
 } from './cameraSetup';
-import { QualityLevel } from './renderConfig';
+import type { CameraGameMode, QualityLevel } from './renderConfig';
 
 export const VISUAL_DEFAULTS = {
   quality: {
@@ -69,6 +69,7 @@ export const VISUAL_DEFAULTS = {
     angleRadians: DEFAULT_CAMERA_ANGLE,
     cameraHeightRatio: DEFAULT_CAMERA_HEIGHT_RATIO,
     targetHeightRatio: DEFAULT_TARGET_HEIGHT_RATIO,
+    gameMode: 'followPiece' as CameraGameMode,
   },
   bevel: {
     smoothness: 3,

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { wrapX } from '../core/coords';
+import { getColumnAngle, wrapX } from '../core/coords';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig, createBoardRenderConfig } from './boardConfig';
 
@@ -49,7 +49,7 @@ export class BoardToWorldMapper {
       this.ensureValidY(y);
     }
     const normalizedX = wrapX(x, this.dimensions.width);
-    const angle = this.columnAngle(normalizedX);
+    const angle = getColumnAngle(normalizedX, this.dimensions.width);
     const worldX = Math.cos(angle) * this.config.towerRadius;
     const worldZ = Math.sin(angle) * this.config.towerRadius;
     const worldY = y * this.config.verticalSpacing;
@@ -63,13 +63,9 @@ export class BoardToWorldMapper {
   getRadialOrientation(x: number, target = new THREE.Quaternion()): THREE.Quaternion {
     this.ensureIntegerCoord(x, 'x');
     const normalizedX = wrapX(x, this.dimensions.width);
-    const angle = this.columnAngle(normalizedX);
+    const angle = getColumnAngle(normalizedX, this.dimensions.width);
     const rotationY = Math.PI / 2 - angle;
     return target.setFromAxisAngle(AXIS_Y, rotationY);
-  }
-
-  private columnAngle(normalizedX: number): number {
-    return (2 * Math.PI * normalizedX) / this.dimensions.width;
   }
 
   private ensureValidY(y: number): void {

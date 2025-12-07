@@ -12,6 +12,8 @@ export interface CameraConfig {
   target: THREE.Vector3;
 }
 
+export type CameraGameMode = 'static' | 'followPiece';
+
 export interface AmbientLightConfig {
   color: THREE.ColorRepresentation;
   intensity: number;
@@ -175,6 +177,7 @@ export interface RenderConfig {
   board: BoardRenderConfig;
   materials: MaterialConfig;
   camera: CameraConfig;
+  cameraGameMode: CameraGameMode;
   cameraMotion: CameraMotionConfig;
   lights: LightRigConfig;
   postProcessing: PostProcessingConfig;
@@ -192,6 +195,7 @@ export interface RenderConfigOverrides {
   boardWidth?: number;
   board?: Partial<BoardRenderConfig>;
   camera?: Partial<CameraConfig>;
+  cameraGameMode?: CameraGameMode;
   cameraMotion?: Partial<CameraMotionConfig>;
   lights?: PartialLightRigConfig;
   postProcessing?: PostProcessingOverrides;
@@ -311,6 +315,11 @@ export function createRenderConfig(
     overrides.postProcessing
   );
 
+  const renderMode = resolveRenderMode(overrides.renderMode);
+  const cameraGameMode =
+    overrides.cameraGameMode ??
+    (renderMode.kind === 'game' ? VISUAL_DEFAULTS.camera.gameMode ?? 'followPiece' : 'static');
+
   const environment: EnvironmentConfig = {
     enabled: overrides.environment?.enabled ?? true,
     useAsBackground:
@@ -322,13 +331,12 @@ export function createRenderConfig(
 
   const fog = mergeFogConfig(VISUAL_DEFAULTS.fog, overrides.fog);
 
-  const renderMode = resolveRenderMode(overrides.renderMode);
-
   let config: RenderConfig = {
     boardDimensions,
     board,
     materials,
     camera,
+    cameraGameMode,
     cameraMotion,
     lights,
     postProcessing,

@@ -35,5 +35,6 @@ export function createInitialGameState(config: Partial<GameConfig> = {}): GameSt
     pieceQueue: new PieceQueue({ seed: merged.seed, mode: merged.pieceMode }),
     clearingLayers: [],
     fallState: { ...FALL_STATE_DEFAULT },
+    spawnColumnHint: null,
   };
 }

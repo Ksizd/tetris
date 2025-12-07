@@ -1,4 +1,5 @@
 import { GameStatus, PieceOrientation } from '../types';
+import { wrapX } from '../coords';
 import { canPlacePiece, isGrounded } from '../collision';
 import { FALL_STATE_DEFAULT, GameState } from './gameState';
 import { lockCurrentPiece } from './lock';
@@ -76,12 +77,16 @@ function spawnPiece(state: GameState): GameState {
     currentPiece: spawn,
     gameStatus: state.gameStatus === GameStatus.Idle ? GameStatus.Running : state.gameStatus,
     fallState: FALL_STATE_DEFAULT,
+    spawnColumnHint: state.spawnColumnHint,
   };
 }
 
 function getDefaultSpawnPosition(state: GameState): { x: number; y: number } {
   const { width, height } = state.board.getDimensions();
-  const spawnX = Math.floor(width / 2);
+  const spawnX =
+    state.spawnColumnHint !== undefined && state.spawnColumnHint !== null
+      ? wrapX(state.spawnColumnHint, width)
+      : Math.floor(width / 2);
   const spawnY = height - 1;
   return { x: spawnX, y: spawnY };
 }

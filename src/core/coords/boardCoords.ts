@@ -14,6 +14,17 @@ export function wrapX(x: number, width: number): number {
   return mod < 0 ? mod + width : mod;
 }
 
+export function getColumnAngle(columnIndex: number, width: number): number {
+  if (!Number.isInteger(columnIndex)) {
+    throw new TypeError(`Column index must be an integer, got ${columnIndex}`);
+  }
+  if (width <= 0) {
+    throw new Error('Board width must be positive for getColumnAngle');
+  }
+  const normalizedX = wrapX(columnIndex, width);
+  return (2 * Math.PI * normalizedX) / width;
+}
+
 /**
  * Проверяет валидность координат с учётом высоты и циклической обёртки по x.
  */

@@ -25,7 +25,7 @@ import {
   createPostProcessingContext,
   resizePostProcessing,
 } from './postProcessing';
-import { getTowerBounds } from './towerBounds';
+import { getTowerBounds, TowerBounds } from './towerBounds';
 import { createDebugOverlays } from './debugOverlays';
 import {
   FragmentInstancedResources,
@@ -42,6 +42,7 @@ export interface RenderContext {
   mapper: BoardToWorldMapper;
   renderConfig: RenderConfig;
   cameraBasePlacement: { position: THREE.Vector3; target: THREE.Vector3 };
+  towerBounds: TowerBounds;
   environment?: EnvironmentMapResources | null;
   post?: PostProcessingContext | null;
   fragments?: FragmentInstancedResources | null;
@@ -65,7 +66,7 @@ function applyToneMapping(renderer: THREE.WebGLRenderer, config: ToneMappingConf
 }
 
 function computeCameraNear(
-  bounds: ReturnType<typeof getTowerBounds>,
+  bounds: TowerBounds,
   board: BoardRenderConfig,
   cameraPosition: THREE.Vector3
 ): number {
@@ -186,6 +187,7 @@ export function createRenderContext(
     activePiece: activePieceInstanced,
     mapper,
     renderConfig,
+    towerBounds,
     cameraBasePlacement: {
       position: renderConfig.camera.position.clone(),
       target: renderConfig.camera.target.clone(),
@@ -474,8 +476,8 @@ export function resizeRenderer(ctx: RenderContext, width: number, height: number
   ctx.camera.aspect = width / height;
   ctx.camera.updateProjectionMatrix();
 
-  const bounds = getTowerBounds(ctx.renderConfig.boardDimensions, ctx.renderConfig.board);
-  const pose = computeGameCameraPose(bounds, ctx.camera.aspect, {
+  ctx.towerBounds = getTowerBounds(ctx.renderConfig.boardDimensions, ctx.renderConfig.board);
+  const pose = computeGameCameraPose(ctx.towerBounds, ctx.camera.aspect, {
     fovDeg: ctx.renderConfig.camera.fov,
   });
   ctx.camera.position.copy(pose.position);
