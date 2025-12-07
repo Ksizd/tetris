@@ -185,6 +185,7 @@ export interface RenderConfig {
   fog: FogConfig;
   quality: QualityConfig;
   renderMode: RenderModeConfig;
+  showGhostPreview?: boolean;
 }
 
 export interface RenderConfigOverrides {
@@ -344,6 +345,7 @@ export function createRenderConfig(
     fog,
     quality,
     renderMode,
+    showGhostPreview: true,
   };
 
   if (quality.level === 'ultra2') {

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { updateGameCamera, CameraFollowState } from '../cameraMotion';
 import { TowerBounds } from '../towerBounds';
-
 function createCamera(): THREE.PerspectiveCamera {
   const camera = new THREE.PerspectiveCamera(36, 16 / 9, 0.1, 100);
   camera.position.set(5, 5, 5);

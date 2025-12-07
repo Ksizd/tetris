@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createRenderContext, resizeRenderer, renderFrame, renderScene } from './render';
+import { createRenderContext, resizeRenderer, renderFrame, renderScene, RenderContext } from './render';
 import { updateCameraMotion } from './render/cameraMotion';
 import { GameController } from './app/gameController';
 import { GameEventType } from './app/events';
@@ -12,7 +12,9 @@ import { isTextureProbeEnabled, startTextureProbe } from './app/textureProbe';
 import { QualityLevel, RenderConfigOverrides } from './render/renderConfig';
 import { wrapX } from './core/coords';
 import { getWorldBlocks } from './core/piece';
-import { ActivePiece } from './core/types';
+import { ActivePiece, CellCoord, GameStatus } from './core/types';
+import { GameState } from './core/state/gameState';
+import { computeHardDropPosition } from './core/state';
 import {
   clearDestruction,
   createDestructionOrchestratorState,
@@ -59,6 +61,10 @@ if (isTextureProbeEnabled()) {
       columnIndex: deriveColumnFromCamera(renderCtx.renderConfig.boardDimensions.width, renderCtx.camera),
       width: renderCtx.renderConfig.boardDimensions.width,
       snap: false,
+    },
+    ghost: {
+      cells: [] as CellCoord[],
+      visible: false,
     },
   };
   const controller = new GameController();
@@ -130,8 +136,9 @@ if (isTextureProbeEnabled()) {
       width: renderCtx.renderConfig.boardDimensions.width,
       snap: spawnSnap,
     };
+    renderState.ghost = deriveGhostState(snapshot, renderCtx);
 
-    renderScene(renderCtx, snapshot, destructionPayload, renderState.cameraFollow, deltaMs);
+    renderScene(renderCtx, snapshot, destructionPayload, renderState.cameraFollow, deltaMs, renderState.ghost);
     if (renderCtx.renderConfig.cameraGameMode !== 'followPiece') {
       updateCameraMotion(renderCtx, timestamp);
     }
@@ -186,4 +193,22 @@ function angleToColumnIndex(angle: number, width: number): number {
   const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   const column = Math.round((normalized / (2 * Math.PI)) * width) % width;
   return wrapX(column, width);
+}
+
+function deriveGhostState(snapshot: Readonly<GameState>, renderCtx: RenderContext) {
+  const isActive =
+    snapshot.currentPiece &&
+    snapshot.gameStatus === GameStatus.Running &&
+    snapshot.clearingLayers.length === 0;
+  if (!isActive) {
+    return { cells: [], visible: false };
+  }
+  const ghost = computeHardDropPosition(snapshot as any);
+  if (!ghost) {
+    return { cells: [], visible: false };
+  }
+  const cells = getWorldBlocks(ghost, renderCtx.renderConfig.boardDimensions).filter(
+    (cell) => cell.y >= 0 && cell.y < renderCtx.renderConfig.boardDimensions.height
+  );
+  return { cells, visible: true };
 }

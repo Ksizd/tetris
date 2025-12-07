@@ -1,6 +1,7 @@
 import { GameState } from './gameState';
-import { CellCoord, CellContent, PieceOrientation, RotationDirection } from '../types';
+import { ActivePiece, CellCoord, CellContent, PieceOrientation, RotationDirection } from '../types';
 import { rotateOrientation, getWorldBlocks } from '../piece';
+import { canMove } from '../collision';
 
 export interface MoveRequest {
   dx: number;
@@ -62,6 +63,21 @@ export function tryMovePiece(state: GameState, move: MoveRequest): MoveResult {
  */
 export function tryTranslatePiece(state: GameState, dx: number, dy: number): MoveResult {
   return tryMovePiece(state, { dx, dy, rotation: 0 });
+}
+
+/**
+ * Computes the final landing position for the active piece without mutating the state.
+ */
+export function computeHardDropPosition(state: GameState): ActivePiece | null {
+  const piece = state.currentPiece;
+  if (!piece) {
+    return null;
+  }
+  const landed = { ...piece, position: { ...piece.position } };
+  while (canMove(state.board, landed, 0, -1)) {
+    landed.position = { ...landed.position, y: landed.position.y - 1 };
+  }
+  return landed;
 }
 
 function normalizeRotationSteps(raw: number): number {

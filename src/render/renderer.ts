@@ -39,6 +39,7 @@ export interface RenderContext {
   boardPlaceholder: THREE.Group;
   board: BoardInstancedResources;
   activePiece: ActivePieceInstancedResources;
+  ghost?: ActivePieceInstancedResources;
   mapper: BoardToWorldMapper;
   renderConfig: RenderConfig;
   cameraBasePlacement: { position: THREE.Vector3; target: THREE.Vector3 };
@@ -169,6 +170,32 @@ export function createRenderContext(
     renderConfig.materials
   );
   scene.add(activePieceInstanced.mesh);
+  const ghostInstanced = createActivePieceInstancedMesh(renderConfig.board, {
+    front: {
+      roughness: 0.18,
+      metalness: 0.0,
+      envMapIntensity: 0.6,
+      emissive: 0xffe9a6,
+      emissiveIntensity: 0.55,
+    },
+    side: {
+      roughness: 0.22,
+      metalness: 0.0,
+      envMapIntensity: 0.45,
+      emissive: 0xffe9a6,
+      emissiveIntensity: 0.4,
+    },
+  });
+  ghostInstanced.mesh.renderOrder = -1;
+  ghostInstanced.mesh.material = ghostInstanced.mesh.material.map((mat) => {
+    const m = mat.clone();
+    m.transparent = true;
+    m.opacity = 0.35;
+    m.depthWrite = false;
+    m.depthTest = true;
+    return m;
+  });
+  scene.add(ghostInstanced.mesh);
 
   const fragments = createFragmentInstancedMeshes(renderConfig.boardDimensions, renderConfig.board);
   fragments.meshesByTemplate.forEach((mesh) => scene.add(mesh));
@@ -185,6 +212,7 @@ export function createRenderContext(
     boardPlaceholder: debugOverlays.group,
     board: boardInstanced,
     activePiece: activePieceInstanced,
+    ghost: ghostInstanced,
     mapper,
     renderConfig,
     towerBounds,

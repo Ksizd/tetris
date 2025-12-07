@@ -9,6 +9,7 @@ export interface ActivePieceInstancedResources {
   mesh: THREE.InstancedMesh;
   geometry: THREE.BufferGeometry;
   material: THREE.MeshStandardMaterial | THREE.MeshStandardMaterial[];
+  capacity: number;
 }
 
 const ACTIVE_PIECE_CAPACITY = 4;
@@ -60,7 +61,7 @@ export function createActivePieceInstancedMesh(
   mesh.receiveShadow = true;
   mesh.name = 'activePieceInstanced';
 
-  return { mesh, geometry, material: materials };
+  return { mesh, geometry, material: materials, capacity: ACTIVE_PIECE_CAPACITY };
 }
 
 function tagFrontGroup(geometry: THREE.BufferGeometry): void {

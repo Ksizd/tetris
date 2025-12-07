@@ -7,11 +7,14 @@ import { applyFragmentInstanceUpdates } from './destruction/instanceUpdater';
 import { FragmentInstancedResources } from './destruction/fragmentInstancedMesh';
 import { FragmentBucket } from '../app/destruction/destructionRuntime';
 import { updateGameCamera, CameraFollowState } from './cameraMotion';
+import { CellCoord } from '../core/types';
+import * as THREE from 'three';
 
 export type SceneRenderContext = Pick<
   RenderContext,
   | 'board'
   | 'activePiece'
+  | 'ghost'
   | 'mapper'
   | 'renderConfig'
   | 'fragments'
@@ -25,12 +28,18 @@ export interface SceneDestructionPayload {
   fragmentBuckets?: Map<number, FragmentBucket>;
 }
 
+export interface GhostRenderState {
+  cells: CellCoord[];
+  visible: boolean;
+}
+
 export function renderScene(
   ctx: SceneRenderContext,
   snapshot: Readonly<GameState>,
   destruction?: SceneDestructionPayload,
   cameraFollow?: CameraFollowState | null,
-  deltaMs?: number
+  deltaMs?: number,
+  ghost?: GhostRenderState | null
 ): void {
   if (cameraFollow?.enabled) {
     updateGameCamera(ctx.camera, ctx.cameraBasePlacement, ctx.towerBounds, cameraFollow, deltaMs ?? 0);
@@ -54,6 +63,7 @@ export function renderScene(
     mapper: ctx.mapper,
     offsetY,
   });
+  renderGhost(ctx, ghost);
   renderFragments(ctx.fragments ?? null, destruction?.fragmentBuckets);
 }
 
@@ -114,4 +124,33 @@ function renderFragments(
       b: base.b,
     });
   });
+}
+
+function renderGhost(ctx: SceneRenderContext, ghost?: GhostRenderState | null): void {
+  if (!ctx.ghost) {
+    return;
+  }
+  const targetMesh = ctx.ghost.mesh;
+  if (!ghost?.visible || !ghost.cells?.length) {
+    targetMesh.count = 0;
+    targetMesh.instanceMatrix.needsUpdate = true;
+    targetMesh.visible = false;
+    return;
+  }
+  const matrix = new THREE.Matrix4();
+  const rotation = new THREE.Quaternion();
+  const scale = new THREE.Vector3(1, 1, 1);
+  let idx = 0;
+  ghost.cells.slice(0, ctx.ghost.capacity).forEach((cell) => {
+    const worldPos = ctx.mapper.cellToWorldPosition(cell.x, cell.y, {
+      allowOverflowY: cell.y >= ctx.mapper.getDimensions().height,
+    });
+    ctx.mapper.getRadialOrientation(cell.x, rotation);
+    matrix.compose(worldPos, rotation, scale);
+    targetMesh.setMatrixAt(idx, matrix);
+    idx += 1;
+  });
+  targetMesh.count = idx;
+  targetMesh.instanceMatrix.needsUpdate = true;
+  targetMesh.visible = idx > 0;
 }

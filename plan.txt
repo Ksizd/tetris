@@ -4076,6 +4076,764 @@ boardInstancedMesh, у которого та же геометрия и мате
 Визуально нет ни единого кадра, где цвет/глянец кубика “прыгает” в момент lock’а. Куб выглядел так во время падения — и точно так же выглядит, став частью стены.
 
 ---
+Этап 13A. Стабильный рендер иероглифа (исключаем редкие «пустые» плитки)
+13A.0. Инварианты
+
+[ ] 13A.0.1. В игре существует один общий атлас тайла с иероглифом (одна THREE.Texture), который используют:
+
+активная фигура,
+
+зафиксированная башня,
+
+осколки разрушения.
+
+[ ] 13A.0.2. Загрузка изображения иероглифа (GLYPH_DATA_URL) делается ровно один раз, без перезаписи onload при создании каждого материала.
+
+[ ] 13A.0.3. Даже если картинка грузится асинхронно, все материалы либо:
+
+сразу получают уже готовый атлас с нарисованным иероглифом,
+
+либо атлас обновляется по факту загрузки иероглифа (texture.needsUpdate = true), так что иероглиф появляется и не «застревает» навсегда пустым.
+
+13A.1. Централизованный загрузчик иероглифа
+
+Файл: src/render/textures.ts
+
+[ ] 13A.1.1. Завести один модульный синглтон‑загрузчик:
+
+let glyphImagePromise: Promise<HTMLImageElement> | null = null;
+
+function loadGlyphImage(): Promise<HTMLImageElement> {
+  if (glyphImagePromise) return glyphImagePromise;
+
+  const img = new Image();
+  img.src = GLYPH_DATA_URL;
+
+  glyphImagePromise = new Promise((resolve, reject) => {
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    // если браузер уже кешировал data URL и complete === true:
+    if (img.complete && img.naturalWidth > 0) {
+      resolve(img);
+    }
+  });
+
+  return glyphImagePromise;
+}
+
+
+Никаких cachedGlyphImage с перезаписью onload при каждом вызове createMahjongTileTexture.
+
+13A.2. Один общий атлас тайла
+
+[ ] 13A.2.1. В textures.ts сделать общий кэш для атласа:
+
+let mahjongTileTexture: THREE.CanvasTexture | null = null;
+let mahjongTileTextureReady = false;
+
+
+[ ] 13A.2.2. Функцию createMahjongTileTexture заменить на:
+
+export function getMahjongTileTexture(): THREE.CanvasTexture {
+  if (mahjongTileTexture) return mahjongTileTexture;
+
+  const canvas = document.createElement('canvas');
+//   настроить размер, нарисовать базовую белую плитку + золото без иероглифа
+  const ctx = canvas.getContext('2d')!;
+  drawBaseTile(ctx); // существующая логика без glyph
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+
+  mahjongTileTexture = texture;
+
+  // асинхронно дорисовываем иероглиф
+  loadGlyphImage()
+    .then((img) => {
+      drawCenteredGlyph(ctx, img); // существующая логика
+      texture.needsUpdate = true;
+      mahjongTileTextureReady = true;
+    })
+    .catch((err) => {
+      console.error('Failed to load glyph image', err);
+    });
+
+  return texture;
+}
+
+
+[ ] 13A.2.3. Во всех местах, где раньше вызывался createMahjongTileTexture:
+
+activePieceInstancedMesh.ts
+
+boardInstancedMesh.ts
+
+render/destruction/fragmentInstancedMesh.ts
+
+заменить на getMahjongTileTexture().
+
+13A.3. Тест на гонку загрузки
+
+Файл: src/render/__tests__/textures.glyphLoad.test.ts (новый).
+
+[ ] 13A.3.1. Смок‑тест:
+
+замокать Image так, чтобы onload сработал асинхронно (через setTimeout),
+
+трижды вызвать getMahjongTileTexture() до того, как промис загрузки резолвится,
+
+после await glyphImagePromise проверить, что:
+
+mahjongTileTexture не null,
+
+texture.image содержит нарисованный глиф (можно проверить, что drawCenteredGlyph вызывался один раз через jest‑mock).
+
+[ ] 13A.3.2. Убедиться, что onload не перезаписывается:
+
+проверить, что loadGlyphImage() создаёт новый Image только при первом вызове (можно считать обращения к конструктору Image через mock).
+
+Этап 13B. Железобетонная логика посадки и лока тетримино
+
+Цель: уничтожить баги вида:
+
+фигура «зависла» в воздухе с пустым блоком под собой,
+
+фигура не «дотягивается» до пола/низы шахты, когда её проталкивают,
+
+странные подскоки вверх при постановке.
+
+13B.0. Инварианты движения и лока
+
+Файлы домена: src/core/collision/*, src/core/state/*
+
+[ ] 13B.0.1. Единственный источник правды для коллизий — canPlacePiece(board, piece, position):
+
+ни в одном месте не корректируем позицию «задним числом» (y + 1, «подскок вверх»),
+
+все движения и гравитация проверяют одну и ту же функцию.
+
+[ ] 13B.0.2. Инвариант поддержки:
+
+Для любой клетки фигуры, уже записанной на поле (lockCurrentPiece), верно:
+либо y === 0, либо под ней (y - 1) находится непустая клетка (другая часть фигуры или уже существующий блок).
+
+[ ] 13B.0.3. Инвариант без пропусков:
+
+Не существует ситуации, когда фигура могла бы безопасно опуститься на одну клетку ниже (по canPlacePiece), но при этом уже залочена выше.
+
+[ ] 13B.0.4. fallState.landed и lock delay работают как состояние:
+
+landed = false → фигура падает и может свободно двигаться.
+
+canMoveDown === false → ставим landed = true, запускаем обратный отсчёт lockDelayMs.
+
+пока landed = true и lockDelay > 0:
+
+разрешаем боковые движения/вращения, если canPlacePiece их допускает;
+
+при любом успешном движении/вращении можем либо чуть сокращать задержку (по текущей логике), либо ресетать — но без мгновенного лока.
+
+только когда landed = true и lockDelay <= 0, вызываем lockCurrentPiece.
+
+13B.1. Чистка и упрощение движения
+
+Файлы: src/core/collision/movement.ts, src/core/state/movement.ts, src/core/state/tick.ts, src/core/state/commands.ts
+
+[ ] 13B.1.1. В movement.ts убрать любые спецкейсы вида:
+
+«если y === 0, дополнительно смотреть клетку ниже»,
+
+любое ручное «подталкивание» фигуры вверх/вниз.
+
+Функции canMoveLeft/Right/Down/Rotate должны быть простыми оболочками над canPlacePiece.
+
+[ ] 13B.1.2. В tick.ts переписать гравитационный шаг:
+
+Псевдокод:
+
+function applyGravity(state: GameState, dtMs: number): GameState {
+  const fall = state.fallState;
+
+  // 1. Если фигуры нет — выходим
+  if (!state.currentPiece) return state;
+
+  // 2. Накапливаем время падения
+  fall.fallProgressMs += dtMs;
+
+  const tickInterval = getFallIntervalMs(state.level);
+  while (fall.fallProgressMs >= tickInterval) {
+    fall.fallProgressMs -= tickInterval;
+
+    const canDown = canMoveDown(state.board, state.currentPiece);
+
+    if (canDown) {
+      state.currentPiece = moveDown(state.currentPiece);
+      fall.landed = false;
+      fall.lockDelayMsRemaining = state.config.lockDelayMs;
+      fall.lockMovesCount = 0;
+    } else {
+      if (!fall.landed) {
+        fall.landed = true;
+        fall.lockDelayMsRemaining = state.config.lockDelayMs;
+        break; // в этом «тике» вниз уже не двигаем
+      } else {
+        // фигура стоит, уменьшаем таймер
+        break;
+      }
+    }
+  }
+
+  // Если landed — уменьшаем lockDelay
+  if (fall.landed) {
+    fall.lockDelayMsRemaining -= dtMs;
+    if (fall.lockDelayMsRemaining <= 0) {
+      return lockCurrentPiece(state);
+    }
+  }
+
+  return state;
+}
+
+
+[ ] 13B.1.3. В commands.ts при обработке горизонтальных ходов/вращений/soft drop, если ход успешен и fall.landed === true:
+
+увеличиваем lockMovesCount,
+
+либо уменьшаем lockDelayMsRemaining, либо (проще) сбрасываем его на config.lockDelayMs, но не ушатываем инварианты (не забываем про возможный лимит по lockMovesCount, если он уже есть в конфиге).
+
+Главное: никакого мгновенного лока прямо в обработчике команд — только через tick и fallState.
+
+13B.2. Жёсткие тесты для посадки фигур
+
+Файлы: src/core/state/__tests__/movement.test.ts, src/core/state/__tests__/lock.test.ts, возможно новый landingInvariants.test.ts.
+
+[ ] 13B.2.1. Ввести helper для проверки инварианта поддержки:
+
+function assertAllLockedCellsHaveSupport(board: Board, lastPieceId: PieceId) {
+  for (каждая клетка board, помеченная lastPieceId) {
+    expect(
+      y === 0 || board.getCell(x, y - 1).occupied
+    ).toBe(true);
+  }
+}
+
+
+(как идентифицировать клетки последней фигуры — по отдельному маркеру или по Snapshot до лока; решит Codex, но критерий понятен.)
+
+[ ] 13B.2.2. Набор детерминированных сценариев:
+
+«узкая шахта 1×2» между двумя башнями — как у тебя на 2‑м скрине:
+
+построить вручную конфигурацию доски (BoardBuilder),
+
+заспавнить фигуру-«Г» в нужной ориентации,
+
+прогнать последовательность input‑команд (лево/право/rotate/soft drop),
+
+после лока проверить:
+
+фигура полностью заняла шахту,
+
+нет пустых клеток под её нижними блоками,
+
+инвариант поддержки выполняется.
+
+сценарий «скольжение по краю платформы»:
+
+фигура идёт по ступенькам вниз/вбок,
+
+везде после лока нет «висящих» блоков.
+
+сценарий «hard drop»:
+
+при hard drop фигура падает до первого canMoveDown === false,
+
+сразу лочится там,
+
+инвариант поддержки выполняется.
+
+[ ] 13B.2.3. Маленький property‑тест локально вокруг фигуры (опционально, но очень мощно):
+
+ограничиться локальным окном 6×8 клеток и BoardRadius = 6 (чтобы не мучиться с wrap),
+
+для случайных заполнений этого окна (внутри разумной плотности) и случайных фигур:
+
+поместить фигуру сверху,
+
+симулировать последовательность «падение вниз с возможными боковыми движениями» (без сверхсложной AI, можно просто сразу soft drop без боковых сдвигов),
+
+после лока проверять инвариант поддержки.
+
+Это быстро найдёт любые проблемы, если где-то некорректно считаются коллизии.
+
+13B.3. Удаление «подскока» и запрет on‑the‑fly коррекции
+
+[ ] 13B.3.1. Поиск по коду по словам y + 1, y - 1, adjust, snap, grounded, landed в core‑слое:
+
+убрать/переписать любые места, где после неудачного движения фигуру «поднимают» или «корректируют» по высоте,
+
+оставить только логику «двигаем, если canPlacePiece».
+
+[ ] 13B.3.2. В boardToWorldMapper.ts/рендере убедиться, что визуальный offest вниз (fallProgress) только визуальный:
+
+логические координаты piece.position.y — целое число клетки,
+
+интерполяция по fallProgress не используется для коллизий.
+
+13B.4. Регресс‑тесты под твои конкретные сценарии
+
+[ ] 13B.4.1. Добавить интеграционный тест integration.test.ts с сценариями, максимально похожими на твои:
+
+Сценарий из 2‑го скрина:
+
+два «квадрата» по краям, шахта 1×2 посередине,
+
+фигура‑«Г», последовательность команд такая же, как ты делаешь руками,
+
+ожидаемое финальное положение в шахте.
+
+Сценарий из 3‑го скрина (подскок и зависание):
+
+конфигурация доски, на которой раньше проявлялся «подскок»,
+
+тот же набор команд,
+
+проверить:
+
+нет пустой клетки под фигурой,
+
+высота ровно там, где физически должна быть (можно записать эталон board snapshot).
+
+[ ] 13B.4.2. После правок прогнать весь npm test, убедиться, что старые тесты проходятся (особенно collision.test.ts, movement.test.ts, tick.test.ts), и при необходимости обновить сломанные снапшоты только там, где логика теперь стала корректнее.
+
+---
+
+Этап 13. UX‑апгрейд: следящая камера, прицел и lock‑индикация
+13.0. Инварианты этапа
+
+13.0.1. Камера (game‑mode)
+
+В обычном игровом режиме камера всегда:
+
+смотрит примерно под тем же углом / расстоянием, как сейчас в game‑view;
+
+направлена на активную фигуру — т.е. виден сектор башни, над которым висит тетримино;
+
+если двигаем фигуру по окружности, камера дискретно «переезжает» вместе с ней, на шаг в один столбец.
+
+VisualDebug‑камера и все отладочные режимы не ломаются.
+
+13.0.2. Прицел / ghost‑проекция
+
+Для текущего активного тетримино в каждый момент времени существует одна ghost‑позиция — куда оно приземлится, если сейчас сделать hard‑drop.
+
+Ghost:
+
+никогда не противоречит доменной логике — координаты те же, что вернёт «симуляция падения» через canPlacePiece;
+
+отображается поверх башни как золотистый/подсвеченный «силуэт» фигуры;
+
+исчезает, когда фигуры нет (между локацией и спавном новой, во время чистки и т.п.).
+
+13.0.3. Lock‑эффект и таймер
+
+При начале lock‑фазы (когда фигура стоит на поверхности и идёт отсчёт delay) появляется:
+
+разовый VFX на блоках фигуры (золотой «дымок» / искры);
+
+видимый таймер с оставшимся временем до лока.
+
+В момент реального лока:
+
+таймер всегда доходит до 0 / 100%;
+
+VFX проигрывается ровно один раз, не дублируется при повторных командах;
+
+логика тетриса (скоринг, спавн новой фигуры, чистка линий) не меняется.
+
+13.1. Следящая камера за тетримино
+13.1.1. Режим камеры и конфиг
+
+Файлы: src/render/renderConfig.ts, src/render/cameraMotion.ts, src/app/gameController.ts
+
+Добавить enum‑тип:
+
+export type CameraGameMode = 'static' | 'followPiece';
+
+
+В конфиге рендера (renderConfig / visualDefaults) завести поле:
+
+cameraGameMode: CameraGameMode; // по умолчанию 'followPiece' для game view
+
+
+В visualDebug оставить старое поведение (static / вручную управляемое orbit‑камерой).
+
+13.1.2. Расчёт «орбитального» угла по фигуре
+
+Файлы: src/render/boardToWorldMapper.ts, src/render/towerBounds.ts, src/core/coords/boardCoords.ts
+
+В слое рендера ввести утилиту:
+
+function getColumnAngle(columnIndex: number, width: number): number {
+  return (2 * Math.PI * columnIndex) / width;
+}
+
+
+Определить колонку центра активной фигуры:
+
+В gameController при построении рендер‑view (там, где уже есть activePiece):
+
+получить список occupied‑клеток фигуры;
+
+взять среднее по X (учесть wrap по окружности так же, как в boardToWorldMapper);
+
+округлить до ближайшего целого столбца — followColumn.
+
+Передать в рендер‑слой «target column angle»:
+
+renderState.cameraFollow = {
+  enabled: config.cameraGameMode === 'followPiece',
+  columnIndex: followColumn,
+};
+
+13.1.3. Собственно движение камеры
+
+Файлы: src/render/cameraMotion.ts, src/render/cameraSetup.ts, src/render/sceneRenderer.ts
+
+В cameraMotion добавить ветку:
+
+export function updateGameCamera(
+  camera: THREE.PerspectiveCamera,
+  towerBounds: TowerBounds,
+  follow: CameraFollowState | null,
+  deltaTime: number
+) { ... }
+
+
+Логика:
+
+Базу взять из текущего game‑ракурса:
+
+фиксированный distance до центра башни;
+
+фиксированный height и наклон вниз (как сейчас).
+
+Если follow.enabled:
+
+вычислить целевой азимут theta = getColumnAngle(follow.columnIndex, width).
+
+Смягчённо интерполировать текущий азимут → theta (например, lerp с фактором 0.2–0.3 за кадр), но без отставания на целый столбец.
+
+Позиция камеры:
+
+const r = baseDistance + towerBounds.radius;
+const eye = new Vector3(
+  Math.cos(theta) * r,
+  baseHeight,
+  Math.sin(theta) * r
+);
+camera.position.copy(eye);
+camera.lookAt(towerBounds.center);
+
+
+В sceneRenderer при отрисовке игры вызывать updateGameCamera, передавая renderState.cameraFollow.
+
+Не ломать visualDebug:
+
+В visualDebug‑режиме по-прежнему использовать orbitCamera и его state; cameraGameMode там игнорировать.
+
+13.1.4. Тесты и отладка камеры
+
+Файлы: src/render/__tests__/cameraSetup.test.ts (или новый cameraFollow.test.ts)
+
+Тест: при followColumn = 0 камера стоит на «нулевом» азимуте и смотрит в центр.
+
+Тест: при followColumn = width/2 азимут ~π (камера с обратной стороны).
+
+Интеграционный тест: симулировать движение фигуры по X и убедиться, что:
+
+cameraFollow.columnIndex меняется корректно;
+
+updateGameCamera выдаёт разные азимуты с шагом 2π/width.
+
+13.2. Прицел / ghost‑проекция места падения
+13.2.1. Доменная функция «куда упадёт фигура»
+
+Файлы: src/core/collision/movement.ts, src/core/state/movement.ts, src/core/state/index.ts, тесты в core/state/__tests__
+
+Добавить чистую функцию в core‑слой:
+
+export function computeHardDropPosition(state: GameState): PiecePosition;
+
+
+Внутри:
+
+взять текущий state.falling.activePiece;
+
+пока canMovePieceDown(board, piece) → y--;
+
+вернуть финальное положение (без лока).
+
+Использовать уже существующие canMovePiece / canPlacePiece, никаких своих проверок.
+
+Написать тесты:
+
+Конфигурация «две башенки и узкая щель» — ghost обязан встать ровно в нижнюю свободную клетку.
+
+Кейсы, где под фигурой уже что-то есть, на боках — ghost не пролетает сквозь.
+
+13.2.2. View‑модель ghost‑фигуры
+
+Файл: src/app/gameController.ts
+
+В update‑цикле, если есть активная фигура и игра в состоянии running:
+
+const ghostPos = computeHardDropPosition(coreState);
+const ghostCells = projectPieceToBoardCells(ghostPos); // как для обычной фигуры
+
+
+Передать в render‑слой структуру:
+
+renderState.ghost = {
+  cells: ghostCells, // массив { x, y }
+  visible: true/false,
+};
+
+
+visible = false, если:
+
+нет активной фигуры;
+
+идёт анимация очистки / разрушения;
+
+игра в paused / gameOver.
+
+13.2.3. Рендер ghost‑прицела
+
+Файлы:
+src/render/boardInstancedMesh.ts, src/render/boardRenderer.ts, src/render/textures.ts
+
+Создать отдельный instanced‑mesh для ghost:
+
+Можно использовать ту же геометрию блока (beveledBox).
+
+Материал:
+
+полупрозрачное золото;
+
+без AO/тяжёлых карт или с теми же картами, но opacity ~ 0.4, metalness повыше;
+
+depthWrite = false, depthTest = true, чтобы подсвечивать поверх.
+
+В boardRenderer добавить:
+
+Заполнение матриц инстансов ghost‑mesh по renderState.ghost.cells (используя boardToWorldMapper).
+
+ghostMesh.count = ghostCells.length.
+
+Порядок рендера:
+
+Сначала обычные блоки.
+
+Затем ghost‑mesh (чуть позже в списке детей сцены, чтобы блеск «садился» поверх).
+
+Опция выключения прицела: в renderConfig флаг showGhostPreview (по умолчанию true).
+
+13.2.4. Тесты
+
+Файл: src/render/__tests__/boardRenderer.test.ts (или новый)
+
+Тест: при ghost.cells = [] instanced‑mesh имеет count=0.
+
+Тест: для одного ghost‑блока его матрица позиционируется в ту же world‑позицию, что и реальный блок при фиксированном x,y.
+
+Интеграционный: сценарий падения фигуры + проверка, что ghost каждый тик совпадает с позициями hard‑drop.
+
+13.3. Визуальный эффект в момент lock
+13.3.1. Событие «lock» для визуала
+
+Файлы: src/app/events.ts, src/app/gameController.ts, src/core/state/lock.ts
+
+Убедиться, что при локации уже генерится событие вроде PieceLocked (если нет — добавить).
+
+Расширить событие / вью‑данные:
+
+type PieceLockedEvent = {
+  type: 'PieceLocked';
+  cells: { x: number; y: number }[];
+};
+
+
+В gameController пробросить это событие в destruction / fx‑подсистему.
+
+13.3.2. Мини‑симуляция «lock FX»
+
+Файлы:
+src/app/destruction/lockFxSimulation.ts (новый),
+src/app/destruction/simulationManager.ts,
+src/app/destruction/destructionPresets.ts
+
+Создать отдельный state:
+
+export interface LockFxBurst {
+  id: number;
+  originWorld: Vector3;
+  startTime: number;
+  fragments: FragmentInstanceRef[]; // можно использовать существующую структуру
+}
+
+export interface LockFxState {
+  bursts: LockFxBurst[];
+}
+
+
+На PieceLockedEvent:
+
+Для каждой клетки фигуры:
+
+взять world‑позицию центра блока;
+
+заспавнить небольшой набор фрагментов (dust/gold, 6–10 штук) с:
+
+малой скоростью вверх/в стороны;
+
+коротким временем жизни (0.2–0.4 с);
+
+лёгким вращением.
+
+Можно использовать существующую инфраструктуру fragmentInstances + explosionLifecycle с отдельным preset’ом LockFx.
+
+В fragmentSimulation.ts:
+
+Добавить обработку LockFxState вместе с основными разрушениями, но:
+
+не трогать доменное состояние;
+
+по окончании тайма — удалять фрагменты.
+
+13.3.3. Рендер lock‑фрагментов
+
+Файлы:
+src/render/destruction/fragmentInstancedMesh.ts,
+src/render/destruction/instanceUpdater.ts,
+src/render/renderer.ts
+
+Использовать те же instanced‑mesh’и, что и для разрушения, но:
+
+для lock‑fx:
+
+только dust и небольшие gold кусочки;
+
+максимум N инстансов одновременно (жёсткий лимит по производительности).
+
+В renderer:
+
+Добавить шаг updateLockFxRender(state.lockFx, fragmentMeshes) перед кадром.
+
+13.3.4. Тюнинг и отладка
+
+Файлы: src/app/destructionDebugPanel.ts, src/app/visualDebugMode.ts
+
+В панель destruction‑debug добавить чекбокс: «Show lock FX bursts» (в debug).
+
+Параметры пресета LockFx вынести в destructionPresets (скорость, lifetime, количество).
+
+13.4. HUD‑таймер до лока
+13.4.1. Данные из домена
+
+Файлы: src/core/state/gameState.ts, src/core/state/lock.ts, src/core/state/commands.ts
+
+В домене уже есть lockDelayMs и текущий lockElapsedMs / аналог — если нет, добавить.
+
+В GameState явно экспонировать:
+
+fallState: {
+  landed: boolean;
+  lockDelayMs: number;
+  lockElapsedMs: number;
+}
+
+
+(или производное lockRemainingMs).
+
+13.4.2. UI‑модель
+
+Файлы: src/ui/uiState.ts, src/app/gameController.ts
+
+В uiState добавить:
+
+export interface LockTimerView {
+  active: boolean;
+  progress: number; // 0..1, где 1 = сейчас залочим
+  remainingMs: number;
+}
+
+
+В gameController при сборке uiState:
+
+Если fallState.landed === true и lockDelayMs > 0:
+
+active = true;
+
+progress = clamp(lockElapsedMs / lockDelayMs, 0, 1);
+
+Иначе active = false.
+
+13.4.3. Рендер HUD‑таймера
+
+Файлы: src/ui/hud.ts, src/ui/overlay.ts
+
+В hud:
+
+Нарисовать небольшой круговой индикатор или дугу в углу (или рядом с активной фигурой — на твой вкус, но лучше начать с HUD‑центра).
+
+Цвет: золотой; толщина линии небольшая; прозрачность ~0.8.
+
+Анимация:
+
+при active=true — заполняем прогресс;
+
+при переходе true → false — короткий fade out (0.2 с), чтобы не дёргался.
+
+Не забыть про адаптацию к разным разрешениям (использовать те же привязки, что и для счёта/уровня).
+
+13.4.4. Тесты
+
+Файлы: src/core/state/__tests__/lock.test.ts, src/ui/__tests__/hud.test.ts
+
+Доменный: при пошаговом увеличении lockElapsedMs прогресс от 0 до 1, не перескакивает.
+
+UI: при LockTimerView.active=false HUD не рисует таймер; при active=true — рисует.
+
+13.5. Маленький финальный чек‑лист
+
+После реализации этапа 13 ты глазами проверяешь:
+
+Камера
+
+При старте игры фигура в центре кадра.
+
+Жмёшь ←/→: башня визуально крутится, но фигура всегда «на фронте».
+
+В visualDebug по‑прежнему можно крутить мышью независимо от фигуры.
+
+Прицел
+
+Двигаешь/вращаешь фигуру — золотой силуэт снизу всегда показывает реальное место посадки.
+
+При hard‑drop фигура встаёт ровно туда, где был ghost.
+
+При разрушении ряда / отсутствии фигуры прицел исчезает.
+
+Lock FX + таймер
+
+Когда фигура касается поверхности и начинается lock‑delay — на ней один раз вспыхивает мягкий золотой VFX и появляется таймер.
+
+Пока ты «ёрзаешь» фигурой в lock‑фазе — таймер бегает, VFX не спавнится бесконечно.
+
+В момент лока таймер доходит до конца и пропадает.
+
+---
 
 ## Этап 13. Производительность, оптимизация и полировка
 
