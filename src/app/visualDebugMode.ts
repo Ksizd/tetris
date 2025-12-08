@@ -81,6 +81,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   let materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
   let destructionSim: DestructionSimulationState | null = null;
   let fragmentFilter: FragmentDebugFilter = 'all';
+  let showLockFxBursts = true;
   let fractureDebugGroup: THREE.Group | null = null;
   let showSourceRegion = false;
   let sourceRegionGroup: THREE.Group | null = null;
@@ -345,6 +346,9 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
       return mat === fragmentFilter;
     };
     updatesByTemplate.forEach((entry, templateId) => {
+      if (!showLockFxBursts && templateId === -1) {
+        return;
+      }
       const mesh = fragments.meshesByTemplate.get(templateId);
       if (!mesh) {
         return;
@@ -368,6 +372,10 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     if (fragmentFilter !== 'fractureDebug') {
       removeFractureDebugGroup(renderCtx);
     }
+  }
+
+  function onLockFxVisibilityChange(visible: boolean) {
+    showLockFxBursts = visible;
   }
 
   function getFragmentPhysicsConfig(): FragmentPhysicsConfig {
@@ -401,6 +409,9 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
         },
         onShowSourceRegion: () => {
           showStaticSourceRegion(ctx);
+        },
+        onLockFxVisibilityChange: (visible) => {
+          onLockFxVisibilityChange(visible);
         },
       });
       attachPanelDisposalOnUnload(() => destructionPanel?.dispose());

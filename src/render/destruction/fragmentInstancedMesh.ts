@@ -188,6 +188,7 @@ function createInstancedMeshForTemplate(
   capacity: number
 ): THREE.InstancedMesh {
   const mesh = new THREE.InstancedMesh(tpl.geometry, material, capacity);
+  mesh.userData.capacity = capacity;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   const tintArray = new Float32Array(capacity * 4);
   for (let i = 0; i < capacity; i += 1) {
@@ -255,6 +256,40 @@ export function createFragmentInstancedMeshes(
     meshesByTemplate.set(tpl.templateId, mesh);
     templateMaterial.set(tpl.templateId, materialId);
   });
+
+  // Dedicated lock-fx instanced mesh (templateId = -1) with simple bright geometry to guarantee visibility.
+  const lockFxTemplateId = -1;
+  const lockFxGeometry = new THREE.IcosahedronGeometry(board.blockSize * 0.22, 1);
+  const lockFxCapacity = Math.max(64, Math.min(totalCapacity, 512));
+  const lockFxMaterial = new THREE.MeshBasicMaterial({
+    color: 0xfff2a0,
+    transparent: true,
+    opacity: 1,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+  const lockFxMesh = new THREE.InstancedMesh(lockFxGeometry, lockFxMaterial, lockFxCapacity);
+  lockFxMesh.userData.capacity = lockFxCapacity;
+  lockFxMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const lockTintArray = new Float32Array(lockFxCapacity * 4);
+  for (let i = 0; i < lockFxCapacity; i += 1) {
+    lockTintArray[i * 4] = 1.1;
+    lockTintArray[i * 4 + 1] = 0.98;
+    lockTintArray[i * 4 + 2] = 0.55;
+    lockTintArray[i * 4 + 3] = 1;
+  }
+  const lockTintAttr = new THREE.InstancedBufferAttribute(lockTintArray, 4);
+  lockTintAttr.setUsage(THREE.DynamicDrawUsage);
+  lockFxMesh.geometry.setAttribute('instanceTint', lockTintAttr);
+  lockFxMesh.count = 0;
+  lockFxMesh.visible = false;
+  lockFxMesh.frustumCulled = false;
+  lockFxMesh.castShadow = false;
+  lockFxMesh.receiveShadow = false;
+  lockFxMesh.name = 'lock-fx-mesh';
+  meshesByTemplate.set(lockFxTemplateId, lockFxMesh);
+  templateMaterial.set(lockFxTemplateId, 'gold');
 
   return {
     meshesByTemplate,

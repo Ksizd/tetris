@@ -111,6 +111,8 @@ function applyLockMoveUpdate(
       landed: true,
       lockMovesCount,
       lockTimeMs: LOCK_DELAY_MAX_MS,
+      lockDelayMs: LOCK_DELAY_MAX_MS,
+      lockElapsedMs: 0,
     },
   };
   if (updated.fallState.lockMovesCount >= LOCK_MOVES_MAX) {

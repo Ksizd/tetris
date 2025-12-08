@@ -1,4 +1,5 @@
 import { STANDARD_GRAVITY_MS2, DEFAULT_LINEAR_DRAG, DEFAULT_ANGULAR_DRAG } from './fragmentSimulation';
+import { LockFxPreset } from './lockFxSimulation';
 
 export interface Range {
   min: number;
@@ -66,4 +67,14 @@ export const LOW_DESTRUCTION_PRESET: DestructionPreset = {
   wallRestitution: PHYSICS_DEFAULTS.wallRestitution,
   floorFriction: PHYSICS_DEFAULTS.floorFriction,
   wallFriction: PHYSICS_DEFAULTS.wallFriction,
+};
+
+export const LOCK_FX_PRESET: LockFxPreset = {
+  fragmentCount: { min: 14, max: 22 },
+  lifetimeMs: { min: 800, max: 1300 },
+  radialSpeed: { min: 2.6, max: 4.2 },
+  upwardSpeed: { min: 1.8, max: 2.9 },
+  angularSpeed: { min: 4, max: 11 },
+  scale: { min: 0.28, max: 0.42 },
+  materials: ['gold'],
 };

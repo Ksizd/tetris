@@ -3,6 +3,7 @@ export interface DestructionDebugPanel {
   getSelectedLevel: () => number | null;
   setLevels: (levels: number[]) => void;
   getFragmentFilter: () => FragmentDebugFilter;
+  getLockFxVisible: () => boolean;
   onShowSourceRegion?: () => void;
   getPhysicsOverrides: () => PhysicsOverrides;
 }
@@ -20,6 +21,7 @@ export interface DestructionDebugOptions {
   onDestroy: (level: number) => void;
   onFilterChange?: (filter: FragmentDebugFilter) => void;
   onShowSourceRegion?: () => void;
+  onLockFxVisibilityChange?: (visible: boolean) => void;
 }
 
 /**
@@ -134,6 +136,23 @@ export function createDestructionDebugPanel(options: DestructionDebugOptions): D
   });
   container.appendChild(sourceRegionBtn);
 
+  const lockFxLabel = document.createElement('label');
+  lockFxLabel.style.display = 'flex';
+  lockFxLabel.style.alignItems = 'center';
+  lockFxLabel.style.gap = '6px';
+  lockFxLabel.style.marginTop = '10px';
+  const lockFxCheckbox = document.createElement('input');
+  lockFxCheckbox.type = 'checkbox';
+  lockFxCheckbox.checked = true;
+  const lockFxText = document.createElement('span');
+  lockFxText.textContent = 'Show lock FX bursts';
+  lockFxLabel.appendChild(lockFxCheckbox);
+  lockFxLabel.appendChild(lockFxText);
+  lockFxCheckbox.addEventListener('change', () => {
+    options.onLockFxVisibilityChange?.(lockFxCheckbox.checked);
+  });
+  container.appendChild(lockFxLabel);
+
   const tuning: PhysicsOverrides = {
     explosionStrength: 1,
     gravityScale: 1,
@@ -188,6 +207,7 @@ export function createDestructionDebugPanel(options: DestructionDebugOptions): D
       rebuildOptions();
     },
     getFragmentFilter: () => filterSelect.value as FragmentDebugFilter,
+    getLockFxVisible: () => lockFxCheckbox.checked,
     onShowSourceRegion: options.onShowSourceRegion,
     getPhysicsOverrides: () => ({ ...tuning }),
   };

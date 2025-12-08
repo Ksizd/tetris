@@ -6,6 +6,7 @@ import { lockCurrentPiece } from './lock';
 import { beginClearingPhase } from './clearing';
 import { tryMovePiece } from './movement';
 import { LOCK_DELAY_MAX_MS, LOCK_MOVES_MAX } from './lockDelay';
+import { clampToLockBounds } from './utils';
 
 export function tickGame(state: GameState, deltaTimeMs: number): GameState {
   if (
@@ -30,12 +31,25 @@ export function tickGame(state: GameState, deltaTimeMs: number): GameState {
   if (grounded && !working.fallState.landed) {
     working = {
       ...working,
-      fallState: { landed: true, lockMovesCount: 0, lockTimeMs: LOCK_DELAY_MAX_MS },
+      fallState: {
+        landed: true,
+        lockMovesCount: 0,
+        lockTimeMs: LOCK_DELAY_MAX_MS,
+        lockDelayMs: LOCK_DELAY_MAX_MS,
+        lockElapsedMs: 0,
+      },
       timing: { ...working.timing, fallProgressMs: 0 },
     };
   }
   if (!grounded && working.fallState.landed) {
-    working = { ...working, fallState: { ...FALL_STATE_DEFAULT, lockTimeMs: LOCK_DELAY_MAX_MS } };
+    working = {
+      ...working,
+      fallState: {
+        ...FALL_STATE_DEFAULT,
+        lockTimeMs: LOCK_DELAY_MAX_MS,
+        lockDelayMs: LOCK_DELAY_MAX_MS,
+      },
+    };
   }
 
   working = applyGravity(working, deltaTimeMs);
@@ -50,9 +64,18 @@ export function tickGame(state: GameState, deltaTimeMs: number): GameState {
       });
       return beginClearingPhase(locked);
     }
+    const clampedRemaining = Math.max(0, remaining);
+    const elapsed = clampToLockBounds(
+      working.fallState.lockDelayMs - clampedRemaining,
+      working.fallState.lockDelayMs
+    );
     return {
       ...working,
-      fallState: { ...working.fallState, lockTimeMs: remaining },
+      fallState: {
+        ...working.fallState,
+        lockTimeMs: clampedRemaining,
+        lockElapsedMs: elapsed,
+      },
     };
   }
 
@@ -102,7 +125,12 @@ function applyGravity(state: GameState, deltaTimeMs: number): GameState {
     if (step.moved && step.state.currentPiece) {
       working = {
         ...step.state,
-        fallState: { ...FALL_STATE_DEFAULT, lockTimeMs: LOCK_DELAY_MAX_MS },
+        fallState: {
+          ...FALL_STATE_DEFAULT,
+          lockTimeMs: LOCK_DELAY_MAX_MS,
+          lockDelayMs: LOCK_DELAY_MAX_MS,
+          lockElapsedMs: 0,
+        },
         timing: { ...step.state.timing, fallProgressMs: fallProgress },
       };
     } else {
@@ -114,6 +142,10 @@ function applyGravity(state: GameState, deltaTimeMs: number): GameState {
           lockTimeMs: working.fallState.landed
             ? working.fallState.lockTimeMs
             : LOCK_DELAY_MAX_MS,
+          lockDelayMs: working.fallState.landed
+            ? working.fallState.lockDelayMs
+            : LOCK_DELAY_MAX_MS,
+          lockElapsedMs: working.fallState.landed ? working.fallState.lockElapsedMs : 0,
         },
         timing: { ...working.timing, fallProgressMs: fallProgress },
       };

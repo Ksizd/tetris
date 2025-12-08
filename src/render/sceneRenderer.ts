@@ -102,26 +102,81 @@ function renderFragments(
     return;
   }
 
+  const fallbackTemplateByMaterial = new Map<string, number>();
+  resources.templateMaterial.forEach((materialId, tplId) => {
+    if (!fallbackTemplateByMaterial.has(materialId)) {
+      fallbackTemplateByMaterial.set(materialId, tplId);
+    }
+  });
+
+  const aggregated = new Map<
+    number,
+    {
+      mesh: THREE.InstancedMesh;
+      materialId: string;
+      color: { r: number; g: number; b: number };
+      updates: typeof buckets extends Map<any, infer V> ? V['updates'] : never;
+    }
+  >();
+
   buckets.forEach((bucket, templateId) => {
-    const mesh = resources.meshesByTemplate.get(templateId);
+    const materialId = resources.templateMaterial.get(templateId) ?? bucket.materialId;
+    const material =
+      resources.materials[materialId] ??
+      resources.materials.gold ??
+      Object.values(resources.materials)[0];
+    if (!material) {
+      return;
+    }
+    let targetTemplate = templateId;
+    let mesh = resources.meshesByTemplate.get(targetTemplate);
     if (!mesh) {
-      return;
+      const fallbackTpl =
+        fallbackTemplateByMaterial.get(materialId) ?? fallbackTemplateByMaterial.get('gold');
+      if (fallbackTpl === undefined) {
+        return;
+      }
+      targetTemplate = fallbackTpl;
+      mesh = resources.meshesByTemplate.get(targetTemplate);
+      if (!mesh) {
+        return;
+      }
     }
-    const matId = resources.templateMaterial.get(templateId) ?? bucket.materialId;
-    const base = resources.materials[matId]?.color;
-    if (!base) {
-      return;
-    }
-    const capped = bucket.updates.slice(0, resources.capacityPerTemplate);
-    mesh.count = capped.length;
-    mesh.visible = capped.length > 0;
+
+    const entry =
+      aggregated.get(targetTemplate) ??
+      (() => {
+        const created = {
+          mesh,
+          materialId,
+          color: material.color,
+          updates: [] as typeof bucket.updates,
+        };
+        aggregated.set(targetTemplate, created);
+        return created;
+      })();
+
+    bucket.updates.forEach((update) => {
+      entry.updates.push({
+        ...update,
+        instanceId: entry.updates.length,
+      });
+    });
+  });
+
+  aggregated.forEach((entry) => {
+    const capacity =
+      (entry.mesh.userData?.capacity as number | undefined) ?? resources.capacityPerTemplate;
+    const capped = entry.updates.slice(0, capacity);
+    entry.mesh.count = capped.length;
+    entry.mesh.visible = capped.length > 0;
     if (capped.length === 0) {
       return;
     }
-    applyFragmentInstanceUpdates(mesh, capped, {
-      r: base.r,
-      g: base.g,
-      b: base.b,
+    applyFragmentInstanceUpdates(entry.mesh, capped, {
+      r: entry.color?.r ?? 1,
+      g: entry.color?.g ?? 0.9,
+      b: entry.color?.b ?? 0.4,
     });
   });
 }

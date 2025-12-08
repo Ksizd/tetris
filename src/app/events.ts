@@ -12,6 +12,7 @@ export type GameEvent =
     }
   | {
       type: GameEventType.PieceLocked;
+      cells: { x: number; y: number }[];
     }
   | {
       type: GameEventType.NewPieceSpawned;

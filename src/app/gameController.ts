@@ -5,6 +5,7 @@ import { tickGame } from '../core/state/tick';
 import { createInitialGameState, GameConfig } from '../core/state/initialState';
 import { GameEvent, GameEventType } from './events';
 import { GameStatus } from '../core/types';
+import { getWorldBlocks } from '../core/piece';
 import { wrapX } from '../core/coords';
 
 /**
@@ -84,7 +85,11 @@ export class GameController {
 
   private collectEvents(prev: GameState, current: GameState, bucket: GameEvent[]): void {
     if (prev.currentPiece && !current.currentPiece) {
-      bucket.push({ type: GameEventType.PieceLocked });
+      const dims = prev.board.getDimensions();
+      const cells = getWorldBlocks(prev.currentPiece, dims).filter(
+        (cell) => cell.y >= 0 && cell.y < dims.height
+      );
+      bucket.push({ type: GameEventType.PieceLocked, cells });
     }
 
     const hadNoClearing = prev.clearingLayers.length === 0;

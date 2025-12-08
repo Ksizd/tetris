@@ -18,6 +18,7 @@ import { computeHardDropPosition } from './core/state';
 import {
   clearDestruction,
   createDestructionOrchestratorState,
+  addLockFxFromCells,
   startDestructionFromEvent,
   stepDestruction,
 } from './app/destruction/destructionRuntime';
@@ -100,6 +101,9 @@ if (isTextureProbeEnabled()) {
           timestamp
         );
       }
+      if (event.type === GameEventType.PieceLocked) {
+        destructionState = addLockFxFromCells(destructionState, renderCtx.mapper, event.cells, timestamp);
+      }
       if (event.type === GameEventType.NewPieceSpawned) {
         spawnSnap = true;
       }
@@ -118,7 +122,7 @@ if (isTextureProbeEnabled()) {
         destructionState = clearDestruction(destructionState);
         destructionPayload = {
           hiddenCells: new Set(),
-          fragmentBuckets: new Map(),
+          fragmentBuckets: destructionStep.fragmentsByTemplate,
         };
       }
     }
