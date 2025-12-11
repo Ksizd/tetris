@@ -3,7 +3,7 @@ import { RenderContext } from './renderer';
 import { EnvironmentConfig } from './renderConfig';
 import { createEnvironmentMap } from './environmentMap';
 
-export type EnvDebugMode = 'full' | 'lightsOnly' | 'envOnly';
+export type EnvDebugMode = 'full' | 'lightsOnly' | 'envOnly' | 'hallOnly' | 'noHall';
 
 export function deriveEnvOverrides(mode: EnvDebugMode): Partial<EnvironmentConfig> {
   if (mode === 'lightsOnly') {
@@ -35,7 +35,7 @@ export function applyEnvDebugMode(ctx: RenderContext, mode: EnvDebugMode): void 
     return;
   }
 
-  // full
+  // full / hallOnly / noHall
   ctx.scene.traverse((obj) => {
     const light = obj as THREE.Light;
     if (light.isLight) {

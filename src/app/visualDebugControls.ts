@@ -3,18 +3,33 @@ export interface VisualControlState {
   cameraDistance: number;
   cameraHeight: number;
   towerRadius: number;
+  goldenHallEnabled: boolean;
+  showHallBase: boolean;
+  showHallShell: boolean;
+  showHallFx: boolean;
+  showHallRadii: boolean;
+  hallWallHeight: number;
+  hallBrightness: number;
   ambientIntensity: number;
   hemisphereIntensity: number;
   keyIntensity: number;
   autoRotateEnabled: boolean;
   qualityLevel: 'ultra' | 'ultra2' | 'medium' | 'low';
   materialDebugMode: 'none' | 'matcap' | 'flat';
-  envDebugMode: 'full' | 'lightsOnly' | 'envOnly';
+  envDebugMode: 'full' | 'lightsOnly' | 'envOnly' | 'hallOnly' | 'noHall';
+  hallMaterialMode: 'off' | 'hallOnly' | 'albedo' | 'roughness' | 'metalness';
+  inspectorEnabled: boolean;
 }
 
 export interface VisualDebugControls {
   dispose: () => void;
   getState: () => VisualControlState;
+  updateInspector: (info: {
+    selectedLabel: string;
+    summary: string;
+    json: string;
+    details: string;
+  } | null) => void;
 }
 
 interface ControlSpec {
@@ -31,6 +46,8 @@ const CONTROL_SPECS: ControlSpec[] = [
   { key: 'cameraDistance', label: 'Camera distance', min: 5, max: 80, step: 0.5, precision: 1 },
   { key: 'cameraHeight', label: 'Camera height', min: -10, max: 80, step: 0.5, precision: 1 },
   { key: 'towerRadius', label: 'Tower radius', min: 2, max: 20, step: 0.2, precision: 2 },
+  { key: 'hallWallHeight', label: 'Hall wall height', min: 12, max: 120, step: 1, precision: 0 },
+  { key: 'hallBrightness', label: 'Hall brightness', min: 0.25, max: 2, step: 0.05, precision: 2 },
   { key: 'ambientIntensity', label: 'Ambient', min: 0, max: 2, step: 0.05, precision: 2 },
   { key: 'hemisphereIntensity', label: 'Hemisphere', min: 0, max: 2, step: 0.05, precision: 2 },
   { key: 'keyIntensity', label: 'Key light', min: 0, max: 2, step: 0.05, precision: 2 },
@@ -119,6 +136,60 @@ export function createVisualDebugControls(
     container.appendChild(row);
   });
 
+  const hallToggleRow = document.createElement('div');
+  hallToggleRow.style.display = 'flex';
+  hallToggleRow.style.flexDirection = 'column';
+  hallToggleRow.style.marginBottom = '8px';
+
+  const hallEnableLabel = document.createElement('label');
+  hallEnableLabel.textContent = 'Enable Golden Hall';
+  hallEnableLabel.style.marginBottom = '4px';
+
+  const hallEnableCheckbox = document.createElement('input');
+  hallEnableCheckbox.type = 'checkbox';
+  hallEnableCheckbox.checked = Boolean(state.goldenHallEnabled);
+  hallEnableCheckbox.addEventListener('change', () => {
+    state.goldenHallEnabled = hallEnableCheckbox.checked;
+    onChange({ ...state });
+  });
+
+  const enableWrap = document.createElement('div');
+  enableWrap.style.display = 'flex';
+  enableWrap.style.alignItems = 'center';
+  enableWrap.appendChild(hallEnableLabel);
+  enableWrap.appendChild(hallEnableCheckbox);
+  enableWrap.style.justifyContent = 'space-between';
+  hallToggleRow.appendChild(enableWrap);
+
+  const visibilityRow = document.createElement('div');
+  visibilityRow.style.display = 'flex';
+  visibilityRow.style.flexDirection = 'column';
+  visibilityRow.style.gap = '2px';
+
+  [
+    { key: 'showHallBase', label: 'Show base' },
+    { key: 'showHallShell', label: 'Show hall shell' },
+    { key: 'showHallFx', label: 'Show FX' },
+    { key: 'showHallRadii', label: 'Show hall radii' },
+  ].forEach((item) => {
+    const row = document.createElement('label');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = Boolean(state[item.key as keyof VisualControlState]);
+    cb.addEventListener('change', () => {
+      (state as any)[item.key] = cb.checked;
+      onChange({ ...state });
+    });
+    cb.style.marginRight = '6px';
+    row.appendChild(cb);
+    row.appendChild(document.createTextNode(item.label));
+    visibilityRow.appendChild(row);
+  });
+  hallToggleRow.appendChild(visibilityRow);
+  container.appendChild(hallToggleRow);
+
   const autoRotateRow = document.createElement('div');
   autoRotateRow.style.display = 'flex';
   autoRotateRow.style.alignItems = 'center';
@@ -139,6 +210,83 @@ export function createVisualDebugControls(
   autoRotateRow.appendChild(autoRotateLabel);
   autoRotateRow.appendChild(autoRotateCheckbox);
   container.appendChild(autoRotateRow);
+
+  const inspectorRow = document.createElement('div');
+  inspectorRow.style.display = 'flex';
+  inspectorRow.style.alignItems = 'center';
+  inspectorRow.style.marginBottom = '8px';
+  const inspectorLabel = document.createElement('label');
+  inspectorLabel.textContent = 'Object Inspector';
+  inspectorLabel.style.flex = '1';
+  const inspectorCheckbox = document.createElement('input');
+  inspectorCheckbox.type = 'checkbox';
+  inspectorCheckbox.checked = Boolean(state.inspectorEnabled);
+  inspectorCheckbox.addEventListener('change', () => {
+    state.inspectorEnabled = inspectorCheckbox.checked;
+    onChange({ ...state });
+  });
+  inspectorRow.appendChild(inspectorLabel);
+  inspectorRow.appendChild(inspectorCheckbox);
+  container.appendChild(inspectorRow);
+
+  const inspectorPanel = document.createElement('div');
+  inspectorPanel.style.display = 'flex';
+  inspectorPanel.style.flexDirection = 'column';
+  inspectorPanel.style.gap = '4px';
+  inspectorPanel.style.marginBottom = '10px';
+  inspectorPanel.style.background = 'rgba(255,255,255,0.03)';
+  inspectorPanel.style.padding = '6px';
+  inspectorPanel.style.borderRadius = '6px';
+
+  const selectedRow = document.createElement('div');
+  selectedRow.textContent = 'Selected object: —';
+  selectedRow.style.fontWeight = 'bold';
+  inspectorPanel.appendChild(selectedRow);
+
+  const summaryArea = document.createElement('textarea');
+  summaryArea.readOnly = true;
+  summaryArea.rows = 3;
+  summaryArea.style.width = '100%';
+  summaryArea.style.resize = 'vertical';
+  summaryArea.placeholder = 'summaryForLLM';
+  inspectorPanel.appendChild(summaryArea);
+
+  const buttonsRow = document.createElement('div');
+  buttonsRow.style.display = 'flex';
+  buttonsRow.style.gap = '6px';
+  const copySummaryBtn = document.createElement('button');
+  copySummaryBtn.textContent = 'Copy summary';
+  copySummaryBtn.addEventListener('click', () => {
+    navigator.clipboard?.writeText(summaryArea.value ?? '');
+  });
+  const copyJsonBtn = document.createElement('button');
+  copyJsonBtn.textContent = 'Copy JSON';
+  copyJsonBtn.addEventListener('click', () => {
+    navigator.clipboard?.writeText(jsonArea.value ?? '');
+  });
+  buttonsRow.appendChild(copySummaryBtn);
+  buttonsRow.appendChild(copyJsonBtn);
+  inspectorPanel.appendChild(buttonsRow);
+
+  const jsonArea = document.createElement('textarea');
+  jsonArea.readOnly = true;
+  jsonArea.rows = 3;
+  jsonArea.style.width = '100%';
+  jsonArea.style.resize = 'vertical';
+  jsonArea.placeholder = 'jsonForLLM';
+  inspectorPanel.appendChild(jsonArea);
+
+  const detailsArea = document.createElement('div');
+  detailsArea.style.fontFamily = 'monospace';
+  detailsArea.style.fontSize = '11px';
+  detailsArea.style.whiteSpace = 'pre-wrap';
+  detailsArea.style.background = 'rgba(255,255,255,0.04)';
+  detailsArea.style.padding = '6px';
+  detailsArea.style.borderRadius = '4px';
+  detailsArea.textContent = 'debugTag: —';
+  inspectorPanel.appendChild(detailsArea);
+
+  container.appendChild(inspectorPanel);
 
   const qualityRow = document.createElement('div');
   qualityRow.style.display = 'flex';
@@ -212,6 +360,8 @@ export function createVisualDebugControls(
     { value: 'full', label: 'Full (env + lights)' },
     { value: 'lightsOnly', label: 'Lights only' },
     { value: 'envOnly', label: 'Env only' },
+    { value: 'hallOnly', label: 'Hall only' },
+    { value: 'noHall', label: 'No hall' },
   ].forEach((optDef) => {
     const opt = document.createElement('option');
     opt.value = optDef.value;
@@ -228,6 +378,39 @@ export function createVisualDebugControls(
   envRow.appendChild(envLabel);
   envRow.appendChild(envSelect);
   container.appendChild(envRow);
+
+  const hallRow = document.createElement('div');
+  hallRow.style.display = 'flex';
+  hallRow.style.flexDirection = 'column';
+  hallRow.style.marginBottom = '8px';
+
+  const hallLabel = document.createElement('label');
+  hallLabel.textContent = 'Golden Hall material preview';
+  hallLabel.style.marginBottom = '2px';
+
+  const hallSelect = document.createElement('select');
+  [
+    { value: 'off', label: 'Off' },
+    { value: 'hallOnly', label: 'Hall only (hide tower)' },
+    { value: 'albedo', label: 'Hall Albedo' },
+    { value: 'roughness', label: 'Hall Roughness' },
+    { value: 'metalness', label: 'Hall Metalness' },
+  ].forEach((optDef) => {
+    const opt = document.createElement('option');
+    opt.value = optDef.value;
+    opt.textContent = optDef.label;
+    hallSelect.appendChild(opt);
+  });
+  hallSelect.value = state.hallMaterialMode;
+  hallSelect.addEventListener('change', () => {
+    const val = hallSelect.value as VisualControlState['hallMaterialMode'];
+    state.hallMaterialMode = val;
+    onChange({ ...state });
+  });
+
+  hallRow.appendChild(hallLabel);
+  hallRow.appendChild(hallSelect);
+  container.appendChild(hallRow);
 
   if (onReset) {
     const resetBtn = document.createElement('button');
@@ -249,5 +432,18 @@ export function createVisualDebugControls(
   return {
     dispose: () => container.remove(),
     getState: () => ({ ...state }),
+    updateInspector: (info) => {
+      if (!info) {
+        selectedRow.textContent = 'Selected object: —';
+        summaryArea.value = '';
+        jsonArea.value = '';
+        detailsArea.textContent = 'debugTag: —';
+        return;
+      }
+      selectedRow.textContent = `Selected object: ${info.selectedLabel}`;
+      summaryArea.value = info.summary;
+      jsonArea.value = info.json;
+      detailsArea.textContent = info.details;
+    },
   };
 }

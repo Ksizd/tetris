@@ -1,0 +1,3057 @@
+{
+  "type": "hall_geometry_snapshot",
+  "engineVersion": "dev",
+  "hallLayout": {
+    "towerOuterRadius": 9.474085273310466,
+    "cameraOrbitRadius": 56.24908082008269,
+    "hallInnerRadius": 57.24908082008269,
+    "hallOuterRadius": 58.49908082008269,
+    "platformOuterRadius": 56.89908082008269
+  },
+  "platformLayout": {
+    "baseY": -1.1949999999999998,
+    "heightCore": 0.6,
+    "ringA": {
+      "inner": 0,
+      "outer": 9.674085273310466,
+      "height": 0.7
+    },
+    "ringB": {
+      "inner": 9.674085273310466,
+      "outer": 9.774085273310467,
+      "height": 0.65
+    },
+    "ringC": {
+      "inner": 9.774085273310467,
+      "outer": 56.89908082008269,
+      "height": 0.6
+    }
+  },
+  "objects": [
+    {
+      "id": "f0fd9399-f84b-4708-80d3-f871f0868201",
+      "kind": "platformRingA",
+      "name": "platform-ringA-helper",
+      "worldPos": [
+        0,
+        -0.4949999999999999,
+        0.00011539459228515625
+      ],
+      "bbox": {
+        "min": [
+          -9.674027442932129,
+          -0.49600000004749734,
+          -9.67385482788086
+        ],
+        "max": [
+          9.674027442932129,
+          -0.49399999995250243,
+          9.67408561706543
+        ]
+      },
+      "approxRadiusXZ": 9.67408561706543,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "platformRingA",
+        "sourceFile": "src/render/goldenPlatform.ts"
+      }
+    },
+    {
+      "id": "77202336-3147-45ed-86ff-df18543ab3df",
+      "kind": "platformRingB",
+      "name": "platform-ringB-helper",
+      "worldPos": [
+        0,
+        -0.5449999999999998,
+        0.0001163482666015625
+      ],
+      "bbox": {
+        "min": [
+          -9.774026870727539,
+          -0.5460000000474973,
+          -9.773852348327637
+        ],
+        "max": [
+          9.774026870727539,
+          -0.5439999999525024,
+          9.77408504486084
+        ]
+      },
+      "approxRadiusXZ": 9.77408504486084,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "platformRingB",
+        "sourceFile": "src/render/goldenPlatform.ts"
+      }
+    },
+    {
+      "id": "d54d9910-881a-4916-a2dc-e9771c7706ef",
+      "kind": "platformRingC",
+      "name": "platform-ringC-helper",
+      "worldPos": [
+        0,
+        -0.5949999999999999,
+        0.00067901611328125
+      ],
+      "bbox": {
+        "min": [
+          -56.89874267578125,
+          -0.5960000000474973,
+          -56.89772415161133
+        ],
+        "max": [
+          56.89874267578125,
+          -0.5939999999525024,
+          56.89908218383789
+        ]
+      },
+      "approxRadiusXZ": 56.89908218383789,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "platformRingC",
+        "sourceFile": "src/render/goldenPlatform.ts"
+      }
+    },
+    {
+      "id": "72264702-ce49-4250-96ac-c719ffde52c9",
+      "kind": "platformSide",
+      "name": "platform-side-helper",
+      "worldPos": [
+        0,
+        -0.8949999999999998,
+        0.00067901611328125
+      ],
+      "bbox": {
+        "min": [
+          -56.89874267578125,
+          -1.1950000119209288,
+          -56.89772415161133
+        ],
+        "max": [
+          56.89874267578125,
+          -0.5949999880790708,
+          56.89908218383789
+        ]
+      },
+      "approxRadiusXZ": 56.89908218383789,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "platformSide",
+        "sourceFile": "src/render/goldenPlatform.ts"
+      }
+    },
+    {
+      "id": "ab5c2dcd-364c-4a38-b839-0c09742da98b",
+      "kind": "footprintDecor",
+      "name": "footprintDecor",
+      "worldPos": [
+        0,
+        -0.4790000000000011,
+        0
+      ],
+      "bbox": {
+        "min": [
+          -9.73758316040039,
+          -0.48000000000000215,
+          -9.754085540771484
+        ],
+        "max": [
+          9.73758316040039,
+          -0.478,
+          9.754085540771484
+        ]
+      },
+      "approxRadiusXZ": 9.754085540771484,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "footprintDecor",
+        "sourceFile": "src/render/footprintDecor.ts"
+      }
+    },
+    {
+      "id": "4afd68ea-a5fe-4403-891e-52cd13bb5547",
+      "kind": "hallFloor",
+      "name": "hall-base-steps",
+      "worldPos": [
+        0,
+        -3.735000002197921,
+        0
+      ],
+      "bbox": {
+        "min": [
+          -56.89908218383789,
+          -7.5000000047683715,
+          -56.89908218383789
+        ],
+        "max": [
+          56.89908218383789,
+          0.03000000037252968,
+          56.89908218383789
+        ]
+      },
+      "approxRadiusXZ": 56.89908218383789,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallFloor",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "ca508eef-395a-45b4-a5df-bca84fa7ebb4",
+      "kind": "hallFloor",
+      "name": "hall-base-center",
+      "worldPos": [
+        0,
+        -0.5449999999999999,
+        0
+      ],
+      "bbox": {
+        "min": [
+          -8.402603149414062,
+          -0.595000000745058,
+          -8.402603149414062
+        ],
+        "max": [
+          8.402603149414062,
+          -0.49499999925494187,
+          8.402603149414062
+        ]
+      },
+      "approxRadiusXZ": 8.402603149414062,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallFloor",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "a30bcc8b-97c1-4c33-ab27-014e97e03136",
+      "kind": "hallInnerShell",
+      "name": "hall-wall-main-mesh",
+      "worldPos": [
+        0,
+        19.32,
+        0
+      ],
+      "bbox": {
+        "min": [
+          -58.499080657958984,
+          0.11999923706054716,
+          -58.499080657958984
+        ],
+        "max": [
+          58.499080657958984,
+          38.52000076293945,
+          58.499080657958984
+        ]
+      },
+      "approxRadiusXZ": 58.499080657958984,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "742a102e-6941-4fa6-bdf9-b5366dfdf827",
+      "kind": "hallInnerShell",
+      "name": "hall-rim-mesh",
+      "worldPos": [
+        0,
+        38.24,
+        0
+      ],
+      "bbox": {
+        "min": [
+          -55.832589537654094,
+          38.08000000357628,
+          -55.86662171713671
+        ],
+        "max": [
+          55.832589537654094,
+          38.39999999642372,
+          55.86662171713671
+        ]
+      },
+      "approxRadiusXZ": 55.86662171713671,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "beeb1460-d4bd-4ec5-bf47-32a512c5d4e9",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-0",
+      "worldPos": [
+        57.62159460778145,
+        8.18,
+        0
+      ],
+      "bbox": {
+        "min": [
+          57.3334866463652,
+          0.5000001716613767,
+          -7.24094295501709
+        ],
+        "max": [
+          57.90970256919769,
+          15.859999828338623,
+          7.24094295501709
+        ]
+      },
+      "approxRadiusXZ": 57.90970256919769,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "21865c04-8c11-4bdc-b308-27a12d2396ea",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-1",
+      "worldPos": [
+        57.23197799870484,
+        7.684999999999999,
+        6.689458834560002
+      ],
+      "bbox": {
+        "min": [
+          56.105195951592904,
+          0.005000171661376562,
+          -0.5359707474077569
+        ],
+        "max": [
+          58.35876004581678,
+          15.364999828338622,
+          13.91488841652776
+        ]
+      },
+      "approxRadiusXZ": 58.35876004581678,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "b7e82de8-f04e-4cab-95d1-a4a8a62d56d0",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-2",
+      "worldPos": [
+        56.06839706773177,
+        7.684999999999999,
+        13.288454214041414
+      ],
+      "bbox": {
+        "min": [
+          54.11817872913488,
+          0.005000171661376562,
+          6.176249545111084
+        ],
+        "max": [
+          58.018615406328664,
+          15.364999828338622,
+          20.400658882971744
+        ]
+      },
+      "approxRadiusXZ": 58.018615406328664,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "a9a8af26-d19a-4abe-823b-5a395201a92e",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-3",
+      "worldPos": [
+        54.146587250849315,
+        7.684999999999999,
+        19.70774604640699
+      ],
+      "bbox": {
+        "min": [
+          51.39930597822887,
+          0.005000171661376562,
+          12.804946657788872
+        ],
+        "max": [
+          56.89386852346976,
+          15.364999828338622,
+          26.610545435025106
+        ]
+      },
+      "approxRadiusXZ": 56.89386852346976,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "59cb51b5-ed67-466a-8efc-9cd86d461284",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-4",
+      "worldPos": [
+        51.49253772899703,
+        7.684999999999999,
+        25.86052442181569
+      ],
+      "bbox": {
+        "min": [
+          47.985345788648445,
+          0.005000171661376562,
+          19.260478833599716
+        ],
+        "max": [
+          54.99972966934561,
+          15.364999828338622,
+          32.46057001003166
+        ]
+      },
+      "approxRadiusXZ": 54.99972966934561,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "518d7787-1f8f-4e7e-bd64-22869a9cd0b5",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-5",
+      "worldPos": [
+        48.14213996897878,
+        7.684999999999999,
+        31.663583567732253
+      ],
+      "bbox": {
+        "min": [
+          43.92246611536404,
+          0.005000171661376562,
+          25.455546074227197
+        ],
+        "max": [
+          52.361813822593525,
+          15.364999828338622,
+          37.871621061237306
+        ]
+      },
+      "approxRadiusXZ": 52.361813822593525,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "58b1362e-afa0-4083-9ad4-87e04c190ec5",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-6",
+      "worldPos": [
+        44.140702352945446,
+        7.684999999999999,
+        37.03844706426261
+      ],
+      "bbox": {
+        "min": [
+          39.26561043615217,
+          0.005000171661376562,
+          31.30637072277985
+        ],
+        "max": [
+          49.01579426973872,
+          15.364999828338622,
+          42.77052340574538
+        ]
+      },
+      "approxRadiusXZ": 49.01579426973872,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "49af12f8-edf6-4b9f-a459-8f955db9a1a4",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-7",
+      "worldPos": [
+        39.54233746025213,
+        7.684999999999999,
+        41.91242910310793
+      ],
+      "bbox": {
+        "min": [
+          34.077754735313334,
+          0.005000171661376562,
+          36.73383041288142
+        ],
+        "max": [
+          45.00692018519092,
+          15.364999828338622,
+          47.09102779333445
+        ]
+      },
+      "approxRadiusXZ": 47.09102779333445,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "255ddca5-17f2-4b47-a134-77b3fa464689",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-8",
+      "worldPos": [
+        34.409230287651624,
+        7.684999999999999,
+        46.21961743843047
+      ],
+      "bbox": {
+        "min": [
+          28.42905586151849,
+          0.005000171661376562,
+          41.66452806294291
+        ],
+        "max": [
+          40.38940471378476,
+          15.364999828338622,
+          50.77470681391803
+        ]
+      },
+      "approxRadiusXZ": 50.77470681391803,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "84545fa7-c4a6-431f-baad-cd05b17b39c3",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-9",
+      "worldPos": [
+        28.81079730389073,
+        7.684999999999999,
+        49.901764736907154
+      ],
+      "bbox": {
+        "min": [
+          22.39590277678385,
+          0.005000171661376562,
+          46.03178444577959
+        ],
+        "max": [
+          35.22569183099761,
+          15.364999828338622,
+          53.771745028034715
+        ]
+      },
+      "approxRadiusXZ": 53.771745028034715,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "a7383782-3714-4919-81e6-c8bad193c24b",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-10",
+      "worldPos": [
+        22.82274771105322,
+        7.684999999999999,
+        52.90907627299047
+      ],
+      "bbox": {
+        "min": [
+          16.059883526803517,
+          0.005000171661376562,
+          49.77653991077158
+        ],
+        "max": [
+          29.585611895302925,
+          15.364999828338622,
+          56.041612635209354
+        ]
+      },
+      "approxRadiusXZ": 56.041612635209354,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "6cf6794c-fdfd-4e03-bb0c-1b32f2f545c8",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-11",
+      "worldPos": [
+        16.52605960747965,
+        7.684999999999999,
+        55.200883317149355
+      ],
+      "bbox": {
+        "min": [
+          9.506681902594568,
+          0.005000171661376562,
+          52.8481530643225
+        ],
+        "max": [
+          23.54543731236473,
+          15.364999828338622,
+          57.55361356997621
+        ]
+      },
+      "approxRadiusXZ": 57.55361356997621,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "3621f71e-84db-4577-a190-df79c067c8ee",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-12",
+      "worldPos": [
+        10.005884897903872,
+        7.684999999999999,
+        56.74619311066961
+      ],
+      "bbox": {
+        "min": [
+          2.8249187142126484,
+          0.005000171661376562,
+          55.20508560783343
+        ],
+        "max": [
+          17.186851081595094,
+          15.364999828338622,
+          58.287300613505785
+        ]
+      },
+      "approxRadiusXZ": 58.287300613505785,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "7de0f4a5-2dae-414d-9ac9-d405d3a8dc22",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-13",
+      "worldPos": [
+        3.350397760018253,
+        7.684999999999999,
+        57.524107989547936
+      ],
+      "bbox": {
+        "min": [
+          -3.8950466536764665,
+          0.005000171661376562,
+          56.815464071933214
+        ],
+        "max": [
+          10.595842173712972,
+          15.364999828338622,
+          58.23275190716266
+        ]
+      },
+      "approxRadiusXZ": 58.23275190716266,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "137f7d80-a02f-4e3c-822f-b91d70e05c19",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-14",
+      "worldPos": [
+        -3.3503977600182457,
+        7.684999999999999,
+        57.524107989547936
+      ],
+      "bbox": {
+        "min": [
+          -10.595842173712965,
+          0.005000171661376562,
+          56.815464071933214
+        ],
+        "max": [
+          3.8950466536764736,
+          15.364999828338622,
+          58.23275190716266
+        ]
+      },
+      "approxRadiusXZ": 58.23275190716266,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "ac8b0e90-94f8-4755-9e4f-e24aeea0e868",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-15",
+      "worldPos": [
+        -10.005884897903865,
+        7.684999999999999,
+        56.74619311066961
+      ],
+      "bbox": {
+        "min": [
+          -17.186851081595087,
+          0.005000171661376562,
+          55.20508560783343
+        ],
+        "max": [
+          -2.8249187142126413,
+          15.364999828338622,
+          58.287300613505785
+        ]
+      },
+      "approxRadiusXZ": 58.287300613505785,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "f9f107f0-d4f3-4c94-a1fc-d0750c8b7667",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-16",
+      "worldPos": [
+        -16.52605960747964,
+        7.684999999999999,
+        55.200883317149355
+      ],
+      "bbox": {
+        "min": [
+          -23.545437312364722,
+          0.005000171661376562,
+          52.8481530643225
+        ],
+        "max": [
+          -9.506681902594561,
+          15.364999828338622,
+          57.55361356997621
+        ]
+      },
+      "approxRadiusXZ": 57.55361356997621,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "e87c1df9-842d-457e-bcc5-831970785a5f",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-17",
+      "worldPos": [
+        -22.822747711053214,
+        7.684999999999999,
+        52.90907627299047
+      ],
+      "bbox": {
+        "min": [
+          -29.585611895302918,
+          0.005000171661376562,
+          49.77653991077158
+        ],
+        "max": [
+          -16.05988352680351,
+          15.364999828338622,
+          56.041612635209354
+        ]
+      },
+      "approxRadiusXZ": 56.041612635209354,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "84d961c7-6703-4823-b87d-157856b9eaf0",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-18",
+      "worldPos": [
+        -28.81079730389071,
+        7.684999999999999,
+        49.90176473690716
+      ],
+      "bbox": {
+        "min": [
+          -35.22569183099759,
+          0.005000171661376562,
+          46.0317844457796
+        ],
+        "max": [
+          -22.395902776783824,
+          15.364999828338622,
+          53.77174502803472
+        ]
+      },
+      "approxRadiusXZ": 53.77174502803472,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "d3e5d9e4-a500-4e8b-9363-d0a66c93539b",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-19",
+      "worldPos": [
+        -34.40923028765162,
+        7.684999999999999,
+        46.219617438430475
+      ],
+      "bbox": {
+        "min": [
+          -40.38940471378475,
+          0.005000171661376562,
+          41.664528062942914
+        ],
+        "max": [
+          -28.42905586151848,
+          15.364999828338622,
+          50.77470681391804
+        ]
+      },
+      "approxRadiusXZ": 50.77470681391804,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "2b542698-3f47-49d9-876f-f1e206ea4938",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-20",
+      "worldPos": [
+        -39.54233746025212,
+        7.684999999999999,
+        41.91242910310795
+      ],
+      "bbox": {
+        "min": [
+          -45.00692018519092,
+          0.005000171661376562,
+          36.73383041288143
+        ],
+        "max": [
+          -34.07775473531332,
+          15.364999828338622,
+          47.09102779333446
+        ]
+      },
+      "approxRadiusXZ": 47.09102779333446,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "ce651fa3-7298-4c63-a5c7-6a139754ab3b",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-21",
+      "worldPos": [
+        -44.14070235294544,
+        7.684999999999999,
+        37.03844706426263
+      ],
+      "bbox": {
+        "min": [
+          -49.01579426973871,
+          0.005000171661376562,
+          31.306370722779864
+        ],
+        "max": [
+          -39.265610436152166,
+          15.364999828338622,
+          42.770523405745394
+        ]
+      },
+      "approxRadiusXZ": 49.01579426973871,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "ef48644e-6f27-43b2-83ef-363e34f8d796",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-22",
+      "worldPos": [
+        -48.14213996897877,
+        7.684999999999999,
+        31.66358356773226
+      ],
+      "bbox": {
+        "min": [
+          -52.36181382259351,
+          0.005000171661376562,
+          25.455546074227207
+        ],
+        "max": [
+          -43.922466115364024,
+          15.364999828338622,
+          37.87162106123731
+        ]
+      },
+      "approxRadiusXZ": 52.36181382259351,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "e5d68cf6-2e20-4233-a85e-41d166e38d51",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-23",
+      "worldPos": [
+        -51.49253772899702,
+        7.684999999999999,
+        25.86052442181569
+      ],
+      "bbox": {
+        "min": [
+          -54.9997296693456,
+          0.005000171661376562,
+          19.260478833599723
+        ],
+        "max": [
+          -47.985345788648445,
+          15.364999828338622,
+          32.46057001003166
+        ]
+      },
+      "approxRadiusXZ": 54.9997296693456,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "82d96bdc-15c9-4b6b-8f7e-dfd0c63611d8",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-24",
+      "worldPos": [
+        -54.14658725084931,
+        7.684999999999999,
+        19.707746046407
+      ],
+      "bbox": {
+        "min": [
+          -56.89386852346976,
+          0.005000171661376562,
+          12.804946657788879
+        ],
+        "max": [
+          -51.39930597822885,
+          15.364999828338622,
+          26.61054543502512
+        ]
+      },
+      "approxRadiusXZ": 56.89386852346976,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "4a685e76-63a8-4972-b3d7-c6de3ca45eb2",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-25",
+      "worldPos": [
+        -56.06839706773177,
+        7.684999999999999,
+        13.288454214041423
+      ],
+      "bbox": {
+        "min": [
+          -58.018615406328664,
+          0.005000171661376562,
+          6.1762495451110935
+        ],
+        "max": [
+          -54.11817872913488,
+          15.364999828338622,
+          20.40065888297175
+        ]
+      },
+      "approxRadiusXZ": 58.018615406328664,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "0388264d-c762-4c6e-9bfb-24ae0916ecc5",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-26",
+      "worldPos": [
+        -57.23197799870484,
+        7.684999999999999,
+        6.689458834560009
+      ],
+      "bbox": {
+        "min": [
+          -58.35876004581678,
+          0.005000171661376562,
+          -0.5359707474077497
+        ],
+        "max": [
+          -56.105195951592904,
+          15.364999828338622,
+          13.914888416527766
+        ]
+      },
+      "approxRadiusXZ": 58.35876004581678,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "4fcd46d1-f936-46e9-a4e0-942afec3ff3c",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-27",
+      "worldPos": [
+        -57.62159460778145,
+        7.684999999999999,
+        7.105427357601002e-15
+      ],
+      "bbox": {
+        "min": [
+          -57.90970256919769,
+          0.005000171661376562,
+          -7.240942955017083
+        ],
+        "max": [
+          -57.3334866463652,
+          15.364999828338622,
+          7.240942955017097
+        ]
+      },
+      "approxRadiusXZ": 57.90970256919769,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "50796fd7-9dc7-47ce-a102-486830dae0be",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-28",
+      "worldPos": [
+        -57.23197799870484,
+        7.684999999999999,
+        -6.689458834559995
+      ],
+      "bbox": {
+        "min": [
+          -58.35876004581678,
+          0.005000171661376562,
+          -13.914888416527752
+        ],
+        "max": [
+          -56.105195951592904,
+          15.364999828338622,
+          0.5359707474077631
+        ]
+      },
+      "approxRadiusXZ": 58.35876004581678,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "c62b198d-f5fe-4c44-ab4a-47bcd863fc14",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-29",
+      "worldPos": [
+        -56.06839706773177,
+        7.684999999999999,
+        -13.288454214041408
+      ],
+      "bbox": {
+        "min": [
+          -58.018615406328664,
+          0.005000171661376562,
+          -20.40065888297174
+        ],
+        "max": [
+          -54.11817872913488,
+          15.364999828338622,
+          -6.176249545111078
+        ]
+      },
+      "approxRadiusXZ": 58.018615406328664,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "b9e2ff91-bb9c-48cc-80bf-1bddc166d771",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-30",
+      "worldPos": [
+        -54.146587250849315,
+        7.684999999999999,
+        -19.707746046406985
+      ],
+      "bbox": {
+        "min": [
+          -56.89386852346976,
+          0.005000171661376562,
+          -26.610545435025106
+        ],
+        "max": [
+          -51.39930597822887,
+          15.364999828338622,
+          -12.804946657788864
+        ]
+      },
+      "approxRadiusXZ": 56.89386852346976,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "d5fed70c-74af-467c-8f2f-95f8900dd94c",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-31",
+      "worldPos": [
+        -51.49253772899703,
+        7.684999999999999,
+        -25.860524421815683
+      ],
+      "bbox": {
+        "min": [
+          -54.999729669345605,
+          0.005000171661376562,
+          -32.46057001003165
+        ],
+        "max": [
+          -47.98534578864845,
+          15.364999828338622,
+          -19.260478833599713
+        ]
+      },
+      "approxRadiusXZ": 54.999729669345605,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "027c8780-f167-4b0e-8b9c-0188882655c2",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-32",
+      "worldPos": [
+        -48.14213996897878,
+        7.684999999999999,
+        -31.663583567732253
+      ],
+      "bbox": {
+        "min": [
+          -52.361813822593525,
+          0.005000171661376562,
+          -37.871621061237306
+        ],
+        "max": [
+          -43.92246611536404,
+          15.364999828338622,
+          -25.455546074227197
+        ]
+      },
+      "approxRadiusXZ": 52.361813822593525,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "7fa8ac61-4a71-45a0-b956-7bfc69389f69",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-33",
+      "worldPos": [
+        -44.140702352945446,
+        7.684999999999999,
+        -37.03844706426261
+      ],
+      "bbox": {
+        "min": [
+          -49.01579426973872,
+          0.005000171661376562,
+          -42.77052340574538
+        ],
+        "max": [
+          -39.26561043615217,
+          15.364999828338622,
+          -31.30637072277985
+        ]
+      },
+      "approxRadiusXZ": 49.01579426973872,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "eb5f2b32-1c25-4a52-8c68-4e46a8a71dc0",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-34",
+      "worldPos": [
+        -39.54233746025213,
+        7.684999999999999,
+        -41.91242910310793
+      ],
+      "bbox": {
+        "min": [
+          -45.00692018519092,
+          0.005000171661376562,
+          -47.09102779333445
+        ],
+        "max": [
+          -34.077754735313334,
+          15.364999828338622,
+          -36.73383041288142
+        ]
+      },
+      "approxRadiusXZ": 47.09102779333445,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "f63b7945-51ba-41bd-b675-2643a09450ae",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-35",
+      "worldPos": [
+        -34.409230287651624,
+        7.684999999999999,
+        -46.21961743843047
+      ],
+      "bbox": {
+        "min": [
+          -40.38940471378476,
+          0.005000171661376562,
+          -50.77470681391803
+        ],
+        "max": [
+          -28.429055861518492,
+          15.364999828338622,
+          -41.66452806294291
+        ]
+      },
+      "approxRadiusXZ": 50.77470681391803,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "a1d976e0-988e-43c1-822a-6e404bc3c324",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-36",
+      "worldPos": [
+        -28.81079730389075,
+        7.684999999999999,
+        -49.90176473690715
+      ],
+      "bbox": {
+        "min": [
+          -35.22569183099763,
+          0.005000171661376562,
+          -53.77174502803471
+        ],
+        "max": [
+          -22.395902776783867,
+          15.364999828338622,
+          -46.031784445779586
+        ]
+      },
+      "approxRadiusXZ": 53.77174502803471,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "b896d6dc-eda0-4d78-9395-216e7d29f6a9",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-37",
+      "worldPos": [
+        -22.822747711053218,
+        7.684999999999999,
+        -52.90907627299047
+      ],
+      "bbox": {
+        "min": [
+          -29.58561189530292,
+          0.005000171661376562,
+          -56.041612635209354
+        ],
+        "max": [
+          -16.059883526803514,
+          15.364999828338622,
+          -49.77653991077158
+        ]
+      },
+      "approxRadiusXZ": 56.041612635209354,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "44968ea7-72b0-4295-ba17-0b8f3f67ebba",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-38",
+      "worldPos": [
+        -16.526059607479667,
+        7.684999999999999,
+        -55.20088331714935
+      ],
+      "bbox": {
+        "min": [
+          -23.545437312364744,
+          0.005000171661376562,
+          -57.55361356997621
+        ],
+        "max": [
+          -9.50668190259459,
+          15.364999828338622,
+          -52.84815306432249
+        ]
+      },
+      "approxRadiusXZ": 57.55361356997621,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "419c9908-fc06-40a0-8907-be4cdcc0fb82",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-39",
+      "worldPos": [
+        -10.005884897903867,
+        7.684999999999999,
+        -56.74619311066961
+      ],
+      "bbox": {
+        "min": [
+          -17.18685108159509,
+          0.005000171661376562,
+          -58.287300613505785
+        ],
+        "max": [
+          -2.824918714212643,
+          15.364999828338622,
+          -55.20508560783343
+        ]
+      },
+      "approxRadiusXZ": 58.287300613505785,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "8bc5fda6-9e8d-4cb6-ba55-dacdd9f6ca17",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-40",
+      "worldPos": [
+        -3.350397760018273,
+        7.684999999999999,
+        -57.524107989547936
+      ],
+      "bbox": {
+        "min": [
+          -10.595842173712992,
+          0.005000171661376562,
+          -58.232751907162665
+        ],
+        "max": [
+          3.895046653676446,
+          15.364999828338622,
+          -56.81546407193321
+        ]
+      },
+      "approxRadiusXZ": 58.232751907162665,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "a1e73f46-5d7c-483e-95ab-bcf3118a22c4",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-41",
+      "worldPos": [
+        3.3503977600182515,
+        7.684999999999999,
+        -57.524107989547936
+      ],
+      "bbox": {
+        "min": [
+          -3.8950466536764674,
+          0.005000171661376562,
+          -58.23275190716266
+        ],
+        "max": [
+          10.59584217371297,
+          15.364999828338622,
+          -56.815464071933214
+        ]
+      },
+      "approxRadiusXZ": 58.23275190716266,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "b4948e2c-b6fe-4f7e-a2ee-f50344ec725f",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-42",
+      "worldPos": [
+        10.005884897903847,
+        7.684999999999999,
+        -56.746193110669616
+      ],
+      "bbox": {
+        "min": [
+          2.8249187142126235,
+          0.005000171661376562,
+          -58.287300613505785
+        ],
+        "max": [
+          17.186851081595073,
+          15.364999828338622,
+          -55.205085607833446
+        ]
+      },
+      "approxRadiusXZ": 58.287300613505785,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "85d35472-5c0e-4fcf-9976-13918b886a1b",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-43",
+      "worldPos": [
+        16.52605960747965,
+        7.684999999999999,
+        -55.200883317149355
+      ],
+      "bbox": {
+        "min": [
+          9.506681902594572,
+          0.005000171661376562,
+          -57.55361356997621
+        ],
+        "max": [
+          23.545437312364726,
+          15.364999828338622,
+          -52.8481530643225
+        ]
+      },
+      "approxRadiusXZ": 57.55361356997621,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "0b2ac43d-a810-468b-9935-2e1bbd23c04f",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-44",
+      "worldPos": [
+        22.822747711053196,
+        7.684999999999999,
+        -52.909076272990475
+      ],
+      "bbox": {
+        "min": [
+          16.059883526803493,
+          0.005000171661376562,
+          -56.04161263520936
+        ],
+        "max": [
+          29.5856118953029,
+          15.364999828338622,
+          -49.77653991077159
+        ]
+      },
+      "approxRadiusXZ": 56.04161263520936,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "bc34b855-809f-4c90-b24b-dd3c9fccbbfc",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-45",
+      "worldPos": [
+        28.81079730389073,
+        7.684999999999999,
+        -49.901764736907154
+      ],
+      "bbox": {
+        "min": [
+          22.395902776783846,
+          0.005000171661376562,
+          -53.771745028034715
+        ],
+        "max": [
+          35.22569183099761,
+          15.364999828338622,
+          -46.03178444577959
+        ]
+      },
+      "approxRadiusXZ": 53.771745028034715,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "0ec4183b-0f2e-41ee-bc3a-60eb49a84421",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-46",
+      "worldPos": [
+        34.40923028765161,
+        7.684999999999999,
+        -46.219617438430475
+      ],
+      "bbox": {
+        "min": [
+          28.429055861518474,
+          0.005000171661376562,
+          -50.77470681391804
+        ],
+        "max": [
+          40.38940471378474,
+          15.364999828338622,
+          -41.664528062942914
+        ]
+      },
+      "approxRadiusXZ": 50.77470681391804,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "b7c4f2af-4ae8-45d4-a69d-cec88453dade",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-47",
+      "worldPos": [
+        39.542337460252135,
+        7.684999999999999,
+        -41.91242910310793
+      ],
+      "bbox": {
+        "min": [
+          34.077754735313334,
+          0.005000171661376562,
+          -47.09102779333445
+        ],
+        "max": [
+          45.006920185190936,
+          15.364999828338622,
+          -36.73383041288142
+        ]
+      },
+      "approxRadiusXZ": 47.09102779333445,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "27535e54-bb6e-41fc-bf9b-e26860251f24",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-48",
+      "worldPos": [
+        44.14070235294543,
+        7.684999999999999,
+        -37.038447064262634
+      ],
+      "bbox": {
+        "min": [
+          39.26561043615216,
+          0.005000171661376562,
+          -42.770523405745394
+        ],
+        "max": [
+          49.015794269738706,
+          15.364999828338622,
+          -31.30637072277987
+        ]
+      },
+      "approxRadiusXZ": 49.015794269738706,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "26d50178-fc7e-4ec9-8f60-91965f1db3ef",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-49",
+      "worldPos": [
+        48.14213996897878,
+        7.684999999999999,
+        -31.66358356773224
+      ],
+      "bbox": {
+        "min": [
+          43.92246611536404,
+          0.005000171661376562,
+          -37.87162106123729
+        ],
+        "max": [
+          52.361813822593525,
+          15.364999828338622,
+          -25.45554607422719
+        ]
+      },
+      "approxRadiusXZ": 52.361813822593525,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "bae7c092-c930-43fc-82bc-f74f42bf0e12",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-50",
+      "worldPos": [
+        51.49253772899702,
+        7.684999999999999,
+        -25.860524421815704
+      ],
+      "bbox": {
+        "min": [
+          47.985345788648445,
+          0.005000171661376562,
+          -32.460570010031674
+        ],
+        "max": [
+          54.9997296693456,
+          15.364999828338622,
+          -19.26047883359973
+        ]
+      },
+      "approxRadiusXZ": 54.9997296693456,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "a6e25c58-db1b-4dfc-b618-d69f3e3a487c",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-51",
+      "worldPos": [
+        54.146587250849315,
+        7.684999999999999,
+        -19.707746046406985
+      ],
+      "bbox": {
+        "min": [
+          51.39930597822887,
+          0.005000171661376562,
+          -26.610545435025106
+        ],
+        "max": [
+          56.89386852346976,
+          15.364999828338622,
+          -12.804946657788864
+        ]
+      },
+      "approxRadiusXZ": 56.89386852346976,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "028e0e48-84a9-4c91-9720-95b50a958aa1",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-52",
+      "worldPos": [
+        56.06839706773177,
+        7.684999999999999,
+        -13.28845421404143
+      ],
+      "bbox": {
+        "min": [
+          54.11817872913488,
+          0.005000171661376562,
+          -20.400658882971758
+        ],
+        "max": [
+          58.018615406328664,
+          15.364999828338622,
+          -6.176249545111101
+        ]
+      },
+      "approxRadiusXZ": 58.018615406328664,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "18cf2f84-6cc4-46d6-b1b8-960afd314522",
+      "kind": "hallInnerShell",
+      "name": "hall-panel-53",
+      "worldPos": [
+        57.23197799870484,
+        7.684999999999999,
+        -6.689458834559991
+      ],
+      "bbox": {
+        "min": [
+          56.105195951592904,
+          0.005000171661376562,
+          -13.914888416527749
+        ],
+        "max": [
+          58.35876004581678,
+          15.364999828338622,
+          0.5359707474077675
+        ]
+      },
+      "approxRadiusXZ": 58.35876004581678,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "ece870eb-a36f-486f-900b-434cc8eb9fc7",
+      "kind": "hallInnerShell",
+      "name": "hall-wall-seam",
+      "worldPos": [
+        0,
+        -0.4349999999999999,
+        0
+      ],
+      "bbox": {
+        "min": [
+          -58.499080657958984,
+          -0.4949999986588954,
+          -58.499080657958984
+        ],
+        "max": [
+          58.499080657958984,
+          -0.3750000013411044,
+          58.499080657958984
+        ]
+      },
+      "approxRadiusXZ": 58.499080657958984,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallInnerShell",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "86f130e5-12c2-408b-97ee-2d058df14648",
+      "kind": "hallColumn",
+      "name": "hall-pillar-0",
+      "worldPos": [
+        58.39908082008269,
+        20,
+        0
+      ],
+      "bbox": {
+        "min": [
+          57.52159459113982,
+          0,
+          -0.5849907994270327
+        ],
+        "max": [
+          59.27656704902556,
+          40,
+          0.5849907994270327
+        ]
+      },
+      "approxRadiusXZ": 59.27656704902556,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "730913b2-c612-4281-9c86-f61d99f4c0d0",
+      "kind": "hallColumn",
+      "name": "hall-pillar-1",
+      "worldPos": [
+        56.82492603855803,
+        19.504999999999995,
+        13.467754873881505
+      ],
+      "bbox": {
+        "min": [
+          55.836184401894556,
+          -0.495000000000001,
+          12.69617032641048
+        ],
+        "max": [
+          57.81366767522151,
+          39.504999999999995,
+          14.23933942135253
+        ]
+      },
+      "approxRadiusXZ": 57.81366767522151,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "6b7d218d-6a09-432f-a435-8f30483b65bb",
+      "kind": "hallColumn",
+      "name": "hall-pillar-2",
+      "worldPos": [
+        52.187324785710835,
+        19.504999999999995,
+        26.209459596513643
+      ],
+      "bbox": {
+        "min": [
+          51.14063105888552,
+          -0.495000000000001,
+          25.292877623670005
+        ],
+        "max": [
+          53.23401851253615,
+          39.504999999999995,
+          27.12604156935728
+        ]
+      },
+      "approxRadiusXZ": 53.23401851253615,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "50e04d63-a0c5-4537-8667-8497eb9623d5",
+      "kind": "hallColumn",
+      "name": "hall-pillar-3",
+      "worldPos": [
+        44.73629134548043,
+        19.504999999999995,
+        37.53820556823197
+      ],
+      "bbox": {
+        "min": [
+          43.688073058232995,
+          -0.495000000000001,
+          36.52603934142012
+        ],
+        "max": [
+          45.78450963272787,
+          39.504999999999995,
+          38.55037179504382
+        ]
+      },
+      "approxRadiusXZ": 45.78450963272787,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "c5ba7888-ce67-447a-8306-cbf0c887e56e",
+      "kind": "hallColumn",
+      "name": "hall-pillar-4",
+      "worldPos": [
+        34.87351285925777,
+        19.504999999999995,
+        46.84325716136456
+      ],
+      "bbox": {
+        "min": [
+          33.88027973077492,
+          -0.495000000000001,
+          45.79007282386139
+        ],
+        "max": [
+          35.86674598774062,
+          39.504999999999995,
+          47.89644149886774
+        ]
+      },
+      "approxRadiusXZ": 47.89644149886774,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "b53e2fdb-29f2-49b6-b1b6-2f152a2f2536",
+      "kind": "hallColumn",
+      "name": "hall-pillar-5",
+      "worldPos": [
+        23.130694268120166,
+        19.504999999999995,
+        53.622976636002804
+      ],
+      "bbox": {
+        "min": [
+          22.24599175344722,
+          -0.495000000000001,
+          52.58555162804971
+        ],
+        "max": [
+          24.01539678279311,
+          39.504999999999995,
+          54.6604016439559
+        ]
+      },
+      "approxRadiusXZ": 54.6604016439559,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "548b4067-907c-41c4-a353-9d31ee331a02",
+      "kind": "hallColumn",
+      "name": "hall-pillar-6",
+      "worldPos": [
+        10.140893961831146,
+        19.504999999999995,
+        57.511867560403964
+      ],
+      "bbox": {
+        "min": [
+          9.412416602530838,
+          -0.495000000000001,
+          56.54612973270715
+        ],
+        "max": [
+          10.869371321131455,
+          39.504999999999995,
+          58.47760538810078
+        ]
+      },
+      "approxRadiusXZ": 58.47760538810078,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "648a1662-06e1-4445-be1f-f0b849e74759",
+      "kind": "hallColumn",
+      "name": "hall-pillar-7",
+      "worldPos": [
+        -3.395604562812755,
+        19.504999999999995,
+        58.30027881823169
+      ],
+      "bbox": {
+        "min": [
+          -4.0306269370475745,
+          -0.495000000000001,
+          57.390262967160446
+        ],
+        "max": [
+          -2.760582188577936,
+          39.504999999999995,
+          59.21029466930293
+        ]
+      },
+      "approxRadiusXZ": 59.21029466930293,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "db0511f8-7860-487d-bfc1-eb1aff512898",
+      "kind": "hallColumn",
+      "name": "hall-pillar-8",
+      "worldPos": [
+        -16.74904516655594,
+        19.504999999999995,
+        55.945706954503834
+      ],
+      "bbox": {
+        "min": [
+          -17.56112610432837,
+          -0.495000000000001,
+          54.937307097593376
+        ],
+        "max": [
+          -15.936964228783511,
+          39.504999999999995,
+          56.95410681141429
+        ]
+      },
+      "approxRadiusXZ": 56.95410681141429,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "b4a8fb82-f8cb-4530-a1c7-b722ce351ef5",
+      "kind": "hallColumn",
+      "name": "hall-pillar-9",
+      "worldPos": [
+        -29.19954041004133,
+        19.504999999999995,
+        50.57508754785218
+      ],
+      "bbox": {
+        "min": [
+          -30.14490041779674,
+          -0.495000000000001,
+          49.52266678240313
+        ],
+        "max": [
+          -28.254180402285918,
+          39.504999999999995,
+          51.62750831330123
+        ]
+      },
+      "approxRadiusXZ": 51.62750831330123,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "2ba38b3e-416b-4a47-9212-90701414ab3d",
+      "kind": "hallColumn",
+      "name": "hall-pillar-10",
+      "worldPos": [
+        -40.07588087200208,
+        19.504999999999995,
+        42.47795208062234
+      ],
+      "bbox": {
+        "min": [
+          -41.103555347025065,
+          -0.495000000000001,
+          41.43824668250901
+        ],
+        "max": [
+          -39.0482063969791,
+          39.504999999999995,
+          43.517657478735664
+        ]
+      },
+      "approxRadiusXZ": 43.517657478735664,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "907bbb4a-720f-427c-b2b3-2bcf387b9b2f",
+      "kind": "hallColumn",
+      "name": "hall-pillar-11",
+      "worldPos": [
+        -48.79172022289807,
+        19.504999999999995,
+        32.09081922171806
+      ],
+      "bbox": {
+        "min": [
+          -49.84630696823651,
+          -0.495000000000001,
+          31.119879978070458
+        ],
+        "max": [
+          -47.73713347755963,
+          39.504999999999995,
+          33.061758465365656
+        ]
+      },
+      "approxRadiusXZ": 49.84630696823651,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "35a7e464-73e0-4ff8-b355-7605372c3ce1",
+      "kind": "hallColumn",
+      "name": "hall-pillar-12",
+      "worldPos": [
+        -54.87718530731157,
+        19.504999999999995,
+        19.973661992172
+      ],
+      "bbox": {
+        "min": [
+          -55.901831278554674,
+          -0.495000000000001,
+          19.123832488933427
+        ],
+        "max": [
+          -53.85253933606847,
+          39.504999999999995,
+          20.823491495410575
+        ]
+      },
+      "approxRadiusXZ": 55.901831278554674,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "9262449a-4266-42cf-b8e6-8d49d643fc6d",
+      "kind": "hallColumn",
+      "name": "hall-pillar-13",
+      "worldPos": [
+        -58.00420712737793,
+        19.504999999999995,
+        6.779719474638247
+      ],
+      "bbox": {
+        "min": [
+          -58.94367339499625,
+          -0.495000000000001,
+          6.096814240298458
+        ],
+        "max": [
+          -57.06474085975961,
+          39.504999999999995,
+          7.462624708978036
+        ]
+      },
+      "approxRadiusXZ": 58.94367339499625,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "e5728a32-c576-48e7-ba1e-8d88aaf2033a",
+      "kind": "hallColumn",
+      "name": "hall-pillar-14",
+      "worldPos": [
+        -58.00420712737793,
+        19.504999999999995,
+        -6.779719474638233
+      ],
+      "bbox": {
+        "min": [
+          -58.94367339499625,
+          -0.495000000000001,
+          -7.462624708978021
+        ],
+        "max": [
+          -57.06474085975961,
+          39.504999999999995,
+          -6.096814240298444
+        ]
+      },
+      "approxRadiusXZ": 58.94367339499625,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "c20f18ed-574d-4175-9858-f8f4b2239f58",
+      "kind": "hallColumn",
+      "name": "hall-pillar-15",
+      "worldPos": [
+        -54.87718530731158,
+        19.504999999999995,
+        -19.973661992171987
+      ],
+      "bbox": {
+        "min": [
+          -55.90183127855468,
+          -0.495000000000001,
+          -20.82349149541056
+        ],
+        "max": [
+          -53.852539336068475,
+          39.504999999999995,
+          -19.123832488933413
+        ]
+      },
+      "approxRadiusXZ": 55.90183127855468,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "99248b02-f2fa-48a2-9997-9a0cbae8b5f3",
+      "kind": "hallColumn",
+      "name": "hall-pillar-16",
+      "worldPos": [
+        -48.79172022289808,
+        19.504999999999995,
+        -32.09081922171804
+      ],
+      "bbox": {
+        "min": [
+          -49.84630696823652,
+          -0.495000000000001,
+          -33.06175846536564
+        ],
+        "max": [
+          -47.73713347755964,
+          39.504999999999995,
+          -31.119879978070443
+        ]
+      },
+      "approxRadiusXZ": 49.84630696823652,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "873bd2d2-98d7-4916-9763-d12f49e10e9c",
+      "kind": "hallColumn",
+      "name": "hall-pillar-17",
+      "worldPos": [
+        -40.07588087200209,
+        19.504999999999995,
+        -42.47795208062232
+      ],
+      "bbox": {
+        "min": [
+          -41.10355534702507,
+          -0.495000000000001,
+          -43.51765747873565
+        ],
+        "max": [
+          -39.048206396979104,
+          39.504999999999995,
+          -41.438246682508996
+        ]
+      },
+      "approxRadiusXZ": 43.51765747873565,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "fecbd239-dd1f-4793-9bac-0aa7b8b575e8",
+      "kind": "hallColumn",
+      "name": "hall-pillar-18",
+      "worldPos": [
+        -29.19954041004137,
+        19.504999999999995,
+        -50.57508754785216
+      ],
+      "bbox": {
+        "min": [
+          -30.144900417796784,
+          -0.495000000000001,
+          -51.62750831330121
+        ],
+        "max": [
+          -28.254180402285954,
+          39.504999999999995,
+          -49.522666782403114
+        ]
+      },
+      "approxRadiusXZ": 51.62750831330121,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "c852f6da-5e58-4f1d-adec-b0d079030171",
+      "kind": "hallColumn",
+      "name": "hall-pillar-19",
+      "worldPos": [
+        -16.749045166555966,
+        19.504999999999995,
+        -55.94570695450383
+      ],
+      "bbox": {
+        "min": [
+          -17.561126104328398,
+          -0.495000000000001,
+          -56.954106811414285
+        ],
+        "max": [
+          -15.936964228783536,
+          39.504999999999995,
+          -54.93730709759337
+        ]
+      },
+      "approxRadiusXZ": 56.954106811414285,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "7b71efe1-1ad4-492c-973c-60818bd2b6eb",
+      "kind": "hallColumn",
+      "name": "hall-pillar-20",
+      "worldPos": [
+        -3.3956045628127822,
+        19.504999999999995,
+        -58.30027881823169
+      ],
+      "bbox": {
+        "min": [
+          -4.030626937047602,
+          -0.495000000000001,
+          -59.21029466930293
+        ],
+        "max": [
+          -2.7605821885779624,
+          39.504999999999995,
+          -57.390262967160446
+        ]
+      },
+      "approxRadiusXZ": 59.21029466930293,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "c943c795-39f7-4f22-9115-147f5637f9f6",
+      "kind": "hallColumn",
+      "name": "hall-pillar-21",
+      "worldPos": [
+        10.140893961831122,
+        19.504999999999995,
+        -57.51186756040397
+      ],
+      "bbox": {
+        "min": [
+          9.412416602530815,
+          -0.495000000000001,
+          -58.477605388100784
+        ],
+        "max": [
+          10.869371321131428,
+          39.504999999999995,
+          -56.54612973270716
+        ]
+      },
+      "approxRadiusXZ": 58.477605388100784,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "a444ba60-7dec-4ffa-a182-88cbefcc8549",
+      "kind": "hallColumn",
+      "name": "hall-pillar-22",
+      "worldPos": [
+        23.130694268120145,
+        19.504999999999995,
+        -53.62297663600281
+      ],
+      "bbox": {
+        "min": [
+          22.2459917534472,
+          -0.495000000000001,
+          -54.66040164395591
+        ],
+        "max": [
+          24.01539678279309,
+          39.504999999999995,
+          -52.585551628049714
+        ]
+      },
+      "approxRadiusXZ": 54.66040164395591,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "ebafb7d0-88c1-45f5-b266-f67ccce2e0ef",
+      "kind": "hallColumn",
+      "name": "hall-pillar-23",
+      "worldPos": [
+        34.87351285925775,
+        19.504999999999995,
+        -46.843257161364576
+      ],
+      "bbox": {
+        "min": [
+          33.8802797307749,
+          -0.495000000000001,
+          -47.89644149886775
+        ],
+        "max": [
+          35.8667459877406,
+          39.504999999999995,
+          -45.7900728238614
+        ]
+      },
+      "approxRadiusXZ": 47.89644149886775,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "db431695-7b42-46ba-8e92-f3280d346c94",
+      "kind": "hallColumn",
+      "name": "hall-pillar-24",
+      "worldPos": [
+        44.73629134548042,
+        19.504999999999995,
+        -37.53820556823199
+      ],
+      "bbox": {
+        "min": [
+          43.68807305823298,
+          -0.495000000000001,
+          -38.55037179504384
+        ],
+        "max": [
+          45.784509632727854,
+          39.504999999999995,
+          -36.52603934142014
+        ]
+      },
+      "approxRadiusXZ": 45.784509632727854,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "48402813-a1d6-44e8-b15d-df630255f60a",
+      "kind": "hallColumn",
+      "name": "hall-pillar-25",
+      "worldPos": [
+        52.18732478571083,
+        19.504999999999995,
+        -26.20945959651366
+      ],
+      "bbox": {
+        "min": [
+          51.14063105888551,
+          -0.495000000000001,
+          -27.126041569357298
+        ],
+        "max": [
+          53.234018512536146,
+          39.504999999999995,
+          -25.292877623670023
+        ]
+      },
+      "approxRadiusXZ": 53.234018512536146,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    },
+    {
+      "id": "60478017-034b-420e-8c63-b99fc21f9f70",
+      "kind": "hallColumn",
+      "name": "hall-pillar-26",
+      "worldPos": [
+        56.82492603855803,
+        19.504999999999995,
+        -13.467754873881521
+      ],
+      "bbox": {
+        "min": [
+          55.836184401894556,
+          -0.495000000000001,
+          -14.239339421352547
+        ],
+        "max": [
+          57.81366767522151,
+          39.504999999999995,
+          -12.696170326410495
+        ]
+      },
+      "approxRadiusXZ": 57.81366767522151,
+      "upNormal": [
+        0,
+        1,
+        0
+      ],
+      "debugTag": {
+        "kind": "hallColumn",
+        "sourceFile": "src/render/goldenHallScene.ts",
+        "sourceFunction": "createGoldenHall"
+      }
+    }
+  ],
+  "violations": [
+    {
+      "invariant": "INV_HALL_FLOOR_NOT_ABOVE_TOWER",
+      "severity": "warning",
+      "message": "Hall floor top (0.0300) is above ringA (-0.4940)",
+      "objectsInvolved": [
+        "hall-base-steps",
+        "hall-base-center"
+      ],
+      "details": {
+        "hallFloor": {
+          "min": [
+            -56.89908218383789,
+            -7.5000000047683715,
+            -56.89908218383789
+          ],
+          "max": [
+            56.89908218383789,
+            0.03000000037252968,
+            56.89908218383789
+          ]
+        },
+        "ringATop": -0.49399999995250243,
+        "epsilon": 0.01
+      }
+    }
+  ]
+}

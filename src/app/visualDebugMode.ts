@@ -11,21 +11,26 @@ import {
   renderScene,
   renderFrame,
   resizeRenderer,
+  createHallRadiiOverlay,
 } from '../render';
 import {
   createVisualDebugControls,
   VisualControlState,
   VisualDebugControls,
 } from './visualDebugControls';
+import { ObjectInspector } from '../render/debug/objectInspector';
+import { ObjectDebugInfo } from '../render/debug/objectInspectorTypes';
 import { OrbitCameraController } from './orbitCamera';
 import { QualityLevel, RenderModeConfig } from '../render/renderConfig';
 import { applyMaterialDebugMode, createMaterialsSnapshot } from '../render/materialDebug';
 import { deriveEnvOverrides, applyEnvDebugMode } from '../render/envDebug';
+import { applyHallMaterialPreview } from '../render/goldenHallDebug';
 import {
   createDestructionDebugPanel,
   DestructionDebugPanel,
   FragmentDebugFilter,
 } from './destructionDebugPanel';
+import { createHallGeometryDebugPanel, HallGeometryDebugPanel } from './hallGeometryDebugPanel';
 import { startLineDestructionFromBoard } from './destruction/destructionStarter';
 import { DestructionSimulationState } from './destruction/destructionSimulationState';
 import { launchScheduledExplosions } from './destruction/orchestrator';
@@ -40,11 +45,19 @@ import { buildShardGeometryLibrary, makeFragmentFromTemplate } from './destructi
 import { getDefaultShardTemplateSet } from './destruction/shardTemplateSet';
 import { FACE_NORMALS, CubeFace } from './destruction/cubeSpace';
 import { FaceUvRect, DEFAULT_FACE_UV_RECTS } from './destruction/faceUvRect';
+import { computeHallLayout, createDefaultHallLayoutConfig, HallLayoutRadii } from '../render/hallLayout';
+import { deriveTowerRadii, measureCameraOrbit } from '../render/hallRadiiSources';
+import { createGoldenHall, type GoldenHallInstance } from '../render/goldenHallScene';
+import { collectHallSnapshot } from '../render/debug/hallGeometrySnapshot';
+import { analyzeHallGeometry, HallGeometryViolation } from '../render/debug/hallGeometryMonitor';
+import { buildHallBugTemplate, buildHallGeometryFrameLog } from '../render/debug/hallGeometryReport';
+import { PlatformLayout } from '../render/platformLayout';
 
 type CameraMode = 'game' | 'inspect';
 
 const QUERY_FLAG = 'visualDebug';
 const ULTRA2_FLAG = 'ultra2lab';
+const LAB_FLAG = 'lab';
 const CAMERA_TOGGLE_KEY = 'c';
 const CLOSEUP_KEY = 'v';
 const TRANSITION_DURATION_MS = 450;
@@ -68,21 +81,51 @@ function isUltra2LabModeEnabled(): boolean {
   return value === '1' || value === 'true';
 }
 
+function isHallGeometryLabModeEnabled(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  const value = params.get(LAB_FLAG);
+  return value === 'hallGeometry';
+}
+
 export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   const ultra2Lab = isUltra2LabModeEnabled();
+  const hallGeometryLab = isHallGeometryLabModeEnabled();
   const qualityFromUrl = ultra2Lab ? 'ultra2' : parseQualityFromUrl(window.location.search);
   const baseOverrides: RenderConfigOverrides = { renderMode: { ...VISUAL_DEBUG_RENDER_MODE } };
   const renderOverrides: RenderConfigOverrides = qualityFromUrl
     ? { ...baseOverrides, quality: { level: qualityFromUrl } }
     : baseOverrides;
+  let labPlatformOffset = 0;
+  let labFootprintOffset = 0;
+  let labFootprintScale = 1;
   let renderCtx = createRenderContext(canvas, renderOverrides);
-  let snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions);
+  let snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions, hallGeometryLab ? 2 : undefined);
   let controlState = configToControlState(renderCtx.renderConfig);
+  if (hallGeometryLab) {
+    controlState.showHallShell = false;
+    controlState.showHallFx = false;
+    controlState.autoRotateEnabled = false;
+    controlState.hallMaterialMode = 'off';
+  }
+  if (hallGeometryLab) {
+    renderCtx.activePiece.mesh.visible = false;
+    renderCtx.ghost?.mesh && (renderCtx.ghost.mesh.visible = false);
+    renderCtx.fragments?.meshesByTemplate.forEach((m) => (m.visible = false));
+    applyHallGeometryLabTransforms();
+  }
   let materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
+  let hallOverlay: ReturnType<typeof createHallRadiiOverlay> | null = null;
   let destructionSim: DestructionSimulationState | null = null;
   let fragmentFilter: FragmentDebugFilter = 'all';
   let showLockFxBursts = true;
   let fractureDebugGroup: THREE.Group | null = null;
+  let hallGeometryPanel: HallGeometryDebugPanel | null = null;
+  let hallGeometryOverlay: THREE.Group | null = null;
+  let lastHallSnapshot: ReturnType<typeof collectHallSnapshot> | null = null;
+  let hallViolations: HallGeometryViolation[] = [];
+  let hallAutoAnalyze = false;
+  let hallLastAnalyzeMs = 0;
+  let selectedViolation: HallGeometryViolation | null = null;
   let showSourceRegion = false;
   let sourceRegionGroup: THREE.Group | null = null;
   let sourceOverlay: {
@@ -99,6 +142,8 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   let gameRotationAngle = 0;
   let lastFrameTime = performance.now();
   const orbitControllerRef: { current: OrbitCameraController | null } = { current: null };
+  let objectInspector: ObjectInspector | null = null;
+  let inspectorHighlight: THREE.LineSegments | null = null;
   const createOrbit = (placement = renderCtx.cameraBasePlacement) => {
     const ctrl = new OrbitCameraController(renderCtx.camera, placement, {
       minDistance: renderCtx.renderConfig.board.towerRadius * 1.25,
@@ -112,6 +157,380 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     });
     ctrl.attach(canvas);
     orbitControllerRef.current = ctrl;
+  };
+  const disposeHallRadiiOverlay = () => {
+    if (hallOverlay) {
+      renderCtx.scene.remove(hallOverlay.group);
+      hallOverlay.dispose();
+      hallOverlay = null;
+    }
+  };
+
+  const clearInspectorHighlight = () => {
+    if (inspectorHighlight) {
+      renderCtx.scene.remove(inspectorHighlight);
+      inspectorHighlight.geometry.dispose();
+      (inspectorHighlight.material as THREE.Material).dispose();
+      inspectorHighlight = null;
+    }
+  };
+
+  const updateInspectorHighlight = (info: ObjectDebugInfo | null) => {
+    clearInspectorHighlight();
+    if (!info?.object) {
+      return;
+    }
+    const box = new THREE.Box3();
+    if ((info.object as THREE.Mesh).isInstancedMesh && info.instanceId !== undefined) {
+      const inst = info.object as THREE.InstancedMesh;
+      const geom = inst.geometry as THREE.BufferGeometry;
+      if (!geom.boundingBox) {
+        geom.computeBoundingBox();
+      }
+      const bbox = geom.boundingBox;
+      const matrix = new THREE.Matrix4();
+      inst.getMatrixAt(info.instanceId, matrix);
+      box.copy(bbox ?? new THREE.Box3()).applyMatrix4(matrix).applyMatrix4(inst.matrixWorld);
+    } else {
+      box.setFromObject(info.object);
+    }
+    if (!box.isEmpty()) {
+      const helper = new THREE.Box3Helper(box, 0x66ff66);
+      helper.renderOrder = 999;
+      helper.userData.debugSelectable = false;
+      // Avoid inspector ray hits on the helper itself.
+      helper.raycast = () => undefined;
+      inspectorHighlight = helper;
+      renderCtx.scene.add(helper);
+    }
+  };
+
+  const ensureInspector = () => {
+    if (controlState.inspectorEnabled) {
+      if (!objectInspector) {
+        objectInspector = new ObjectInspector({
+          camera: renderCtx.camera,
+          scene: renderCtx.scene,
+          renderMode: renderCtx.renderConfig.renderMode,
+          domElement: canvas,
+          onSelect: (_sel, info) => {
+            updateInspectorUI(info ?? null);
+            updateInspectorHighlight(info ?? null);
+          },
+        });
+      }
+      objectInspector.enable();
+      canvas.style.cursor = 'crosshair';
+      orbitControllerRef.current?.detach(canvas);
+    } else if (objectInspector) {
+      objectInspector.disable();
+      objectInspector = null;
+      updateInspectorUI(null);
+      clearInspectorHighlight();
+      canvas.style.cursor = '';
+      if (cameraMode === 'inspect' && !orbitControllerRef.current) {
+        createOrbit();
+      }
+    }
+  };
+
+  const ensureHallGeometryPanel = (ctx: RenderContext) => {
+    if (hallGeometryPanel) {
+      return;
+    }
+    hallGeometryPanel = createHallGeometryDebugPanel({
+      onAnalyze: () => runHallAnalysis(ctx),
+      onToggleAuto: (enabled) => {
+        hallAutoAnalyze = enabled;
+        hallGeometryPanel?.setAutoAnalyze(enabled);
+      },
+      onSelectViolation: (v) => {
+        selectedViolation = v ?? null;
+        rebuildHallGeometryOverlay(ctx);
+      },
+      onCopyReport: () => copyHallGeometryReport(ctx),
+      onCopySnapshot: () => copyHallGeometrySnapshotJson(ctx),
+      onCopyBugTemplate: () => copyHallBugTemplate(ctx),
+      onPlatformOffsetChange: (v) => {
+        labPlatformOffset = v;
+        applyHallGeometryLabTransforms();
+        runHallAnalysis(ctx);
+      },
+      onFootprintOffsetChange: (v) => {
+        labFootprintOffset = v;
+        applyHallGeometryLabTransforms();
+        runHallAnalysis(ctx);
+      },
+      onFootprintScaleChange: (v) => {
+        labFootprintScale = v;
+        applyHallGeometryLabTransforms();
+        runHallAnalysis(ctx);
+      },
+    });
+  };
+  const ensureHallRadiiOverlay = (state: VisualControlState) => {
+    if (!state.showHallRadii) {
+      disposeHallRadiiOverlay();
+      return;
+    }
+    if (!hallOverlay) {
+      hallOverlay = createHallRadiiOverlay(renderCtx.hallLayout, renderCtx.towerBounds.center);
+      renderCtx.scene.add(hallOverlay.group);
+    } else {
+      hallOverlay.group.visible = true;
+    }
+    hallOverlay.update(renderCtx.hallLayout, renderCtx.towerBounds.center);
+    validateHallOrdering(renderCtx.hallLayout);
+  };
+
+  function measureHallFloorTop(hall: GoldenHallInstance): number | null {
+    let box: THREE.Box3 | null = null;
+    hall.baseGroup.updateMatrixWorld(true);
+    hall.baseGroup.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const tag = (mesh as any).userData?.debugTag;
+      const name = mesh.name ?? '';
+      const parentName = mesh.parent?.name ?? '';
+      const isFloorTagged = tag?.kind === 'hallFloor';
+      const isFloorByName =
+        name.includes('step') ||
+        name.includes('center') ||
+        parentName.includes('hall-base');
+      if (!isFloorTagged && !isFloorByName) return;
+      const b = new THREE.Box3().setFromObject(mesh);
+      box = box ? box.union(b) : b;
+    });
+    return box ? box.max.y : null;
+  }
+
+  function alignHallInLab(platformLayout: PlatformLayout, hall: GoldenHallInstance, platformOffset: number): void {
+    const ringATop = platformLayout.baseY + platformLayout.ringA.height + platformOffset;
+    hall.baseGroup.position.y = ringATop;
+    hall.hallGroup.position.y = ringATop;
+    hall.fxGroup.position.y = ringATop;
+    const hallFloorTop = measureHallFloorTop(hall);
+    if (hallFloorTop === null) {
+      return;
+    }
+    const desiredTop = ringATop - 0.002;
+    const delta = hallFloorTop - desiredTop;
+    if (Math.abs(delta) > 1e-6) {
+      hall.baseGroup.position.y -= delta;
+      hall.hallGroup.position.y -= delta;
+      hall.fxGroup.position.y -= delta;
+      hall.baseGroup.updateMatrixWorld(true);
+    }
+  }
+
+  function applyHallGeometryLabTransforms(): void {
+    if (!hallGeometryLab) {
+      return;
+    }
+    if (renderCtx.goldenPlatform?.mesh) {
+      renderCtx.goldenPlatform.mesh.position.y = labPlatformOffset;
+    }
+    if (renderCtx.footprintDecor) {
+      renderCtx.footprintDecor.position.y = labFootprintOffset;
+      renderCtx.footprintDecor.scale.set(labFootprintScale, 1, labFootprintScale);
+    }
+    if (renderCtx.goldenPlatform?.layout && renderCtx.goldenHall) {
+      alignHallInLab(renderCtx.goldenPlatform.layout, renderCtx.goldenHall, labPlatformOffset);
+    }
+  }
+
+  const disposeHallGeometryOverlay = () => {
+    if (hallGeometryOverlay) {
+      renderCtx.scene.remove(hallGeometryOverlay);
+      hallGeometryOverlay.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh) {
+          mesh.geometry?.dispose();
+          const mat = mesh.material as THREE.Material | THREE.Material[];
+          if (Array.isArray(mat)) {
+            mat.forEach((m) => m.dispose());
+          } else {
+            mat?.dispose();
+          }
+        }
+        if ((obj as THREE.LineSegments).isLine) {
+          (obj as THREE.LineSegments).geometry?.dispose();
+          (obj as THREE.LineSegments).material?.dispose?.();
+        }
+      });
+      hallGeometryOverlay = null;
+    }
+  };
+
+  const rebuildHallGeometryOverlay = (ctx: RenderContext, snap: ReturnType<typeof collectHallSnapshot> | null = lastHallSnapshot) => {
+    disposeHallGeometryOverlay();
+    if (!snap) {
+      return;
+    }
+    const group = new THREE.Group();
+    group.name = 'hall-geometry-debug-overlay';
+    group.userData.debugSelectable = false;
+
+    const addCircle = (radius: number, y: number, color: number, name: string) => {
+      const segments = Math.max(48, Math.round(radius * 16));
+      const pts: number[] = [];
+      for (let i = 0; i <= segments; i += 1) {
+        const t = (i / segments) * Math.PI * 2;
+        pts.push(Math.cos(t) * radius, 0, Math.sin(t) * radius);
+      }
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      const mat = new THREE.LineBasicMaterial({ color, depthWrite: false, transparent: true, opacity: 0.5 });
+      const line = new THREE.LineLoop(geom, mat);
+      line.position.y = y;
+      line.name = name;
+      line.userData.debugSelectable = false;
+      (line as any).raycast = () => undefined;
+      group.add(line);
+    };
+
+    const floorY = -ctx.renderConfig.board.blockSize * 0.5;
+    const towerHeight = ctx.renderConfig.boardDimensions.height * ctx.renderConfig.board.verticalSpacing;
+    addCircle(ctx.renderConfig.board.towerRadius, floorY + towerHeight * 0.5, 0x3498db, 'tower-cylinder');
+    const footprintRadius =
+      snap.footprints.length > 0
+        ? Math.max(...snap.footprints.map((f) => f.approxRadiusXZ ?? 0))
+        : ctx.renderConfig.board.towerRadius;
+    addCircle(footprintRadius, floorY + 0.001, 0xf39c12, 'footprint-outline');
+    addCircle(ctx.hallLayout.hallInnerRadius, floorY + 0.002, 0xe67e22, 'hall-inner-outline');
+    addCircle(ctx.goldenPlatform?.layout.ringA.outer ?? ctx.hallLayout.platformOuterRadius, ctx.goldenPlatform?.layout.baseY ?? floorY, 0x2ecc71, 'ringA-outline');
+    addCircle(ctx.goldenPlatform?.layout.ringB.outer ?? ctx.hallLayout.platformOuterRadius, ctx.goldenPlatform?.layout.baseY ?? floorY, 0x9b59b6, 'ringB-outline');
+    addCircle(ctx.goldenPlatform?.layout.ringC.outer ?? ctx.hallLayout.platformOuterRadius, ctx.goldenPlatform?.layout.baseY ?? floorY, 0xe74c3c, 'ringC-outline');
+
+    const boxColor = (v: HallGeometryViolation) => (v.severity === 'error' ? 0xff4d62 : 0xf1c40f);
+    const snapMap = new Map<string, ReturnType<typeof collectHallSnapshot>['towerCells'][number]>();
+    [...snap.towerCells, ...snap.platformRings, ...snap.platformSides, ...snap.footprints, ...snap.hallFloor, ...snap.hallShells, ...snap.hallColumns, ...snap.others].forEach(
+      (obj) => snapMap.set(obj.name || obj.id, obj)
+    );
+
+    hallViolations.forEach((v) => {
+      v.objectsInvolved.forEach((name) => {
+        const entry = snapMap.get(name);
+        if (!entry) {
+          return;
+        }
+        const b = new THREE.Box3();
+        b.min.set(entry.bbox.min[0], entry.bbox.min[1], entry.bbox.min[2]);
+        b.max.set(entry.bbox.max[0], entry.bbox.max[1], entry.bbox.max[2]);
+        const helper = new THREE.Box3Helper(b, boxColor(v));
+        helper.userData.debugSelectable = false;
+        (helper as any).raycast = () => undefined;
+        helper.visible = !selectedViolation || selectedViolation === v;
+        group.add(helper);
+      });
+    });
+
+    hallGeometryOverlay = group;
+    ctx.scene.add(group);
+  };
+
+  const runHallAnalysis = (ctx: RenderContext) => {
+    ensureHallGeometryPanel(ctx);
+    lastHallSnapshot = collectHallSnapshot(ctx.scene);
+    const platformLayout = ctx.goldenPlatform?.layout;
+    if (!platformLayout) {
+      hallViolations = [];
+      hallGeometryPanel?.setViolations(hallViolations);
+      disposeHallGeometryOverlay();
+      return;
+    }
+    const result = analyzeHallGeometry({
+      snapshot: lastHallSnapshot,
+      hallLayout: ctx.hallLayout,
+      platformLayout,
+    });
+    hallViolations = result.violations;
+    hallGeometryPanel?.setViolations(hallViolations);
+    hallGeometryPanel?.setLog(
+      hallViolations.length
+        ? hallViolations.map((v) => `${v.invariant} (${v.severity}): ${v.message}`)
+        : ['No violations']
+    );
+    rebuildHallGeometryOverlay(ctx, lastHallSnapshot);
+    hallLastAnalyzeMs = performance.now();
+  };
+
+  const copyHallGeometryReport = (ctx: RenderContext) => {
+    const lines: string[] = [];
+    lines.push('HALL_GEOMETRY_REPORT_BEGIN');
+    lines.push(`Scenario: ${hallGeometryLab ? 'hallGeometryLab' : 'visualDebug'}`);
+    lines.push(`HallLayout:`);
+    lines.push(
+      `  towerRadius: ${ctx.hallLayout.towerOuterRadius.toFixed(3)} | hallInner: ${ctx.hallLayout.hallInnerRadius.toFixed(
+        3
+      )} | platformOuter: ${ctx.hallLayout.platformOuterRadius.toFixed(3)}`
+    );
+    if (ctx.goldenPlatform?.layout) {
+      const l = ctx.goldenPlatform.layout;
+      lines.push(
+        `  ringA.outer: ${l.ringA.outer.toFixed(3)} yTop: ${(l.baseY + l.ringA.height).toFixed(3)}`
+      );
+      lines.push(
+        `  ringB.outer: ${l.ringB.outer.toFixed(3)} yTop: ${(l.baseY + l.ringB.height).toFixed(3)}`
+      );
+      lines.push(
+        `  ringC.outer: ${l.ringC.outer.toFixed(3)} yTop: ${(l.baseY + l.ringC.height).toFixed(3)}`
+      );
+    }
+    lines.push('Violations:');
+    if (!hallViolations.length) {
+      lines.push('- none');
+    } else {
+      hallViolations.forEach((v) => {
+        lines.push(`- ${v.invariant} (${v.severity})`);
+        lines.push(`  message: "${v.message}"`);
+        lines.push(`  objects: ${v.objectsInvolved.join(', ')}`);
+        lines.push(`  details: ${JSON.stringify(v.details)}`);
+      });
+    }
+    lines.push('HALL_GEOMETRY_REPORT_END');
+    const text = lines.join('\n');
+    copyToClipboardOrConsole(text, '[hallGeometry] report copy failed');
+  };
+
+  const copyHallGeometrySnapshotJson = (ctx: RenderContext) => {
+    if (!lastHallSnapshot || !ctx.goldenPlatform?.layout) {
+      return;
+    }
+    const frame = buildHallGeometryFrameLog({
+      hallLayout: ctx.hallLayout,
+      platformLayout: ctx.goldenPlatform.layout,
+      snapshot: lastHallSnapshot,
+      violations: hallViolations,
+      engineVersion: 'dev',
+    });
+    const text = JSON.stringify(frame, null, 2);
+    copyToClipboardOrConsole(text, '[hallGeometry] JSON snapshot copy failed');
+  };
+
+  const copyHallBugTemplate = (ctx: RenderContext) => {
+    const reportLines: string[] = [];
+    reportLines.push('Violations:');
+    if (!hallViolations.length) {
+      reportLines.push('- none');
+    } else {
+      hallViolations.forEach((v) => {
+        reportLines.push(`- ${v.invariant} (${v.severity}): ${v.message}`);
+      });
+    }
+    const text = buildHallBugTemplate(reportLines.join('\n'));
+    copyToClipboardOrConsole(text, '[hallGeometry] bug template copy failed');
+  };
+
+  const copyToClipboardOrConsole = (text: string, failLog: string) => {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {
+        console.info(failLog, 'dumping to console');
+        console.log(text);
+      });
+    } else {
+      console.log(text);
+    }
   };
   createOrbit();
   const switchToGame = () => {
@@ -128,11 +547,46 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     orbitControllerRef.current?.detach(canvas);
     createOrbit(basePlacement);
   };
+
+  const updateInspectorUI = (info: ObjectDebugInfo | null) => {
+    if (typeof controls?.updateInspector !== 'function') {
+      return;
+    }
+    if (!info) {
+      controls.updateInspector(null);
+      return;
+    }
+    const tag = info.debugTag;
+    const detailsParts: string[] = [];
+    if (tag?.kind) {
+      detailsParts.push(`kind: ${tag.kind}`);
+    }
+    if (tag?.boardCoords) {
+      detailsParts.push(
+        `boardCoords: ring=${tag.boardCoords.ring}, level=${tag.boardCoords.level}, height=${tag.boardCoords.height}`
+      );
+    }
+    if (tag?.hallSection) {
+      detailsParts.push(
+        `hallSection: ring=${tag.hallSection.ring}, seg=${tag.hallSection.segmentIndex}${
+          tag.hallSection.levelBand ? `, band=${tag.hallSection.levelBand}` : ''
+        }`
+      );
+    }
+    const selectedLabel = `${info.objectType}${info.name ? ` "${info.name}"` : ''}`;
+    controls.updateInspector({
+      selectedLabel,
+      summary: info.summaryForLLM,
+      json: info.jsonForLLM,
+      details: detailsParts.join('\n') || 'debugTag: —',
+    });
+  };
   const controls = createVisualDebugControls(
     controlState,
     (next) => {
+      const prev = controlState;
       controlState = next;
-      if (controlState.materialDebugMode !== next.materialDebugMode) {
+      if (prev.materialDebugMode !== next.materialDebugMode) {
         applyMaterialDebugMode(
           renderCtx.board,
           renderCtx.activePiece,
@@ -140,9 +594,53 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
           materialsSnapshot
         );
       }
-      if (controlState.envDebugMode !== next.envDebugMode) {
+      if (prev.envDebugMode !== next.envDebugMode) {
         applyEnvDebugMode(renderCtx, next.envDebugMode);
       }
+      if (prev.hallMaterialMode !== next.hallMaterialMode) {
+        const hallOnly = next.hallMaterialMode !== 'off';
+        renderCtx.board.mesh.visible = !hallOnly;
+        renderCtx.activePiece.mesh.visible = !hallOnly;
+        renderCtx.boardPlaceholder.visible = !hallOnly;
+        applyHallMaterialPreview(
+          renderCtx.scene,
+          next.hallMaterialMode === 'hallOnly' ? 'off' : next.hallMaterialMode
+        );
+      }
+      // Hall runtime toggles: visibility + brightness (geometry changes force rebuild).
+      const needsRebuild =
+        prev.qualityLevel !== next.qualityLevel ||
+        prev.goldenHallEnabled !== next.goldenHallEnabled ||
+        prev.hallWallHeight !== next.hallWallHeight;
+      const hallVisibilityChanged =
+        prev.showHallBase !== next.showHallBase ||
+        prev.showHallShell !== next.showHallShell ||
+        prev.showHallFx !== next.showHallFx ||
+        prev.envDebugMode !== next.envDebugMode ||
+        prev.goldenHallEnabled !== next.goldenHallEnabled;
+      const hallBrightnessChanged = prev.hallBrightness !== next.hallBrightness;
+      const hallRadiiChanged = prev.showHallRadii !== next.showHallRadii;
+      const inspectorChanged = prev.inspectorEnabled !== next.inspectorEnabled;
+      if (needsRebuild) {
+        pendingRebuild = true;
+      } else {
+        updateHallVisibility(renderCtx, controlState);
+      }
+      if (inspectorChanged) {
+        ensureInspector();
+      }
+      if (hallBrightnessChanged) {
+        applyHallBrightness(renderCtx, controlState.hallBrightness);
+      }
+      if (hallRadiiChanged) {
+        if (controlState.showHallRadii) {
+          ensureHallRadiiOverlay(controlState);
+        } else {
+          disposeHallRadiiOverlay();
+        }
+      }
+      ensureInspector();
+      // existing toggles may also imply rebuild (e.g., key/ambient) through pendingRebuild flag.
       pendingRebuild = true;
     },
     () => {
@@ -150,6 +648,19 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
       controlState.materialDebugMode = 'none';
       controlState.envDebugMode = 'full';
       controlState.autoRotateEnabled = false;
+      controlState.hallMaterialMode = 'off';
+      controlState.goldenHallEnabled = renderCtx.renderConfig.goldenHall.enabled;
+      controlState.showHallBase = true;
+      controlState.showHallShell = true;
+      controlState.showHallFx = true;
+      controlState.hallBrightness = 1;
+      controlState.showHallRadii = false;
+      renderCtx.board.mesh.visible = true;
+      renderCtx.activePiece.mesh.visible = true;
+      renderCtx.boardPlaceholder.visible = true;
+      applyHallMaterialPreview(renderCtx.scene, 'off');
+      updateHallVisibility(renderCtx, controlState);
+      applyHallBrightness(renderCtx, controlState.hallBrightness);
       pendingRebuild = true;
     }
   );
@@ -428,11 +939,13 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     destructionSim = null;
     clearSourceRegionGroup();
     removeFractureDebugGroup(renderCtx);
+    disposeHallRadiiOverlay();
+    disposeHallGeometryOverlay();
 
     disposeRenderResources(renderCtx);
     const overrides = controlStateToOverrides(controlState, cameraOrientation);
     renderCtx = createRenderContext(canvas, overrides);
-    snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions);
+    snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions, hallGeometryLab ? 2 : undefined);
     orbitControllerRef.current?.detach(canvas);
     createOrbit();
     materialsSnapshot = createMaterialsSnapshot(renderCtx.board, renderCtx.activePiece);
@@ -443,6 +956,28 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
       materialsSnapshot
     );
     applyEnvDebugMode(renderCtx, controlState.envDebugMode);
+    const hallOnly = controlState.hallMaterialMode !== 'off';
+    renderCtx.board.mesh.visible = !hallOnly;
+    renderCtx.activePiece.mesh.visible = !hallOnly;
+    renderCtx.boardPlaceholder.visible = !hallOnly;
+    applyHallMaterialPreview(
+      renderCtx.scene,
+      controlState.hallMaterialMode === 'hallOnly' ? 'off' : controlState.hallMaterialMode
+    );
+    updateHallVisibility(renderCtx, controlState);
+    applyHallBrightness(renderCtx, controlState.hallBrightness);
+    ensureHallRadiiOverlay(controlState);
+    if (hallGeometryLab) {
+      renderCtx.activePiece.mesh.visible = false;
+      renderCtx.ghost?.mesh && (renderCtx.ghost.mesh.visible = false);
+      renderCtx.fragments?.meshesByTemplate.forEach((m) => (m.visible = false));
+      applyHallGeometryLabTransforms();
+      hallGeometryPanel?.setPlatformOffset(labPlatformOffset);
+      hallGeometryPanel?.setFootprintOffset(labFootprintOffset);
+      hallGeometryPanel?.setFootprintScale(labFootprintScale);
+    }
+    ensureHallGeometryPanel(renderCtx);
+    runHallAnalysis(renderCtx);
     cameraMode = 'game';
     transitionCamera(renderCtx, renderCtx.cameraBasePlacement);
     ensureDestructionPanel(renderCtx);
@@ -476,6 +1011,16 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
         return gameRotationAngle;
       }
     );
+    updateHallLayoutFromCamera(renderCtx, controlState);
+    if (controlState.showHallRadii) {
+      ensureHallRadiiOverlay(controlState);
+    }
+    if (hallGeometryLab) {
+      applyHallGeometryLabTransforms();
+    }
+    if (hallAutoAnalyze && now - hallLastAnalyzeMs > 1000) {
+      runHallAnalysis(renderCtx);
+    }
     renderFrame(renderCtx, dt);
     requestAnimationFrame(loop);
   }
@@ -483,6 +1028,9 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   requestAnimationFrame(loop);
 
   ensureDestructionPanel(renderCtx);
+  attachPanelDisposalOnUnload(() => hallGeometryPanel?.dispose());
+  ensureHallGeometryPanel(renderCtx);
+  runHallAnalysis(renderCtx);
   window.addEventListener('resize', () => {
     resizeRenderer(renderCtx, canvas.clientWidth, canvas.clientHeight);
   });
@@ -704,9 +1252,9 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   }
 }
 
-function createStaticSnapshot(dimensions: BoardDimensions): GameState {
+function createStaticSnapshot(dimensions: BoardDimensions, filledLayersOverride?: number): GameState {
   const base = createInitialGameState({ board: dimensions });
-  const board = buildStaticBoard(dimensions);
+  const board = buildStaticBoard(dimensions, filledLayersOverride);
   return {
     ...base,
     board,
@@ -716,12 +1264,10 @@ function createStaticSnapshot(dimensions: BoardDimensions): GameState {
   };
 }
 
-function buildStaticBoard(dimensions: BoardDimensions): Board {
+function buildStaticBoard(dimensions: BoardDimensions, filledLayersOverride?: number): Board {
   const board = Board.createEmpty(dimensions);
-  const filledLayers = Math.min(
-    dimensions.height,
-    Math.max(4, Math.floor(dimensions.height * 0.3))
-  );
+  const defaultLayers = Math.min(dimensions.height, Math.max(4, Math.floor(dimensions.height * 0.3)));
+  const filledLayers = filledLayersOverride ? Math.min(dimensions.height, filledLayersOverride) : defaultLayers;
 
   for (let y = 0; y < filledLayers; y += 1) {
     for (let x = 0; x < dimensions.width; x += 1) {
@@ -744,6 +1290,13 @@ function configToControlState(config: RenderConfig): VisualControlState {
     cameraDistance: delta.length(),
     cameraHeight: config.camera.position.y,
     towerRadius: config.board.towerRadius,
+    goldenHallEnabled: config.goldenHall.enabled,
+    showHallBase: true,
+    showHallShell: true,
+    showHallFx: true,
+    showHallRadii: false,
+    hallWallHeight: config.goldenHall.wallHeight,
+    hallBrightness: 1,
     ambientIntensity: config.lights.ambient.intensity,
     hemisphereIntensity: config.lights.hemisphere.intensity,
     keyIntensity: config.lights.key.intensity,
@@ -751,6 +1304,8 @@ function configToControlState(config: RenderConfig): VisualControlState {
     qualityLevel: config.quality.level,
     materialDebugMode: 'none',
     envDebugMode: 'full',
+    hallMaterialMode: 'off',
+    inspectorEnabled: false,
   };
 }
 
@@ -798,8 +1353,87 @@ function controlStateToOverrides(
     },
     quality: { level: state.qualityLevel as QualityLevel },
     environment: deriveEnvOverrides(state.envDebugMode),
+    goldenHall: {
+      enabled: state.goldenHallEnabled,
+      wallHeight: state.hallWallHeight,
+    },
     renderMode: { ...VISUAL_DEBUG_RENDER_MODE },
   };
+}
+
+const HALL_LAYOUT_EPS = 1e-3;
+
+function hallLayoutsDiffer(a: HallLayoutRadii, b: HallLayoutRadii): boolean {
+  return (
+    Math.abs(a.hallInnerRadius - b.hallInnerRadius) > HALL_LAYOUT_EPS ||
+    Math.abs(a.hallOuterRadius - b.hallOuterRadius) > HALL_LAYOUT_EPS ||
+    Math.abs(a.platformOuterRadius - b.platformOuterRadius) > HALL_LAYOUT_EPS
+  );
+}
+
+function validateHallOrdering(layout: HallLayoutRadii): void {
+  const okHallOverCamera = layout.hallInnerRadius > layout.cameraOrbitRadius + 1e-3;
+  const okHallOverTower = layout.hallInnerRadius > layout.towerOuterRadius + 1e-3;
+  if (!okHallOverCamera || !okHallOverTower) {
+    console.warn('[hallLayout] ordering violated', {
+      hallInnerRadius: layout.hallInnerRadius,
+      hallOuterRadius: layout.hallOuterRadius,
+      platformOuterRadius: layout.platformOuterRadius,
+      cameraOrbitRadius: layout.cameraOrbitRadius,
+      towerOuterRadius: layout.towerOuterRadius,
+    });
+  }
+}
+
+function rebuildHallInstance(ctx: RenderContext, state: VisualControlState): void {
+  if (ctx.goldenHall) {
+    ctx.scene.remove(ctx.goldenHall.baseGroup);
+    ctx.scene.remove(ctx.goldenHall.hallGroup);
+    ctx.scene.remove(ctx.goldenHall.fxGroup);
+    ctx.goldenHall.dispose();
+    ctx.goldenHall = null;
+  }
+  if (!ctx.renderConfig.goldenHall.enabled) {
+    return;
+  }
+  const hall = createGoldenHall({
+    towerBounds: ctx.towerBounds,
+    dimensions: ctx.renderConfig.boardDimensions,
+    board: ctx.renderConfig.board,
+    goldenHall: ctx.renderConfig.goldenHall,
+    quality: ctx.renderConfig.quality.level,
+    envMap: ctx.environment?.environmentMap ?? null,
+    hallLayout: ctx.hallLayout,
+  });
+  ctx.goldenHall = hall;
+  if (hall) {
+    ctx.scene.add(hall.baseGroup);
+    ctx.scene.add(hall.hallGroup);
+    ctx.scene.add(hall.fxGroup);
+  }
+  updateHallVisibility(ctx, state);
+  applyHallBrightness(ctx, state.hallBrightness);
+}
+
+function updateHallLayoutFromCamera(ctx: RenderContext, state: VisualControlState): void {
+  if (!ctx.renderConfig.goldenHall.enabled) {
+    return;
+  }
+  const layoutConfig = createDefaultHallLayoutConfig(ctx.renderConfig.board.blockSize);
+  const tower = deriveTowerRadii(ctx.renderConfig.board, ctx.towerBounds.center);
+  const cameraOrbit = measureCameraOrbit(ctx.camera.position, ctx.towerBounds.center);
+  const nextLayout = computeHallLayout(
+    {
+      towerOuterRadius: tower.outerRadius,
+      cameraOrbitRadius: cameraOrbit.radius,
+    },
+    layoutConfig
+  );
+  if (hallLayoutsDiffer(ctx.hallLayout, nextLayout)) {
+    ctx.hallLayout = nextLayout;
+    rebuildHallInstance(ctx, state);
+    validateHallOrdering(ctx.hallLayout);
+  }
 }
 
 function disposeRenderResources(ctx: RenderContext): void {
@@ -834,6 +1468,40 @@ function disposeMaterials(material: THREE.Material | THREE.Material[]): void {
     return;
   }
   material.dispose();
+}
+
+function updateHallVisibility(ctx: RenderContext, state: VisualControlState): void {
+  const hallMode = state.envDebugMode;
+  const hallEnabled = !!ctx.goldenHall && state.goldenHallEnabled && hallMode !== 'noHall';
+  if (ctx.goldenHall) {
+    ctx.goldenHall.baseGroup.visible = hallEnabled && state.showHallBase;
+    ctx.goldenHall.hallGroup.visible = hallEnabled && state.showHallShell;
+    ctx.goldenHall.fxGroup.visible = hallEnabled && state.showHallFx;
+  }
+  if (hallMode === 'hallOnly') {
+    ctx.board.mesh.visible = false;
+    ctx.activePiece.mesh.visible = false;
+    ctx.boardPlaceholder.visible = false;
+  } else {
+    // leave board visibility as set by hallMaterialMode handler
+  }
+}
+
+function applyHallBrightness(ctx: RenderContext, factor: number): void {
+  if (!ctx.goldenHall) return;
+  const rim = ctx.goldenHall.materials.wallEmissiveRim;
+  const base = (rim.userData.baseEmissiveIntensity as number | undefined) ?? rim.emissiveIntensity;
+  rim.userData.baseEmissiveIntensity = base;
+  rim.emissiveIntensity = base * factor;
+
+  ctx.scene.traverse((obj) => {
+    const light = obj as THREE.Light;
+    if (!light.isLight || !(light.name?.startsWith('main-0'))) return;
+    const baseIntensity =
+      (light.userData.baseIntensity as number | undefined) ?? (light as any).intensity ?? 1;
+    light.userData.baseIntensity = baseIntensity;
+    (light as any).intensity = baseIntensity * factor;
+  });
 }
 
 function attachControlsDisposalOnUnload(controls: VisualDebugControls): void {

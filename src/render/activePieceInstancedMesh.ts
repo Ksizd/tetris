@@ -60,6 +60,10 @@ export function createActivePieceInstancedMesh(
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.name = 'activePieceInstanced';
+  mesh.userData.instanceDebugTag = {
+    kind: 'towerCell',
+    sourceFile: 'src/render/activePieceInstancedMesh.ts',
+  };
 
   return { mesh, geometry, material: materials, capacity: ACTIVE_PIECE_CAPACITY };
 }

@@ -9,6 +9,7 @@ import { FragmentBucket } from '../app/destruction/destructionRuntime';
 import { updateGameCamera, CameraFollowState } from './cameraMotion';
 import { CellCoord } from '../core/types';
 import * as THREE from 'three';
+import { updateGoldenHallFx } from './goldenHallScene';
 
 export type SceneRenderContext = Pick<
   RenderContext,
@@ -20,7 +21,9 @@ export type SceneRenderContext = Pick<
   | 'fragments'
   | 'camera'
   | 'towerBounds'
+  | 'hallLayout'
   | 'cameraBasePlacement'
+  | 'goldenHall'
 >;
 
 export interface SceneDestructionPayload {
@@ -56,6 +59,7 @@ export function renderScene(
     mapper: ctx.mapper,
     hiddenCells: destruction?.hiddenCells,
   });
+  updateGoldenHallFx(ctx.goldenHall, deltaMs ?? 0);
   const offsetY = computeActivePieceOffset(snapshot, ctx.renderConfig.board.verticalSpacing);
   renderActivePiece({
     piece: snapshot.currentPiece,

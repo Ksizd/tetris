@@ -48,6 +48,10 @@ export function createBoardInstancedMesh(
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.name = 'boardBlocksInstanced';
+  mesh.userData.instanceDebugTag = {
+    kind: 'towerCell',
+    sourceFile: 'src/render/boardInstancedMesh.ts',
+  };
 
   return { mesh, geometry, material: materialArray, capacity };
 }

@@ -163,6 +163,20 @@ export interface EnvironmentConfig {
   variant?: 'studio' | 'ultra2';
 }
 
+export interface GoldenHallConfig {
+  enabled: boolean;
+  baseRadiusMargin: number;
+  hallRadiusMargin: number;
+  baseHeight: number;
+  steps: number;
+  baseStepCount: number;
+  baseStepInsetRatio: number;
+  wallHeight: number;
+  wallCurvatureSegments: number;
+  useDustFx: boolean;
+  useLightShafts: boolean;
+}
+
 export type RenderModeKind = 'game' | 'visualDebug' | 'textureProbe';
 
 export interface RenderModeConfig {
@@ -182,10 +196,13 @@ export interface RenderConfig {
   lights: LightRigConfig;
   postProcessing: PostProcessingConfig;
   environment: EnvironmentConfig;
+  goldenHall: GoldenHallConfig;
   fog: FogConfig;
   quality: QualityConfig;
   renderMode: RenderModeConfig;
   showGhostPreview?: boolean;
+  showFootprintDecor?: boolean;
+  showRawFootprintOverlay?: boolean;
 }
 
 export interface RenderConfigOverrides {
@@ -201,10 +218,13 @@ export interface RenderConfigOverrides {
   lights?: PartialLightRigConfig;
   postProcessing?: PostProcessingOverrides;
   environment?: Partial<EnvironmentConfig>;
+  goldenHall?: Partial<GoldenHallConfig>;
   materials?: Partial<MaterialConfig>;
   fog?: Partial<FogConfig>;
   quality?: Partial<QualityConfig>;
   renderMode?: Partial<RenderModeConfig>;
+  showFootprintDecor?: boolean;
+  showRawFootprintOverlay?: boolean;
 }
 
 export interface PartialLightRigConfig {
@@ -287,7 +307,7 @@ export function createRenderConfig(
 
   const materials = mergeMaterialConfig(VISUAL_DEFAULTS.materials, overrides.materials);
 
-  const defaultLights = createDefaultLights(camera, quality);
+  const defaultLights = createDefaultLights(camera, quality, board, boardDimensions);
   const lights: LightRigConfig = {
     ambient: {
       color: overrides.lights?.ambient?.color ?? defaultLights.ambient.color,
@@ -315,6 +335,9 @@ export function createRenderConfig(
     VISUAL_DEFAULTS.postProcessing,
     overrides.postProcessing
   );
+  const adjustedPost = adjustBloomByQuality(postProcessing, quality);
+  const adjustedTone = adjustToneMappingByQuality(adjustedPost.toneMapping, quality);
+  const finalPost: PostProcessingConfig = { ...adjustedPost, toneMapping: adjustedTone };
 
   const renderMode = resolveRenderMode(overrides.renderMode);
   const cameraGameMode =
@@ -330,7 +353,9 @@ export function createRenderConfig(
     variant: overrides.environment?.variant ?? VISUAL_DEFAULTS.environment.variant ?? 'studio',
   };
 
-  const fog = mergeFogConfig(VISUAL_DEFAULTS.fog, overrides.fog);
+  const goldenHall = resolveGoldenHallConfig(quality, overrides.goldenHall);
+
+  const fog = adjustFogByQuality(mergeFogConfig(VISUAL_DEFAULTS.fog, overrides.fog), quality);
 
   let config: RenderConfig = {
     boardDimensions,
@@ -340,12 +365,15 @@ export function createRenderConfig(
     cameraGameMode,
     cameraMotion,
     lights,
-    postProcessing,
+    postProcessing: finalPost,
     environment,
+    goldenHall,
     fog,
     quality,
     renderMode,
     showGhostPreview: true,
+    showFootprintDecor: overrides.showFootprintDecor ?? true,
+    showRawFootprintOverlay: overrides.showRawFootprintOverlay ?? false,
   };
 
   if (quality.level === 'ultra2') {
@@ -355,13 +383,75 @@ export function createRenderConfig(
   return config;
 }
 
-function createDefaultLights(camera: CameraConfig, quality: QualityConfig): LightRigConfig {
-  const keyPosition = camera.position
-    .clone()
-    .multiply(VISUAL_DEFAULTS.lights.key.positionMultiplier);
-  const rimPosition = camera.position
-    .clone()
-    .multiply(VISUAL_DEFAULTS.lights.rim.positionMultiplier);
+function adjustBloomByQuality(
+  cfg: PostProcessingConfig,
+  quality: QualityConfig
+): PostProcessingConfig {
+  const bloom = { ...cfg.bloom };
+  if (quality.level === 'low') {
+    bloom.enabled = false;
+  } else if (quality.level === 'medium') {
+    bloom.enabled = true;
+    bloom.strength = Math.max(bloom.strength, 0.75);
+    bloom.threshold = Math.max(bloom.threshold, 1.18);
+    bloom.radius = Math.max(bloom.radius, 0.65);
+  } else {
+    // ultra / ultra2 baseline before preset overrides
+    bloom.enabled = true;
+    bloom.strength = Math.max(bloom.strength, 1.1);
+    bloom.threshold = Math.max(bloom.threshold, 1.2);
+    bloom.radius = Math.max(bloom.radius, 0.75);
+  }
+  return { ...cfg, bloom };
+}
+
+function adjustToneMappingByQuality(
+  tone: ToneMappingConfig,
+  quality: QualityConfig
+): ToneMappingConfig {
+  if (quality.level === 'ultra2') {
+    return tone;
+  }
+  const exposureTargets: Record<QualityLevel, number> = {
+    ultra: 1.08,
+    ultra2: tone.exposure,
+    medium: 1.02,
+    low: 0.98,
+  };
+  const target = exposureTargets[quality.level] ?? tone.exposure;
+  return { ...tone, exposure: target };
+}
+
+function adjustFogByQuality(fog: FogConfig, quality: QualityConfig): FogConfig {
+  if (!fog.enabled) {
+    return fog;
+  }
+  const densityByQuality: Record<QualityLevel, number> = {
+    ultra: 0.006,
+    ultra2: fog.density,
+    medium: 0.005,
+    low: 0.0035,
+  };
+  const density = densityByQuality[quality.level] ?? fog.density;
+  return { ...fog, density };
+}
+
+function createDefaultLights(
+  camera: CameraConfig,
+  quality: QualityConfig,
+  board: BoardRenderConfig,
+  dimensions: BoardDimensions
+): LightRigConfig {
+  const towerHeight = computeTowerHeight(dimensions, board);
+  const towerRadius = board.towerRadius;
+  const keyShadowSize = Math.min(2048, Math.max(1024, quality.shadowMapSize));
+  const keyPosition = new THREE.Vector3(0, towerHeight * 1.28, towerRadius * 0.12);
+  const rimPosition = new THREE.Vector3(-towerRadius * 2.2, towerHeight * 0.9, -towerRadius * 2.0);
+  const fillPosition = new THREE.Vector3(
+    towerRadius * 2.2,
+    towerHeight * 0.65,
+    -towerRadius * 1.3
+  );
   return {
     hemisphere: {
       skyColor: VISUAL_DEFAULTS.lights.hemisphere.skyColor,
@@ -373,34 +463,40 @@ function createDefaultLights(camera: CameraConfig, quality: QualityConfig): Ligh
       intensity: VISUAL_DEFAULTS.lights.ambient.intensity,
     },
     key: {
+      type: 'spot',
       color: VISUAL_DEFAULTS.lights.key.color,
       intensity: VISUAL_DEFAULTS.lights.key.intensity,
       position: keyPosition,
-      target: camera.target.clone(),
+      target: new THREE.Vector3(0, towerHeight * 0.52, 0),
       castShadow: true,
+      angle: THREE.MathUtils.degToRad(48),
+      penumbra: 0.45,
+      distance: Math.max(towerHeight * 2.4, towerRadius * 7),
+      decay: 1.35,
       shadow: {
-        mapSize: quality.shadowMapSize,
-        radius: 2.4,
-        bias: -0.00018,
-        normalBias: 0.012,
-        cameraNear: 0.6,
-        cameraFar: 60,
-        cameraMargin: 3.5,
+        mapSize: keyShadowSize,
+        radius: 2.6,
+        bias: -0.00016,
+        normalBias: 0.01,
+        cameraNear: 0.45,
+        cameraFar: Math.max(towerHeight * 3.2, towerRadius * 10),
+        cameraMargin: 3.2,
+        cameraFov: 52,
       },
+    },
+    fill: {
+      type: 'directional',
+      color: VISUAL_DEFAULTS.lights.fill.color,
+      intensity: VISUAL_DEFAULTS.lights.fill.intensity,
+      position: fillPosition,
+      target: new THREE.Vector3(0, towerHeight * 0.4, 0),
+      castShadow: false,
     },
     rim: {
       color: VISUAL_DEFAULTS.lights.rim.color,
       intensity: VISUAL_DEFAULTS.lights.rim.intensity,
       position: rimPosition,
-      target: camera.target.clone(),
-      castShadow: false,
-      shadow: undefined,
-    },
-    fill: {
-      color: VISUAL_DEFAULTS.lights.fill.color,
-      intensity: VISUAL_DEFAULTS.lights.fill.intensity,
-      position: camera.target.clone().add(new THREE.Vector3(-2.5, 1.2, -3.5)),
-      target: camera.target.clone(),
+      target: new THREE.Vector3(0, towerHeight * 0.55, 0),
       castShadow: false,
       shadow: undefined,
     },
@@ -511,6 +607,13 @@ function normalizeFov(fov: number): number {
   return Math.min(85, Math.max(25, fov));
 }
 
+function clamp(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, value));
+}
+
 function mergeMaterialConfig(
   defaults: MaterialConfig,
   overrides?: Partial<MaterialConfig>
@@ -595,6 +698,40 @@ function mergeFogConfig(defaults: FogConfig, overrides?: Partial<FogConfig>): Fo
     enabled: overrides?.enabled ?? defaults.enabled,
     color: overrides?.color ?? defaults.color,
     density: overrides?.density ?? defaults.density,
+  };
+}
+
+function resolveGoldenHallConfig(
+  quality: QualityConfig,
+  overrides?: Partial<GoldenHallConfig>
+): GoldenHallConfig {
+  const defaults = VISUAL_DEFAULTS.goldenHall[quality.level] ?? VISUAL_DEFAULTS.goldenHall.ultra;
+  const stepCount =
+    overrides?.baseStepCount ?? overrides?.steps ?? defaults.baseStepCount ?? defaults.steps;
+  const normalizedStepCount = Math.max(1, Math.round(stepCount));
+  const insetRatio = clamp(overrides?.baseStepInsetRatio ?? defaults.baseStepInsetRatio, 0.02, 0.35);
+  let useDustFx = overrides?.useDustFx ?? defaults.useDustFx;
+  let useLightShafts = overrides?.useLightShafts ?? defaults.useLightShafts;
+  if (quality.level === 'low') {
+    useDustFx = false;
+    useLightShafts = false;
+  } else if (quality.level === 'medium' && useDustFx && useLightShafts) {
+    // Keep only one medium-tier effect to stay within fill-rate budget.
+    useLightShafts = false;
+  }
+  return {
+    enabled: overrides?.enabled ?? defaults.enabled,
+    baseRadiusMargin: overrides?.baseRadiusMargin ?? defaults.baseRadiusMargin,
+    hallRadiusMargin: overrides?.hallRadiusMargin ?? defaults.hallRadiusMargin,
+    baseHeight: overrides?.baseHeight ?? defaults.baseHeight,
+    steps: normalizedStepCount,
+    baseStepCount: normalizedStepCount,
+    baseStepInsetRatio: insetRatio,
+    wallHeight: overrides?.wallHeight ?? defaults.wallHeight,
+    wallCurvatureSegments:
+      overrides?.wallCurvatureSegments ?? defaults.wallCurvatureSegments,
+    useDustFx,
+    useLightShafts,
   };
 }
 

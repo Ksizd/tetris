@@ -5,14 +5,70 @@ import {
   DEFAULT_CAMERA_HEIGHT_RATIO,
   DEFAULT_TARGET_HEIGHT_RATIO,
 } from './cameraSetup';
-import type { CameraGameMode, QualityLevel } from './renderConfig';
+import type { CameraGameMode, GoldenHallConfig, QualityLevel } from './renderConfig';
+
+const GOLDEN_HALL_DEFAULTS: Record<QualityLevel, GoldenHallConfig> = {
+  ultra: {
+    enabled: true,
+    baseRadiusMargin: 3.2,
+    hallRadiusMargin: 8.5,
+    baseHeight: 7.5,
+    steps: 4,
+    baseStepCount: 4,
+    baseStepInsetRatio: 0.12,
+    wallHeight: 38,
+    wallCurvatureSegments: 128,
+    useDustFx: true,
+    useLightShafts: true,
+  },
+  ultra2: {
+    enabled: true,
+    baseRadiusMargin: 3.2,
+    hallRadiusMargin: 8.5,
+    baseHeight: 7.5,
+    steps: 4,
+    baseStepCount: 4,
+    baseStepInsetRatio: 0.12,
+    wallHeight: 38,
+    wallCurvatureSegments: 128,
+    useDustFx: true,
+    useLightShafts: true,
+  },
+  medium: {
+    enabled: true,
+    baseRadiusMargin: 2.8,
+    hallRadiusMargin: 7.5,
+    baseHeight: 6.2,
+    steps: 2,
+    baseStepCount: 2,
+    baseStepInsetRatio: 0.1,
+    wallHeight: 32,
+    wallCurvatureSegments: 64,
+    useDustFx: true,
+    useLightShafts: false,
+  },
+  low: {
+    enabled: true,
+    baseRadiusMargin: 2.4,
+    hallRadiusMargin: 6.0,
+    baseHeight: 5.4,
+    steps: 1,
+    baseStepCount: 1,
+    baseStepInsetRatio: 0.08,
+    wallHeight: 26,
+    wallCurvatureSegments: 32,
+    useDustFx: false,
+    useLightShafts: false,
+  },
+};
 
 export const VISUAL_DEFAULTS = {
   quality: {
     level: 'ultra' as QualityLevel,
   },
+  goldenHall: GOLDEN_HALL_DEFAULTS,
   environment: {
-    intensity: 1.25,
+    intensity: 1.1,
     resolution: 2048,
     useAsBackground: false,
     variant: 'studio' as const,
@@ -25,22 +81,22 @@ export const VISUAL_DEFAULTS = {
     ambient: { color: 0xffffff, intensity: 0.22 },
     hemisphere: { skyColor: 0xfff8e1, groundColor: 0x2a1a0a, intensity: 0.55 },
     key: {
-      color: 0xffefdb,
-      intensity: 2.1,
+      color: 0xfff1c4,
+      intensity: 2.35,
       positionMultiplier: new THREE.Vector3(0.32, 0.95, 0.38),
     },
     rim: {
       color: 0xb7d5ff,
-      intensity: 0.6,
+      intensity: 0.55,
       positionMultiplier: new THREE.Vector3(-0.8, 0.9, -0.8),
     },
     fill: {
-      color: 0xe5ecfa,
-      intensity: 0.65,
+      color: 0xe8f1ff,
+      intensity: 0.55,
     },
   },
   postProcessing: {
-    bloom: { enabled: false, strength: 0.0, threshold: 1.1, radius: 0.6 },
+    bloom: { enabled: true, strength: 1.0, threshold: 1.15, radius: 0.7 },
     toneMapping: { mode: 'aces' as const, exposure: 1.05 },
     vignette: { enabled: false, offset: 1.0, darkness: 1.0 },
     colorGrade: {
@@ -63,7 +119,7 @@ export const VISUAL_DEFAULTS = {
       bias: 0.02,
     },
   },
-  fog: { enabled: false, color: 0x000000, density: 0 },
+  fog: { enabled: true, color: 0x050608, density: 0.006 },
   camera: {
     fov: DEFAULT_CAMERA_FOV,
     angleRadians: DEFAULT_CAMERA_ANGLE,

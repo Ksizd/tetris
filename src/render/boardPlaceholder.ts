@@ -61,8 +61,8 @@ export function createBoardPlaceholder(
     roughness: 0.5,
   });
   const baseRing = new THREE.Mesh(ringGeometry, ringMaterial);
-  baseRing.rotation.x = Math.PI / 2;
-  baseRing.position.y = resolvedConfig.blockSize * 0.25;
+  baseRing.rotation.x = Math.PI / 2; // lay flat on floor (Y-up)
+  baseRing.position.y = -resolvedConfig.blockSize * 0.5 + resolvedConfig.blockSize * 0.002;
   baseRing.castShadow = false;
   baseRing.receiveShadow = false;
   group.add(baseRing);

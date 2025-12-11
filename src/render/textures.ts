@@ -7,6 +7,11 @@ const FRONT_BORDER_COLOR = '#e6e0d5';
 const FRONT_NOISE_LEVEL = 3;
 const GOLD_BASE_COLOR = '#f2c14b';
 const GOLD_NOISE_LEVEL = 8; // subtle 2-3% brightness variation
+const GOLDEN_HALL_FLOOR_DARK = '#23160f';
+const GOLDEN_HALL_FLOOR_EDGE = '#5a412c';
+const GOLDEN_HALL_FLOOR_RING = '#8a6a3e';
+const GOLDEN_HALL_EMISSIVE = '#f6e7bb';
+const GOLDEN_HALL_SHAFT_EDGE = '#ffffff';
 
 type RandomSource = () => number;
 
@@ -455,4 +460,186 @@ function addNoise(
 
 function clamp255(v: number): number {
   return Math.max(0, Math.min(255, v));
+}
+
+export function createGoldenHallPedestalTexture(size = 1024): THREE.CanvasTexture {
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([
+      60, 40, 32, 255, // darker center-ish pixel
+      110, 90, 70, 255, // edge-ish pixel
+      110, 90, 70, 255,
+      60, 40, 32, 255,
+    ]);
+    const tex = new THREE.DataTexture(data, 2, 2);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex as unknown as THREE.CanvasTexture;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Unable to create context for golden hall pedestal texture');
+  }
+
+  // Radial base with darker center.
+  const center = ctx.createRadialGradient(size * 0.5, size * 0.5, size * 0.05, size * 0.5, size * 0.5, size * 0.55);
+  center.addColorStop(0, GOLDEN_HALL_FLOOR_DARK);
+  center.addColorStop(0.35, GOLDEN_HALL_FLOOR_DARK);
+  center.addColorStop(1, GOLDEN_HALL_FLOOR_EDGE);
+  ctx.fillStyle = center;
+  ctx.fillRect(0, 0, size, size);
+
+  // Concentric rings to guide eye toward center.
+  ctx.save();
+  ctx.translate(size * 0.5, size * 0.5);
+  ctx.strokeStyle = GOLDEN_HALL_FLOOR_RING;
+  ctx.lineWidth = Math.max(1, size * 0.006);
+  ctx.globalAlpha = 0.45;
+  const ringCount = 6;
+  for (let i = 1; i <= ringCount; i += 1) {
+    const r = (size * 0.5) * (i / (ringCount + 1));
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Subtle noise to avoid perfect smoothness.
+  addNoise(ctx, size, size, 6, 0, createSeededRandom(20241209));
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.needsUpdate = true;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
+export function createGoldenHallEmissiveRimTexture(size = 512): THREE.CanvasTexture {
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([
+      250, 240, 210, 255, // bright edge
+      180, 170, 150, 80, // faded center-ish
+      180, 170, 150, 80,
+      250, 240, 210, 255,
+    ]);
+    const tex = new THREE.DataTexture(data, 2, 2);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+    return tex as unknown as THREE.CanvasTexture;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Unable to create context for golden hall emissive rim texture');
+  }
+
+  const gradient = ctx.createRadialGradient(size * 0.5, size * 0.5, size * 0.35, size * 0.5, size * 0.5, size * 0.5);
+  gradient.addColorStop(0, 'rgba(255,255,255,0)');
+  gradient.addColorStop(0.68, 'rgba(255,255,255,0.05)');
+  gradient.addColorStop(0.82, 'rgba(246,231,187,0.85)');
+  gradient.addColorStop(1, GOLDEN_HALL_EMISSIVE);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.needsUpdate = true;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
+export function createGoldenHallWallRoughnessMap(size = 256): THREE.CanvasTexture {
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([
+      185, 185, 185, 255, // top rougher
+      140, 140, 140, 255, // bottom smoother
+      185, 185, 185, 255,
+      140, 140, 140, 255,
+    ]);
+    const tex = new THREE.DataTexture(data, 2, 2);
+    tex.colorSpace = THREE.NoColorSpace;
+    tex.needsUpdate = true;
+    return tex as unknown as THREE.CanvasTexture;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size * 2; // favor vertical gradient fidelity
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Unable to create context for golden hall wall roughness map');
+  }
+
+  // Roughness gradient: smoother at bottom, rougher and hazier at top.
+  const grad = ctx.createLinearGradient(0, canvas.height, 0, 0);
+  grad.addColorStop(0, 'rgb(140,140,140)'); // ~0.55 roughness
+  grad.addColorStop(0.5, 'rgb(160,160,160)');
+  grad.addColorStop(1, 'rgb(185,185,185)'); // ~0.72 roughness
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Mild blur/noise towards top to reduce reflection sharpness.
+  addNoise(ctx, canvas.width, canvas.height * 0.4, 4, 0, createSeededRandom(20241211));
+  addNoise(ctx, canvas.width, canvas.height * 0.6, 2, canvas.height * 0.4, createSeededRandom(20241212));
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.needsUpdate = true;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
+}
+
+export function createGoldenHallLightShaftAlphaMap(size = 128): THREE.CanvasTexture {
+  if (typeof document === 'undefined') {
+    const data = new Uint8Array([
+      255, 255, 255, 255, // center bright
+      80, 80, 80, 80, // edge faded
+      80, 80, 80, 80,
+      255, 255, 255, 255,
+    ]);
+    const tex = new THREE.DataTexture(data, 2, 2);
+    tex.colorSpace = THREE.NoColorSpace;
+    tex.needsUpdate = true;
+    return tex as unknown as THREE.CanvasTexture;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Unable to create context for golden hall light shaft alpha');
+  }
+
+  const grad = ctx.createRadialGradient(size * 0.5, size * 0.5, size * 0.05, size * 0.5, size * 0.5, size * 0.5);
+  grad.addColorStop(0, 'rgba(255,255,255,0.6)');
+  grad.addColorStop(0.4, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(1, 'rgba(255,255,255,0.0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.NoColorSpace;
+  texture.wrapS = THREE.ClampToEdgeWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.needsUpdate = true;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  return texture;
 }

@@ -31,6 +31,16 @@ import {
   FragmentInstancedResources,
   createFragmentInstancedMeshes,
 } from './destruction/fragmentInstancedMesh';
+import {
+  GoldenHallInstance,
+  createGoldenHall,
+} from './goldenHallScene';
+import { createGoldenHallMaterials } from './goldenHallMaterials';
+import { createGoldenPlatform, GoldenPlatformInstance } from './goldenPlatform';
+import { createFootprintDecor } from './footprintDecor';
+import { computeHallLayout, createDefaultHallLayoutConfig, HallLayoutRadii } from './hallLayout';
+import { deriveTowerRadii, measureCameraOrbit } from './hallRadiiSources';
+import { runHallGeometryDiagnostics } from './hallGeometryMonitor';
 
 export interface RenderContext {
   scene: THREE.Scene;
@@ -44,15 +54,57 @@ export interface RenderContext {
   renderConfig: RenderConfig;
   cameraBasePlacement: { position: THREE.Vector3; target: THREE.Vector3 };
   towerBounds: TowerBounds;
+  hallLayout: HallLayoutRadii;
   environment?: EnvironmentMapResources | null;
   post?: PostProcessingContext | null;
   fragments?: FragmentInstancedResources | null;
+  footprintDecor?: THREE.Group | null;
+  goldenPlatform?: GoldenPlatformInstance | null;
+  goldenHall?: GoldenHallInstance | null;
+}
+
+function findHallFloorTop(hall: GoldenHallInstance): number | null {
+  let box: THREE.Box3 | null = null;
+  hall.baseGroup.updateMatrixWorld(true);
+  hall.baseGroup.traverse((obj) => {
+    const mesh = obj as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    const tag = (mesh as any).userData?.debugTag;
+    const name = mesh.name ?? '';
+    const parentName = mesh.parent?.name ?? '';
+    const isFloorTagged = tag?.kind === 'hallFloor';
+    const isFloorByName =
+      name.includes('step') ||
+      name.includes('center') ||
+      parentName.includes('hall-base');
+    if (!isFloorTagged && !isFloorByName) return;
+    const b = new THREE.Box3().setFromObject(mesh);
+    box = box ? box.union(b) : b;
+  });
+  return box ? box.max.y : null;
 }
 
 function enforceColorPipeline(renderer: THREE.WebGLRenderer): void {
   THREE.ColorManagement.enabled = true;
   THREE.ColorManagement.workingColorSpace = THREE.LinearSRGBColorSpace;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+}
+
+function alignHallToPlatform(ringATop: number, hall: GoldenHallInstance): void {
+  hall.baseGroup.position.y = ringATop;
+  hall.hallGroup.position.y = ringATop;
+  hall.fxGroup.position.y = ringATop;
+  const hallFloorTop = findHallFloorTop(hall);
+  if (hallFloorTop === null) {
+    return;
+  }
+  const desiredTop = ringATop - 0.002; // keep a tiny clearance below platform top
+  const delta = hallFloorTop - desiredTop;
+  if (Math.abs(delta) > 1e-6) {
+    hall.baseGroup.position.y -= delta;
+    hall.hallGroup.position.y -= delta;
+    hall.fxGroup.position.y -= delta;
+  }
 }
 
 function applyToneMapping(renderer: THREE.WebGLRenderer, config: ToneMappingConfig): void {
@@ -111,6 +163,26 @@ export function createRenderContext(
   camera.position.copy(renderConfig.camera.position);
   camera.lookAt(renderConfig.camera.target);
 
+  const hallLayoutConfig = createDefaultHallLayoutConfig(renderConfig.board.blockSize);
+  const towerRadii = deriveTowerRadii(renderConfig.board, towerBounds.center);
+  const cameraOrbit = measureCameraOrbit(renderConfig.camera.position, towerBounds.center);
+  const hallLayout = computeHallLayout(
+    {
+      towerOuterRadius: towerRadii.outerRadius,
+      cameraOrbitRadius: cameraOrbit.radius,
+    },
+    hallLayoutConfig
+  );
+  if (typeof console !== 'undefined') {
+    console.assert(
+      hallLayout.hallInnerRadius > hallLayout.cameraOrbitRadius + 0.001,
+      'Hall inner radius must exceed camera orbit'
+    );
+    console.assert(
+      hallLayout.hallInnerRadius > hallLayout.towerOuterRadius + 0.001,
+      'Hall inner radius must exceed tower outer radius'
+    );
+  }
   const gl = canvas.getContext('webgl2', {
     antialias: true,
     alpha: false,
@@ -157,6 +229,69 @@ export function createRenderContext(
     renderMode: renderConfig.renderMode,
   });
   scene.add(debugOverlays.group);
+
+  let goldenPlatform: GoldenPlatformInstance | null = null;
+  let goldenHall: GoldenHallInstance | null = null;
+  goldenPlatform = createGoldenPlatform({
+    hallLayout,
+    board: renderConfig.board,
+    dimensions: renderConfig.boardDimensions,
+  });
+  scene.add(goldenPlatform.mesh);
+
+  if (renderConfig.goldenHall.enabled) {
+    const hallMaterials = createGoldenHallMaterials({
+      quality: renderConfig.quality.level,
+      envMap: environment?.environmentMap ?? null,
+      useDustFx: renderConfig.goldenHall.useDustFx,
+      useLightShafts: renderConfig.goldenHall.useLightShafts,
+    });
+    goldenHall = createGoldenHall({
+      towerBounds,
+      dimensions: renderConfig.boardDimensions,
+      board: renderConfig.board,
+      goldenHall: renderConfig.goldenHall,
+      quality: renderConfig.quality.level,
+      materials: hallMaterials,
+      hallLayout,
+    });
+    if (goldenHall) {
+      const ringATop = goldenPlatform.layout.baseY + goldenPlatform.layout.ringA.height;
+      alignHallToPlatform(ringATop, goldenHall);
+      scene.add(goldenHall.baseGroup);
+      scene.add(goldenHall.hallGroup);
+      scene.add(goldenHall.fxGroup);
+    }
+  }
+
+  let footprintDecor: THREE.Group | null = null;
+  if (renderConfig.showFootprintDecor !== false && goldenPlatform?.layout) {
+    footprintDecor = createFootprintDecor({
+      dimensions: renderConfig.boardDimensions,
+      board: renderConfig.board,
+      platformLayout: goldenPlatform.layout,
+    });
+    scene.add(footprintDecor);
+  }
+
+  if (typeof console !== 'undefined') {
+    const diag = runHallGeometryDiagnostics({
+      board: renderConfig.board,
+      hallLayout,
+      platformLayout: goldenPlatform?.layout ?? null,
+      platformObject: goldenPlatform?.mesh ?? null,
+      footprintObject: footprintDecor,
+    });
+    if (diag.errors.length || diag.warnings.length) {
+      console.groupCollapsed('[hallGeometry] invariants (17.0)');
+      diag.errors.forEach((msg) => console.error(msg));
+      diag.warnings.forEach((msg) => console.warn(msg));
+      console.info('report', diag.report);
+      console.groupEnd();
+    } else {
+      console.info('[hallGeometry] invariants OK', diag.report);
+    }
+  }
 
   const boardInstanced = createBoardInstancedMesh(
     renderConfig.boardDimensions,
@@ -216,6 +351,7 @@ export function createRenderContext(
     mapper,
     renderConfig,
     towerBounds,
+    hallLayout,
     cameraBasePlacement: {
       position: renderConfig.camera.position.clone(),
       target: renderConfig.camera.target.clone(),
@@ -223,6 +359,9 @@ export function createRenderContext(
     environment,
     post,
     fragments,
+    footprintDecor,
+    goldenPlatform,
+    goldenHall,
   };
 }
 
@@ -492,6 +631,20 @@ export function disposeRenderResources(ctx: RenderContext): void {
       mesh.dispose();
     });
     Object.values(ctx.fragments.materials).forEach((mat) => mat.dispose());
+  }
+  if (ctx.goldenHall) {
+    ctx.scene.remove(ctx.goldenHall.baseGroup);
+    ctx.scene.remove(ctx.goldenHall.hallGroup);
+    ctx.scene.remove(ctx.goldenHall.fxGroup);
+    ctx.goldenHall.dispose();
+  }
+  if (ctx.footprintDecor) {
+    ctx.scene.remove(ctx.footprintDecor);
+    disposeMeshes(ctx.footprintDecor);
+  }
+  if (ctx.goldenPlatform) {
+    ctx.scene.remove(ctx.goldenPlatform.mesh);
+    ctx.goldenPlatform.dispose();
   }
   disposeMeshes(ctx.boardPlaceholder);
   ctx.environment?.dispose();
