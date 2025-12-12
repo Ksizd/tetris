@@ -27,7 +27,8 @@ describe('footprint geometry (15.3.6)', () => {
     const bbox = new THREE.Box3().setFromObject(footprint);
     const bs = bbox.getBoundingSphere(new THREE.Sphere());
     const rFootprint = getFootprintRadius(board);
-    expect(bs.radius).toBeGreaterThan(rFootprint * 0.8);
-    expect(bs.radius).toBeLessThan(rFootprint * 1.2);
+    const sq2 = Math.SQRT2;
+    expect(bs.radius).toBeGreaterThan(rFootprint * 0.8 * sq2);
+    expect(bs.radius).toBeLessThan(rFootprint * 1.2 * sq2);
   });
 });

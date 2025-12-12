@@ -2,12 +2,12 @@ import * as THREE from 'three';
 import { BoardDimensions } from '../core/types';
 import { BoardRenderConfig } from './boardConfig';
 import { PlatformLayout } from './platformLayout';
-import { getFootprintRadius } from './towerFootprint';
 
 export interface FootprintDecorParams {
   dimensions: BoardDimensions;
   board: BoardRenderConfig;
   platformLayout: PlatformLayout;
+  debugLiftBlocks?: number;
 }
 
 const EPS = 1e-4;
@@ -23,25 +23,26 @@ export function createFootprintDecor(params: FootprintDecorParams): THREE.Group 
     sourceFile: 'src/render/footprintDecor.ts',
   };
 
-  const footprintRadius = getFootprintRadius(board);
+  const towerRadius = board.towerRadius;
+  const halfDepth = board.blockDepth * 0.5;
+  const footprintInner = Math.max(0, towerRadius - halfDepth);
   const floorY = -board.blockSize * 0.5;
-  const yBase = floorY + board.blockSize * 0.02; // higher above cube floor for visibility
+  const liftY = (params.debugLiftBlocks ?? 0) * board.blockSize;
+  const yBase = floorY + board.blockSize * 0.02 + liftY; // higher above cube floor for visibility
   const ringClearance = Math.max(
     board.blockSize * FOOTPRINT_RING_CLEARANCE_RATIO,
     FOOTPRINT_RING_CLEARANCE_MIN
   );
   const maxFootprintOuter = Math.min(
+    platformLayout.ringA.outer - ringClearance,
     platformLayout.ringB.outer - ringClearance,
     platformLayout.ringC.inner - ringClearance
   );
+  const footprintOuter = Math.min(towerRadius + halfDepth, maxFootprintOuter);
 
   // Layer 1: thin ring engraving
-  const ringWidth = board.blockSize * 0.5;
-  const ringInner = Math.max(0, footprintRadius - ringWidth * 0.5);
-  const ringOuter = Math.max(
-    ringInner + EPS,
-    Math.min(footprintRadius + ringWidth * 0.5, maxFootprintOuter)
-  );
+  const ringInner = footprintInner;
+  const ringOuter = Math.max(ringInner + EPS, footprintOuter);
   const ringSegments = Math.max(24, dimensions.width * 2);
   const ringGeometry = new THREE.RingGeometry(ringInner, ringOuter, ringSegments, 1);
   const ringMaterial = new THREE.MeshStandardMaterial({
@@ -51,23 +52,21 @@ export function createFootprintDecor(params: FootprintDecorParams): THREE.Group 
     emissive: 0x0d0a06,
     emissiveIntensity: 0.08,
     side: THREE.DoubleSide,
+    depthWrite: false,
     polygonOffset: true,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits: 1,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
   });
   const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
   ringMesh.rotation.x = -Math.PI / 2;
   ringMesh.position.y = yBase;
   ringMesh.name = 'footprintRingEngraving';
-  ringMesh.renderOrder = -2;
+  ringMesh.renderOrder = 1;
   group.add(ringMesh);
 
   // Layer 2: cell sectors
-  const sectorInner = Math.max(0, footprintRadius - board.blockSize * 0.5);
-  const sectorOuter = Math.max(
-    sectorInner + EPS,
-    Math.min(footprintRadius + board.blockSize * 0.5, maxFootprintOuter)
-  );
+  const sectorInner = ringInner;
+  const sectorOuter = ringOuter;
   const sectorGeometry = buildCellSectorGeometry(dimensions.width, sectorInner, sectorOuter);
   const sectorMaterial = new THREE.MeshStandardMaterial({
     color: 0xf3d8a2,
@@ -76,16 +75,40 @@ export function createFootprintDecor(params: FootprintDecorParams): THREE.Group 
     emissive: 0xf6d8a2,
     emissiveIntensity: 0.24,
     side: THREE.DoubleSide,
+    depthWrite: false,
     polygonOffset: true,
-    polygonOffsetFactor: 1.5,
-    polygonOffsetUnits: 1.5,
+    polygonOffsetFactor: -1.5,
+    polygonOffsetUnits: -1.5,
   });
   const sectorMesh = new THREE.Mesh(sectorGeometry, sectorMaterial);
   sectorMesh.rotation.x = 0; // geometry already in XZ plane; keep flat on platform
   sectorMesh.position.y = yBase + 0.002;
   sectorMesh.name = 'footprintCellSectors';
-  sectorMesh.renderOrder = -1;
+  sectorMesh.renderOrder = 2;
   group.add(sectorMesh);
+
+  // Layer 3: radial guide lines to preserve per-cell placement cues.
+  const guideGeometry = buildRadialGuideLinesGeometry(
+    dimensions.width,
+    sectorInner,
+    sectorOuter
+  );
+  const guideMaterial = new THREE.LineBasicMaterial({
+    color: 0xe9ecf5,
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+    depthTest: false,
+    toneMapped: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+  const guides = new THREE.LineSegments(guideGeometry, guideMaterial);
+  guides.position.y = yBase + board.blockSize * 0.004;
+  guides.name = 'footprintRadialGuides';
+  guides.renderOrder = 3;
+  group.add(guides);
 
   return group;
 }
@@ -130,6 +153,33 @@ function buildCellSectorGeometry(
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function buildRadialGuideLinesGeometry(
+  columnCount: number,
+  innerRadius: number,
+  outerRadius: number
+): THREE.BufferGeometry {
+  const vertices: number[] = [];
+  const step = (Math.PI * 2) / columnCount;
+  for (let col = 0; col < columnCount; col += 1) {
+    const angle = step * (col + 0.5);
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    vertices.push(
+      cos * outerRadius,
+      0,
+      sin * outerRadius,
+      cos * innerRadius,
+      0,
+      sin * innerRadius
+    );
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;

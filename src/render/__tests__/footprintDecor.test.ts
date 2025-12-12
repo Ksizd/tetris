@@ -27,8 +27,14 @@ describe('createFootprintDecor (15.3.2)', () => {
     const sectors = footprint.getObjectByName('footprintCellSectors') as
       | THREE.Mesh<THREE.BufferGeometry>
       | null;
+    const guides = footprint.getObjectByName('footprintRadialGuides') as
+      | THREE.LineSegments<THREE.BufferGeometry>
+      | null;
     expect(ring).toBeTruthy();
     expect(sectors).toBeTruthy();
+    expect(guides).toBeTruthy();
+    const guidePositions = guides!.geometry.getAttribute('position') as THREE.BufferAttribute;
+    expect(guidePositions.count).toBe(dimensions.width * 2);
 
     const ringTop = ring!.position.y;
     const ringBTop = platformLayout.baseY + platformLayout.ringB.height;
