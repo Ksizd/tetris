@@ -2,12 +2,15 @@ import * as THREE from 'three';
 import { HallLayoutRadii } from '../hallLayout';
 import { PlatformLayout } from '../platformLayout';
 import { HallGeometrySnapshot, HallObjectSnapshot } from './hallGeometrySnapshot';
+import { getColumnAngle } from '../../core/coords';
+import { computeFootprintAngleOffsetRad, computeFootprintStepRad } from '../footprintAngles';
 
 export type InvariantId =
   | 'INV_PLATFORM_RINGA_FLOOR_ALIGNMENT'
   | 'INV_TOWER_BASE_ABOVE_RINGA'
   | 'INV_FOOTPRINT_HEIGHT_RANGE'
   | 'INV_FOOTPRINT_NOT_BURIED'
+  | 'INV_FOOTPRINT_ANGLE_ALIGNMENT'
   | 'INV_FOOTPRINT_ORIENTATION'
   | 'INV_PLATFORM_RING_RADII_ORDER'
   | 'INV_PLATFORM_NO_DEEP_INTERSECTIONS'
@@ -37,6 +40,8 @@ export interface HallGeometryMonitorInput {
   snapshot: HallGeometrySnapshot;
   hallLayout: HallLayoutRadii;
   platformLayout: PlatformLayout;
+  columns: number;
+  footprintAngleOffsetRad?: number;
   config?: Partial<HallGeometryMonitorConfig>;
 }
 
@@ -53,6 +58,8 @@ const DEFAULT_CONFIG: HallGeometryMonitorConfig = {
 export function analyzeHallGeometry(input: HallGeometryMonitorInput): { violations: HallGeometryViolation[] } {
   const cfg: HallGeometryMonitorConfig = { ...DEFAULT_CONFIG, ...(input.config ?? {}) };
   const violations: HallGeometryViolation[] = [];
+  const columns = Math.max(3, Math.floor(input.columns));
+  const footprintAngleOffsetRad = input.footprintAngleOffsetRad ?? computeFootprintAngleOffsetRad(columns);
 
   const ringA = unionBoxes(input.snapshot.platformRings.filter((r) => r.kind === 'platformRingA'));
   const ringB = unionBoxes(input.snapshot.platformRings.filter((r) => r.kind === 'platformRingB'));
@@ -67,6 +74,7 @@ export function analyzeHallGeometry(input: HallGeometryMonitorInput): { violatio
     ...checkTowerBasePenetration(input.snapshot, platformAll, cfg),
     ...checkFootprintHeightRange(input.snapshot, input.platformLayout, ringA, cfg),
     ...checkFootprintNotBuried(input.snapshot, ringA, cfg),
+    ...checkFootprintAngleAlignment(input.snapshot, columns, footprintAngleOffsetRad),
     ...checkFootprintOrientation(input.snapshot, cfg),
     ...checkPlatformRingRadiiOrder(input.snapshot, input.hallLayout, input.platformLayout, ringA, ringB, ringC, cfg),
     ...checkPlatformIntersections(input.snapshot, platformAll, ringA, cfg),
@@ -76,6 +84,56 @@ export function analyzeHallGeometry(input: HallGeometryMonitorInput): { violatio
   );
 
   return { violations };
+}
+
+function normalizeAngleDeltaRad(delta: number): number {
+  const twoPi = Math.PI * 2;
+  let v = delta % twoPi;
+  if (v > Math.PI) v -= twoPi;
+  if (v < -Math.PI) v += twoPi;
+  return v;
+}
+
+function checkFootprintAngleAlignment(
+  snapshot: HallGeometrySnapshot,
+  columns: number,
+  footprintAngleOffsetRad: number
+): HallGeometryViolation[] {
+  if (!snapshot.footprints.length) {
+    return [];
+  }
+
+  const step = computeFootprintStepRad(columns);
+  const boundary0 = getColumnAngle(0, columns) + footprintAngleOffsetRad;
+  const actualCenter0 = boundary0 + step * 0.5;
+  const expectedCenter0 = getColumnAngle(0, columns);
+  const deltaRad = normalizeAngleDeltaRad(actualCenter0 - expectedCenter0);
+  const absDelta = Math.abs(deltaRad);
+  const EPS = 1e-3;
+
+  if (absDelta <= EPS) {
+    return [];
+  }
+
+  const deltaDeg = (deltaRad * 180) / Math.PI;
+  return [
+    {
+      invariant: 'INV_FOOTPRINT_ANGLE_ALIGNMENT',
+      severity: 'error',
+      message: `Footprint angle misaligned: Δ=${deltaRad.toFixed(6)} rad (${deltaDeg.toFixed(3)}°) exceeds ${EPS}`,
+      objectsInvolved: collectNames(snapshot.footprints),
+      details: {
+        columns,
+        step,
+        footprintAngleOffsetRad,
+        expectedCenter0,
+        actualCenter0,
+        deltaRad,
+        deltaDeg,
+        epsilon: EPS,
+      },
+    },
+  ];
 }
 
 function checkPlatformRingAFloorAlignment(

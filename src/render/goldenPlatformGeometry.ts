@@ -13,6 +13,7 @@ export interface GoldenPlatformGeometryOptions {
     blockDepth: number;
     blockSize: number;
     columns: number;
+    angleOffsetRad?: number;
   };
 }
 

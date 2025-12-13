@@ -1,10 +1,12 @@
 import * as THREE from 'three';
+import { computeFootprintAngleOffsetRad } from './footprintAngles';
 
 export interface FootprintSakuraLavaMaterialParams {
   towerRadius: number;
   blockDepth: number;
   blockSize: number;
   columns: number;
+  angleOffsetRad?: number;
   intensity?: number;
 }
 
@@ -56,6 +58,7 @@ const FRAGMENT_SHADER = `
   uniform float uTime;
   uniform float uIntensity;
   uniform float uDebugLavaUV;
+  uniform float uAngleOffset;
 
   uniform float uR0;
   uniform float uR1;
@@ -104,14 +107,18 @@ const FRAGMENT_SHADER = `
     vec2 xz = vPos.xz;
     float radius = length(xz);
     float theta = atan(xz.y, xz.x);
-    float thetaWrapped = theta < 0.0 ? theta + TWO_PI : theta;
-    float thetaNorm = thetaWrapped / TWO_PI;
+    float thetaAligned = theta - uAngleOffset;
+    thetaAligned = mod(thetaAligned, TWO_PI);
+    if (thetaAligned < 0.0) {
+      thetaAligned += TWO_PI;
+    }
+    float thetaNorm = thetaAligned / TWO_PI;
 
     float sRing0 = abs(radius - uR0) - uGrooveHalfW;
     float sRing1 = abs(radius - uR1) - uGrooveHalfW;
 
     float dTheta = TWO_PI / max(1.0, uColumns);
-    float rel = fract(thetaWrapped / dTheta);
+    float rel = fract(thetaAligned / dTheta);
     float signedRel = rel < 0.5 ? rel : rel - 1.0;
     float angDist = abs(signedRel) * dTheta;
     float sTheta = angDist - uThetaHalfW;
@@ -178,6 +185,7 @@ export function createFootprintSakuraLavaMaterial(
   const towerRadius = params.towerRadius;
   const blockDepth = params.blockDepth;
   const intensity = params.intensity ?? 3.25;
+  const angleOffsetRad = params.angleOffsetRad ?? computeFootprintAngleOffsetRad(columns);
 
   const angularSegments = Math.max(MIN_ANGULAR_SEGMENTS, columns * ANGULAR_MULTIPLIER);
   const thetaHalfW = computeThetaHalfWidth(columns, angularSegments);
@@ -194,6 +202,7 @@ export function createFootprintSakuraLavaMaterial(
     uTime: { value: 0 },
     uIntensity: { value: intensity },
     uDebugLavaUV: { value: 0 },
+    uAngleOffset: { value: angleOffsetRad },
     uR0: { value: R0 },
     uR1: { value: R1 },
     uGrooveHalfW: { value: grooveHalfW },

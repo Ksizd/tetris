@@ -8,6 +8,7 @@ import { createGoldenPlatformGeometry } from './goldenPlatformGeometry';
 import { DebugTag } from './debug/objectInspectorTypes';
 import { createFootprintSakuraLavaMaterial } from './footprintLavaMaterial';
 import { createFootprintLavaFx } from './footprintLavaFx';
+import { computeFootprintAngleOffsetRad } from './footprintAngles';
 
 export interface GoldenPlatformInstance {
   mesh: THREE.Mesh;
@@ -84,6 +85,7 @@ export function createGoldenPlatform(params: CreateGoldenPlatformParams): Golden
   const design = createDefaultPlatformDesign(params.board.blockSize * (params.designScale ?? 1));
   const layout = computePlatformLayout(params.hallLayout, params.board, design);
   assertPlatformInvariants(layout, params.board, params.hallLayout);
+  const footprintAngleOffsetRad = computeFootprintAngleOffsetRad(params.dimensions.width);
   const geometry = createGoldenPlatformGeometry(layout, {
     segments: params.dimensions.width,
     ringADetailBand: {
@@ -95,6 +97,7 @@ export function createGoldenPlatform(params: CreateGoldenPlatformParams): Golden
       blockDepth: params.board.blockDepth,
       blockSize: params.board.blockSize,
       columns: params.dimensions.width,
+      angleOffsetRad: footprintAngleOffsetRad,
     },
   });
 
@@ -103,6 +106,7 @@ export function createGoldenPlatform(params: CreateGoldenPlatformParams): Golden
     blockDepth: params.board.blockDepth,
     blockSize: params.board.blockSize,
     columns: params.dimensions.width,
+    angleOffsetRad: footprintAngleOffsetRad,
   });
 
   const materials: THREE.Material[] = [

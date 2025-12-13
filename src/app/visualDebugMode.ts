@@ -52,6 +52,7 @@ import { collectHallSnapshot } from '../render/debug/hallGeometrySnapshot';
 import { analyzeHallGeometry, HallGeometryViolation } from '../render/debug/hallGeometryMonitor';
 import { buildHallBugTemplate, buildHallGeometryFrameLog } from '../render/debug/hallGeometryReport';
 import { PlatformLayout } from '../render/platformLayout';
+import { computeFootprintAngleOffsetRad } from '../render/footprintAngles';
 
 type CameraMode = 'game' | 'inspect';
 
@@ -446,6 +447,8 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
       snapshot: lastHallSnapshot,
       hallLayout: ctx.hallLayout,
       platformLayout,
+      columns: ctx.renderConfig.boardDimensions.width,
+      footprintAngleOffsetRad: computeFootprintAngleOffsetRad(ctx.renderConfig.boardDimensions.width),
     });
     hallViolations = result.violations;
     hallGeometryPanel?.setViolations(hallViolations);

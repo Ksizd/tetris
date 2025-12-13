@@ -1,10 +1,12 @@
 import * as THREE from 'three';
+import { computeFootprintAngleOffsetRad } from './footprintAngles';
 
 export interface FootprintCarveParams {
   towerRadius: number;
   blockDepth: number;
   blockSize: number;
   columns: number;
+  angleOffsetRad?: number;
 }
 
 export interface FootprintCarvedRingTopParams {
@@ -73,6 +75,8 @@ export function buildFootprintCarvedRingTopGeometry(
   const blockDepth = params.carve.blockDepth;
   const blockSize = params.carve.blockSize;
   const towerRadius = params.carve.towerRadius;
+  const footprintAngleOffsetRad =
+    params.carve.angleOffsetRad ?? computeFootprintAngleOffsetRad(columns);
 
   const R0 = towerRadius - blockDepth * 0.5;
   const R1 = towerRadius + blockDepth * 0.5;
@@ -103,10 +107,11 @@ export function buildFootprintCarvedRingTopGeometry(
   const yWallBottom = yBottom + microBevelHeight;
 
   const signedDistanceToFootprint = (radius: number, theta: number) => {
+    const thetaAligned = theta - footprintAngleOffsetRad;
     const sRing0 = Math.abs(radius - R0) - grooveHalfW;
     const sRing1 = Math.abs(radius - R1) - grooveHalfW;
 
-    const columnPosition = theta / dTheta;
+    const columnPosition = thetaAligned / dTheta;
     const frac = columnPosition - Math.floor(columnPosition);
     const distToBoundary = Math.min(frac, 1 - frac) * dTheta;
     const sTheta = distToBoundary - thetaHalfW;

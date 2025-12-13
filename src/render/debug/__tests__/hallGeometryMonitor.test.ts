@@ -89,6 +89,7 @@ describe('hallGeometryMonitor (17.5 acceptance)', () => {
       snapshot: makeSnapshot(),
       hallLayout: BASE_HALL,
       platformLayout: BASE_LAYOUT,
+      columns: 16,
       config: { floorEpsilon: 0.02 },
     });
     expect(result.violations.length).toBe(0);
@@ -109,6 +110,7 @@ describe('hallGeometryMonitor (17.5 acceptance)', () => {
       snapshot: snap,
       hallLayout: BASE_HALL,
       platformLayout: BASE_LAYOUT,
+      columns: 16,
     });
     expect(result.violations.some((v) => v.invariant === 'INV_FOOTPRINT_NOT_BURIED')).toBe(true);
   });
@@ -130,6 +132,7 @@ describe('hallGeometryMonitor (17.5 acceptance)', () => {
       }),
       hallLayout: BASE_HALL,
       platformLayout: layout,
+      columns: 16,
       config: { floorEpsilon: 0.01 },
     });
     expect(
