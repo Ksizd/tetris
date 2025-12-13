@@ -8,6 +8,7 @@ export interface HallGeometryDiagnosticsConfig {
   floorEpsilon: number;
   penetrationEpsilon: number;
   footprintMaxOffset: number;
+  engravingMaxDepth: number;
   orientationCosTolerance: number;
 }
 
@@ -40,6 +41,7 @@ const DEFAULT_CONFIG: HallGeometryDiagnosticsConfig = {
   floorEpsilon: 0.01,
   penetrationEpsilon: 0.002,
   footprintMaxOffset: 0.05,
+  engravingMaxDepth: 0.2,
   orientationCosTolerance: 0.98,
 };
 
@@ -87,11 +89,12 @@ export function runHallGeometryDiagnostics(
     footprintMinY = box.min.y;
     footprintMaxY = box.max.y;
     if (ringATop !== undefined) {
-      if (footprintMinY < ringATop - cfg.floorEpsilon) {
+      const depth = ringATop - footprintMinY;
+      if (depth > cfg.engravingMaxDepth + cfg.floorEpsilon) {
         errors.push(
-          `[Footprint Y] minY=${footprintMinY.toFixed(
+          `[Footprint Y] depth=${depth.toFixed(4)} exceeds engravingMaxDepth=${cfg.engravingMaxDepth.toFixed(
             4
-          )} below ring A top ${ringATop.toFixed(4)} (eps=${cfg.floorEpsilon})`
+          )} (ringA top ${ringATop.toFixed(4)})`
         );
       }
       if (footprintMaxY > ringATop + cfg.footprintMaxOffset + cfg.floorEpsilon) {
@@ -109,8 +112,8 @@ export function runHallGeometryDiagnostics(
   // Radii ordering
   if (platformLayout) {
     const radiiIssues: string[] = [];
-    if (!(input.hallLayout.towerOuterRadius < footprintRadius)) {
-      radiiIssues.push('R_tower < R_footprintInner violated');
+    if (!(footprintRadius + 1e-6 >= input.hallLayout.towerOuterRadius)) {
+      radiiIssues.push('R_footprintOuter < R_tower violated');
     }
     if (!(footprintRadius < platformLayout.ringB.outer)) {
       radiiIssues.push('R_footprintOuter < R_ringBOuter violated');
@@ -194,13 +197,15 @@ export function runHallGeometryDiagnostics(
     }
   }
   if (platformBox && footprintBox) {
-    const penetration = penetrationDepth(platformBox, footprintBox);
-    if (penetration !== null && penetration > cfg.penetrationEpsilon) {
-      warnings.push(
-        `[Collision] platform vs footprint overlap penetration=${penetration.toFixed(
-          4
-        )} (> ${cfg.penetrationEpsilon})`
-      );
+    if (!(ringATop !== undefined && footprintMaxY !== undefined && footprintMaxY <= ringATop + cfg.floorEpsilon)) {
+      const penetration = penetrationDepth(platformBox, footprintBox);
+      if (penetration !== null && penetration > cfg.penetrationEpsilon) {
+        warnings.push(
+          `[Collision] platform vs footprint overlap penetration=${penetration.toFixed(
+            4
+          )} (> ${cfg.penetrationEpsilon})`
+        );
+      }
     }
   }
 

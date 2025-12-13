@@ -19,7 +19,7 @@ import {
   VisualDebugControls,
 } from './visualDebugControls';
 import { ObjectInspector } from '../render/debug/objectInspector';
-import { ObjectDebugInfo } from '../render/debug/objectInspectorTypes';
+import { ObjectDebugInfo, readDebugTag } from '../render/debug/objectInspectorTypes';
 import { OrbitCameraController } from './orbitCamera';
 import { QualityLevel, RenderModeConfig } from '../render/renderConfig';
 import { applyMaterialDebugMode, createMaterialsSnapshot } from '../render/materialDebug';
@@ -64,9 +64,9 @@ const TRANSITION_DURATION_MS = 450;
 const GAME_MODE_ROTATION_SPEED = 0.00035;
 const VISUAL_DEBUG_RENDER_MODE: RenderModeConfig = {
   kind: 'visualDebug',
-  showGuides: true,
-  showDebugRing: true,
-  showColliders: true,
+  showGuides: false,
+  showDebugRing: false,
+  showColliders: false,
 };
 
 export function isVisualDebugModeEnabled(): boolean {
@@ -249,6 +249,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
         rebuildHallGeometryOverlay(ctx);
       },
       onCopyReport: () => copyHallGeometryReport(ctx),
+      onCopyFootprintInlayReport: () => copyFootprintInlayReport(ctx),
       onCopySnapshot: () => copyHallGeometrySnapshotJson(ctx),
       onCopyBugTemplate: () => copyHallBugTemplate(ctx),
       onPlatformOffsetChange: (v) => {
@@ -313,7 +314,9 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     if (hallFloorTop === null) {
       return;
     }
-    const desiredTop = ringATop - 0.002;
+    const blockSize = hall.layout.footprint.blockSize;
+    const grooveD = THREE.MathUtils.clamp(blockSize * 0.08, blockSize * 0.04, blockSize * 0.08);
+    const desiredTop = ringATop - grooveD - 0.002;
     const delta = hallFloorTop - desiredTop;
     if (Math.abs(delta) > 1e-6) {
       hall.baseGroup.position.y -= delta;
@@ -364,7 +367,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
 
   const rebuildHallGeometryOverlay = (ctx: RenderContext, snap: ReturnType<typeof collectHallSnapshot> | null = lastHallSnapshot) => {
     disposeHallGeometryOverlay();
-    if (!snap) {
+    if (!snap || !controlState.showHallGeometryOverlay) {
       return;
     }
     const group = new THREE.Group();
@@ -491,6 +494,116 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     lines.push('HALL_GEOMETRY_REPORT_END');
     const text = lines.join('\n');
     copyToClipboardOrConsole(text, '[hallGeometry] report copy failed');
+  };
+
+  const copyFootprintInlayReport = (ctx: RenderContext) => {
+    if (!ctx.goldenPlatform?.layout) {
+      return;
+    }
+    const lines: string[] = [];
+    const board = ctx.renderConfig.board;
+    const layout = ctx.goldenPlatform.layout;
+    const t = ctx.clock.getElapsedTime();
+
+    const R0 = board.towerRadius - board.blockDepth * 0.5;
+    const R1 = board.towerRadius + board.blockDepth * 0.5;
+    const grooveW = Math.min(board.blockDepth * 0.1, Math.max(board.blockDepth * 0.06, board.blockDepth * 0.08));
+    const grooveD = Math.min(board.blockSize * 0.08, Math.max(board.blockSize * 0.04, board.blockSize * 0.08));
+    const microBevelHeight = grooveD * 0.12;
+    const ringATopY = layout.baseY + layout.ringA.height;
+    const lavaSurfaceY = ringATopY - grooveD + microBevelHeight * 0.95;
+
+    lines.push('FOOTPRINT_INLAY_REPORT_BEGIN');
+    lines.push(`Scenario: ${hallGeometryLab ? 'hallGeometryLab' : 'visualDebug'}`);
+    lines.push(`Mode: inlayLava`);
+    lines.push(
+      `Debug: wireframe=${controlState.showFootprintInlayWireframe} lavaUV=${controlState.showFootprintLavaUV}`
+    );
+    lines.push(`Time: freeze=${controlState.disableFootprintLavaAnimation} t=${t.toFixed(3)}`);
+    lines.push('Band:');
+    lines.push(`  innerR: ${R0.toFixed(3)} | outerR: ${R1.toFixed(3)}`);
+    lines.push('Channels:');
+    lines.push(`  grooveW: ${grooveW.toFixed(3)} | grooveD: ${grooveD.toFixed(3)}`);
+    lines.push('Y:');
+    lines.push(
+      `  ringATopY: ${ringATopY.toFixed(3)} | engraveDepth: ${grooveD.toFixed(3)} | lavaSurfaceY: ${lavaSurfaceY.toFixed(3)}`
+    );
+    lines.push('BBoxes:');
+    lines.push(
+      `  gold: min=${[-R1, ringATopY - grooveD, -R1].map((v) => v.toFixed(3)).join(',')} max=${[
+        R1,
+        ringATopY,
+        R1,
+      ]
+        .map((v) => v.toFixed(3))
+        .join(',')}`
+    );
+    const lavaR = Math.max(0, R1 - grooveW);
+    lines.push(
+      `  lava: min=${[-lavaR, lavaSurfaceY, -lavaR].map((v) => v.toFixed(3)).join(',')} max=${[
+        lavaR,
+        lavaSurfaceY,
+        lavaR,
+      ]
+        .map((v) => v.toFixed(3))
+        .join(',')}`
+    );
+
+    lines.push('Materials:');
+    const mats = Array.isArray(ctx.goldenPlatform.mesh.material) ? ctx.goldenPlatform.mesh.material : [];
+    const describeMaterial = (mat: unknown) => {
+      const m = mat as any;
+      const type = m?.type ?? typeof mat;
+      const roughness = typeof m?.roughness === 'number' ? m.roughness.toFixed(3) : undefined;
+      const metalness = typeof m?.metalness === 'number' ? m.metalness.toFixed(3) : undefined;
+      const color = m?.color?.getHexString ? `#${m.color.getHexString()}` : undefined;
+      const toneMapped = typeof m?.toneMapped === 'boolean' ? m.toneMapped : undefined;
+      const depthTest = typeof m?.depthTest === 'boolean' ? m.depthTest : undefined;
+      const depthWrite = typeof m?.depthWrite === 'boolean' ? m.depthWrite : undefined;
+      const uniforms = m?.uniforms as Record<string, { value: any }> | undefined;
+      const intensity =
+        uniforms?.uIntensity && typeof uniforms.uIntensity.value === 'number'
+          ? uniforms.uIntensity.value.toFixed(3)
+          : undefined;
+      const debugUv =
+        uniforms?.uDebugLavaUV && typeof uniforms.uDebugLavaUV.value === 'number'
+          ? uniforms.uDebugLavaUV.value
+          : undefined;
+      return {
+        type,
+        color,
+        roughness,
+        metalness,
+        toneMapped,
+        depthTest,
+        depthWrite,
+        intensity,
+        debugUv,
+      };
+    };
+    lines.push(`  goldTop: ${JSON.stringify(describeMaterial(mats[0] ?? null))}`);
+    lines.push(`  goldCarve: ${JSON.stringify(describeMaterial(mats[1] ?? null))}`);
+    lines.push(`  lavaBottom: ${JSON.stringify(describeMaterial(mats[2] ?? null))}`);
+
+    lines.push('Objects:');
+    const items: string[] = [];
+    ctx.goldenPlatform.mesh.traverse((obj) => {
+      const name = obj.name || obj.type;
+      if (!name.toLowerCase().includes('footprint')) {
+        return;
+      }
+      const tag = readDebugTag(obj);
+      items.push(`- ${name}${tag?.kind ? ` (${tag.kind})` : ''}`);
+    });
+    if (!items.length) {
+      lines.push('- none');
+    } else {
+      lines.push(...items);
+    }
+
+    lines.push('FOOTPRINT_INLAY_REPORT_END');
+    const text = lines.join('\n');
+    copyToClipboardOrConsole(text, '[footprintInlay] report copy failed');
   };
 
   const copyHallGeometrySnapshotJson = (ctx: RenderContext) => {
@@ -648,6 +761,9 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
       controlState.materialDebugMode = 'none';
       controlState.envDebugMode = 'full';
       controlState.autoRotateEnabled = false;
+      controlState.showFootprintInlayWireframe = false;
+      controlState.showFootprintLavaUV = false;
+      controlState.disableFootprintLavaAnimation = false;
       controlState.hallMaterialMode = 'off';
       controlState.goldenHallEnabled = renderCtx.renderConfig.goldenHall.enabled;
       controlState.showHallBase = true;
@@ -1301,6 +1417,13 @@ function configToControlState(config: RenderConfig): VisualControlState {
     hemisphereIntensity: config.lights.hemisphere.intensity,
     keyIntensity: config.lights.key.intensity,
     autoRotateEnabled: false,
+    showSceneGuides: config.renderMode.showGuides,
+    showSceneDebugRing: config.renderMode.showDebugRing,
+    showSceneColliders: config.renderMode.showColliders,
+    showHallGeometryOverlay: false,
+    showFootprintInlayWireframe: Boolean(config.showFootprintInlayWireframe),
+    showFootprintLavaUV: Boolean(config.showFootprintLavaUV),
+    disableFootprintLavaAnimation: Boolean(config.disableFootprintLavaAnimation),
     qualityLevel: config.quality.level,
     materialDebugMode: 'none',
     envDebugMode: 'full',
@@ -1357,7 +1480,15 @@ function controlStateToOverrides(
       enabled: state.goldenHallEnabled,
       wallHeight: state.hallWallHeight,
     },
-    renderMode: { ...VISUAL_DEBUG_RENDER_MODE },
+    renderMode: {
+      ...VISUAL_DEBUG_RENDER_MODE,
+      showGuides: state.showSceneGuides,
+      showDebugRing: state.showSceneDebugRing,
+      showColliders: state.showSceneColliders,
+    },
+    showFootprintInlayWireframe: state.showFootprintInlayWireframe,
+    showFootprintLavaUV: state.showFootprintLavaUV,
+    disableFootprintLavaAnimation: state.disableFootprintLavaAnimation,
   };
 }
 

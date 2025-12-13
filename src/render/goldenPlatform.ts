@@ -6,10 +6,13 @@ import { PlatformLayout, computePlatformLayout } from './platformLayout';
 import { createDefaultPlatformDesign } from './platformDesign';
 import { createGoldenPlatformGeometry } from './goldenPlatformGeometry';
 import { DebugTag } from './debug/objectInspectorTypes';
+import { createFootprintSakuraLavaMaterial } from './footprintLavaMaterial';
+import { createFootprintLavaFx } from './footprintLavaFx';
 
 export interface GoldenPlatformInstance {
   mesh: THREE.Mesh;
   layout: PlatformLayout;
+  update: (timeSeconds: number) => void;
   dispose: () => void;
 }
 
@@ -21,6 +24,33 @@ export interface CreateGoldenPlatformParams {
 }
 
 const PLATFORM_ASSERT_EPS = 1e-4;
+const FOOTPRINT_HELPER_EPS = 1e-6;
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+function createFootprintInlayCoreHelper(
+  layout: PlatformLayout,
+  board: BoardRenderConfig,
+  columns: number
+): THREE.Mesh {
+  const ringATopY = layout.baseY + layout.ringA.height;
+  const R1 = board.towerRadius + board.blockDepth * 0.5;
+  const grooveD = clamp(board.blockSize * 0.08, board.blockSize * 0.04, board.blockSize * 0.08);
+  const height = Math.max(FOOTPRINT_HELPER_EPS, grooveD);
+  const segments = Math.max(24, Math.min(96, Math.floor(columns) * 4));
+  const geometry = new THREE.CylinderGeometry(R1, R1, height, segments, 1, true);
+  const material = new THREE.MeshBasicMaterial({ visible: false });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.name = 'footprintInlayCore';
+  mesh.position.y = ringATopY - height * 0.5;
+  mesh.userData.debugSelectable = false;
+  mesh.userData.debugTag = {
+    kind: 'footprintCore',
+    sourceFile: 'src/render/goldenPlatform.ts',
+    sourceFunction: 'createFootprintInlayCoreHelper',
+  } satisfies DebugTag;
+  return mesh;
+}
 
 function assertPlatformInvariants(
   layout: PlatformLayout,
@@ -54,10 +84,31 @@ export function createGoldenPlatform(params: CreateGoldenPlatformParams): Golden
   const design = createDefaultPlatformDesign(params.board.blockSize * (params.designScale ?? 1));
   const layout = computePlatformLayout(params.hallLayout, params.board, design);
   assertPlatformInvariants(layout, params.board, params.hallLayout);
-  const geometry = createGoldenPlatformGeometry(layout, { segments: params.dimensions.width });
+  const geometry = createGoldenPlatformGeometry(layout, {
+    segments: params.dimensions.width,
+    ringADetailBand: {
+      inner: params.board.towerRadius - params.board.blockDepth * 0.5,
+      outer: params.board.towerRadius + params.board.blockDepth * 0.5,
+    },
+    footprintCarve: {
+      towerRadius: params.board.towerRadius,
+      blockDepth: params.board.blockDepth,
+      blockSize: params.board.blockSize,
+      columns: params.dimensions.width,
+    },
+  });
+
+  const lava = createFootprintSakuraLavaMaterial({
+    towerRadius: params.board.towerRadius,
+    blockDepth: params.board.blockDepth,
+    blockSize: params.board.blockSize,
+    columns: params.dimensions.width,
+  });
 
   const materials: THREE.Material[] = [
     new THREE.MeshStandardMaterial({ color: 0xd9b169, metalness: 0.55, roughness: 0.3 }),
+    new THREE.MeshStandardMaterial({ color: 0xc19444, metalness: 0.55, roughness: 0.62 }),
+    lava.material,
     new THREE.MeshStandardMaterial({ color: 0xf1c779, metalness: 0.6, roughness: 0.26 }),
     new THREE.MeshStandardMaterial({ color: 0xf6d48e, metalness: 0.65, roughness: 0.32 }),
     new THREE.MeshStandardMaterial({ color: 0xe6c27a, metalness: 0.6, roughness: 0.36 }),
@@ -70,12 +121,41 @@ export function createGoldenPlatform(params: CreateGoldenPlatformParams): Golden
   mesh.receiveShadow = true;
   attachPlatformDebugHelpers(mesh, layout);
 
+  const footprintFx = createFootprintLavaFx({
+    dimensions: params.dimensions,
+    board: params.board,
+    platformLayout: layout,
+    includeSteam: false,
+  });
+  const footprintInlay = new THREE.Group();
+  footprintInlay.name = 'footprintInlay';
+  footprintInlay.userData.debugSelectable = false;
+  footprintInlay.userData.debugTag = {
+    kind: 'hallFootprint',
+    sourceFile: 'src/render/goldenPlatform.ts',
+    sourceFunction: 'createGoldenPlatform',
+  } satisfies DebugTag;
+  const footprintCore = createFootprintInlayCoreHelper(layout, params.board, params.dimensions.width);
+  footprintInlay.add(footprintCore);
+  if (footprintFx) {
+    footprintInlay.add(footprintFx.group);
+  }
+  mesh.add(footprintInlay);
+
+  const update = (timeSeconds: number) => {
+    lava.uniforms.uTime.value = timeSeconds;
+    footprintFx?.update(timeSeconds);
+  };
+
   const dispose = () => {
     geometry.dispose();
     materials.forEach((m) => m.dispose());
+    footprintFx?.dispose();
+    footprintCore.geometry.dispose();
+    (footprintCore.material as THREE.Material).dispose();
   };
 
-  return { mesh, layout, dispose };
+  return { mesh, layout, update, dispose };
 }
 
 function attachPlatformDebugHelpers(target: THREE.Mesh, layout: PlatformLayout): void {
@@ -93,10 +173,11 @@ function attachPlatformDebugHelpers(target: THREE.Mesh, layout: PlatformLayout):
     kind: DebugTag['kind'],
     name: string
   ) => {
-    const geom = new THREE.CylinderGeometry(outer, outer, 0.002, segmentCount, 1, true);
+    const helperHeight = 0.002;
+    const geom = new THREE.CylinderGeometry(outer, outer, helperHeight, segmentCount, 1, true);
     const mesh = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ visible: false }));
     mesh.name = name;
-    mesh.position.y = y;
+    mesh.position.y = y - helperHeight * 0.5;
     mesh.userData.debugTag = { kind, sourceFile: 'src/render/goldenPlatform.ts' } satisfies DebugTag;
     helperGroup.add(mesh);
   };

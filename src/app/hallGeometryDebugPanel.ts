@@ -16,6 +16,7 @@ export interface HallGeometryDebugPanelOptions {
   onToggleAuto: (enabled: boolean) => void;
   onSelectViolation?: (violation: HallGeometryViolation | null) => void;
   onCopyReport?: () => void;
+  onCopyFootprintInlayReport?: () => void;
   onCopySnapshot?: () => void;
   onCopyBugTemplate?: () => void;
   onPlatformOffsetChange?: (value: number) => void;
@@ -81,6 +82,14 @@ export function createHallGeometryDebugPanel(options: HallGeometryDebugPanelOpti
   copyBtn.style.width = '100%';
   copyBtn.addEventListener('click', () => options.onCopyReport?.());
   container.appendChild(copyBtn);
+
+  const copyFootprintBtn = document.createElement('button');
+  copyFootprintBtn.textContent = 'Copy footprint inlay report';
+  styleButton(copyFootprintBtn, '#2b7a78');
+  copyFootprintBtn.style.width = '100%';
+  copyFootprintBtn.style.marginTop = '6px';
+  copyFootprintBtn.addEventListener('click', () => options.onCopyFootprintInlayReport?.());
+  container.appendChild(copyFootprintBtn);
 
   const copyRow = document.createElement('div');
   copyRow.style.display = 'flex';

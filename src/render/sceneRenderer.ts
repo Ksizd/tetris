@@ -20,10 +20,12 @@ export type SceneRenderContext = Pick<
   | 'renderConfig'
   | 'fragments'
   | 'camera'
+  | 'clock'
   | 'towerBounds'
   | 'hallLayout'
   | 'cameraBasePlacement'
   | 'goldenHall'
+  | 'goldenPlatform'
 >;
 
 export interface SceneDestructionPayload {
@@ -44,6 +46,9 @@ export function renderScene(
   deltaMs?: number,
   ghost?: GhostRenderState | null
 ): void {
+  const timeSeconds = ctx.clock.getElapsedTime();
+  const footprintTimeSeconds = ctx.renderConfig.disableFootprintLavaAnimation ? 0 : timeSeconds;
+  ctx.goldenPlatform?.update(footprintTimeSeconds);
   if (cameraFollow?.enabled) {
     updateGameCamera(ctx.camera, ctx.cameraBasePlacement, ctx.towerBounds, cameraFollow, deltaMs ?? 0);
     ctx.renderConfig.camera.position.copy(ctx.camera.position);

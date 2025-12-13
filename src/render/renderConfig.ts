@@ -203,6 +203,9 @@ export interface RenderConfig {
   showGhostPreview?: boolean;
   showFootprintDecor?: boolean;
   showRawFootprintOverlay?: boolean;
+  showFootprintInlayWireframe?: boolean;
+  showFootprintLavaUV?: boolean;
+  disableFootprintLavaAnimation?: boolean;
 }
 
 export interface RenderConfigOverrides {
@@ -225,6 +228,9 @@ export interface RenderConfigOverrides {
   renderMode?: Partial<RenderModeConfig>;
   showFootprintDecor?: boolean;
   showRawFootprintOverlay?: boolean;
+  showFootprintInlayWireframe?: boolean;
+  showFootprintLavaUV?: boolean;
+  disableFootprintLavaAnimation?: boolean;
 }
 
 export interface PartialLightRigConfig {
@@ -372,8 +378,11 @@ export function createRenderConfig(
     quality,
     renderMode,
     showGhostPreview: true,
-    showFootprintDecor: overrides.showFootprintDecor ?? true,
+    showFootprintDecor: overrides.showFootprintDecor ?? false,
     showRawFootprintOverlay: overrides.showRawFootprintOverlay ?? false,
+    showFootprintInlayWireframe: overrides.showFootprintInlayWireframe ?? false,
+    showFootprintLavaUV: overrides.showFootprintLavaUV ?? false,
+    disableFootprintLavaAnimation: overrides.disableFootprintLavaAnimation ?? false,
   };
 
   if (quality.level === 'ultra2') {

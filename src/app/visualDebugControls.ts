@@ -14,6 +14,13 @@ export interface VisualControlState {
   hemisphereIntensity: number;
   keyIntensity: number;
   autoRotateEnabled: boolean;
+  showSceneGuides: boolean;
+  showSceneDebugRing: boolean;
+  showSceneColliders: boolean;
+  showHallGeometryOverlay: boolean;
+  showFootprintInlayWireframe: boolean;
+  showFootprintLavaUV: boolean;
+  disableFootprintLavaAnimation: boolean;
   qualityLevel: 'ultra' | 'ultra2' | 'medium' | 'low';
   materialDebugMode: 'none' | 'matcap' | 'flat';
   envDebugMode: 'full' | 'lightsOnly' | 'envOnly' | 'hallOnly' | 'noHall';
@@ -73,6 +80,9 @@ export function createVisualDebugControls(
     borderRadius: '8px',
     zIndex: '2000',
     width: '220px',
+    maxHeight: 'calc(100vh - 24px)',
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
   });
 
   const title = document.createElement('div');
@@ -210,6 +220,73 @@ export function createVisualDebugControls(
   autoRotateRow.appendChild(autoRotateLabel);
   autoRotateRow.appendChild(autoRotateCheckbox);
   container.appendChild(autoRotateRow);
+
+  const overlaysRow = document.createElement('div');
+  overlaysRow.style.display = 'flex';
+  overlaysRow.style.flexDirection = 'column';
+  overlaysRow.style.marginBottom = '8px';
+
+  const overlaysTitle = document.createElement('div');
+  overlaysTitle.textContent = 'Debug overlays';
+  overlaysTitle.style.fontWeight = 'bold';
+  overlaysTitle.style.marginBottom = '4px';
+  overlaysRow.appendChild(overlaysTitle);
+
+  [
+    { key: 'showSceneGuides', label: 'Scene guides (rails + axes)' },
+    { key: 'showSceneDebugRing', label: 'Scene debug ring' },
+    { key: 'showSceneColliders', label: 'Collider debug layer' },
+    { key: 'showHallGeometryOverlay', label: 'Hall geometry overlay (circles/boxes)' },
+  ].forEach((item) => {
+    const row = document.createElement('label');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = Boolean(state[item.key as keyof VisualControlState]);
+    cb.addEventListener('change', () => {
+      (state as any)[item.key] = cb.checked;
+      onChange({ ...state });
+    });
+    cb.style.marginRight = '6px';
+    row.appendChild(cb);
+    row.appendChild(document.createTextNode(item.label));
+    overlaysRow.appendChild(row);
+  });
+  container.appendChild(overlaysRow);
+
+  const footprintRow = document.createElement('div');
+  footprintRow.style.display = 'flex';
+  footprintRow.style.flexDirection = 'column';
+  footprintRow.style.marginBottom = '8px';
+
+  const footprintTitle = document.createElement('div');
+  footprintTitle.textContent = 'Footprint inlay';
+  footprintTitle.style.fontWeight = 'bold';
+  footprintTitle.style.marginBottom = '4px';
+  footprintRow.appendChild(footprintTitle);
+
+  [
+    { key: 'showFootprintInlayWireframe', label: 'Wireframe (inlay)' },
+    { key: 'showFootprintLavaUV', label: 'Show lava UV' },
+    { key: 'disableFootprintLavaAnimation', label: 'Freeze lava/FX time' },
+  ].forEach((item) => {
+    const row = document.createElement('label');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = Boolean(state[item.key as keyof VisualControlState]);
+    cb.addEventListener('change', () => {
+      (state as any)[item.key] = cb.checked;
+      onChange({ ...state });
+    });
+    cb.style.marginRight = '6px';
+    row.appendChild(cb);
+    row.appendChild(document.createTextNode(item.label));
+    footprintRow.appendChild(row);
+  });
+  container.appendChild(footprintRow);
 
   const inspectorRow = document.createElement('div');
   inspectorRow.style.display = 'flex';

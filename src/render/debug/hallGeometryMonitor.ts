@@ -28,6 +28,7 @@ export interface HallGeometryMonitorConfig {
   penetrationEpsilon: number;
   footprintMaxOffset: number;
   footprintAboveEpsilon: number;
+  engravingMaxDepth: number;
   orientationCosTolerance: number;
   ringOrderEpsilon: number;
 }
@@ -44,6 +45,7 @@ const DEFAULT_CONFIG: HallGeometryMonitorConfig = {
   penetrationEpsilon: 0.002,
   footprintMaxOffset: 0.05,
   footprintAboveEpsilon: 0.001,
+  engravingMaxDepth: 0.2,
   orientationCosTolerance: 0.996, // ~5 degrees
   ringOrderEpsilon: 1e-3,
 };
@@ -67,7 +69,7 @@ export function analyzeHallGeometry(input: HallGeometryMonitorInput): { violatio
     ...checkFootprintNotBuried(input.snapshot, ringA, cfg),
     ...checkFootprintOrientation(input.snapshot, cfg),
     ...checkPlatformRingRadiiOrder(input.snapshot, input.hallLayout, input.platformLayout, ringA, ringB, ringC, cfg),
-    ...checkPlatformIntersections(input.snapshot, platformAll, cfg),
+    ...checkPlatformIntersections(input.snapshot, platformAll, ringA, cfg),
     ...checkTowerIntersections(input.snapshot, platformAll, cfg),
     ...checkHallFloorNotAboveTower(input.snapshot, ringA, cfg),
     ...checkUnknownObjects(input.snapshot)
@@ -145,7 +147,8 @@ function checkFootprintHeightRange(
   const ringATop = ringABox ? ringABox.max.y : layout.baseY + layout.ringA.height;
   const minY = footprintBox.min.y;
   const maxY = footprintBox.max.y;
-  if (minY < ringATop - cfg.floorEpsilon || maxY > ringATop + cfg.footprintMaxOffset + cfg.floorEpsilon) {
+  const depth = ringATop - minY;
+  if (depth > cfg.engravingMaxDepth + cfg.floorEpsilon || maxY > ringATop + cfg.footprintMaxOffset + cfg.floorEpsilon) {
     violations.push({
       invariant: 'INV_FOOTPRINT_HEIGHT_RANGE',
       severity: 'error',
@@ -153,7 +156,15 @@ function checkFootprintHeightRange(
         4
       )})`,
       objectsInvolved: collectNames(snapshot.footprints),
-      details: { minY, maxY, ringATop, offset: cfg.footprintMaxOffset, epsilon: cfg.floorEpsilon },
+      details: {
+        minY,
+        maxY,
+        ringATop,
+        depth,
+        engravingMaxDepth: cfg.engravingMaxDepth,
+        offset: cfg.footprintMaxOffset,
+        epsilon: cfg.floorEpsilon,
+      },
     });
   }
   return violations;
@@ -173,13 +184,19 @@ function checkFootprintNotBuried(
     return violations;
   }
   const ringATop = ringABox.max.y;
-  if (footprintBox.max.y <= ringATop + cfg.footprintAboveEpsilon) {
+  const buriedBy = ringATop - footprintBox.max.y;
+  if (buriedBy > cfg.footprintAboveEpsilon) {
     violations.push({
       invariant: 'INV_FOOTPRINT_NOT_BURIED',
       severity: 'error',
-      message: `Footprint buried: maxY=${footprintBox.max.y.toFixed(4)} is not above ringA top ${ringATop.toFixed(4)}`,
+      message: `Footprint buried: maxY=${footprintBox.max.y.toFixed(4)} is below ringA top ${ringATop.toFixed(4)} by ${buriedBy.toFixed(4)}`,
       objectsInvolved: collectNames(snapshot.footprints),
-      details: { footprintBox: serializeBox(footprintBox), ringATop, epsilon: cfg.footprintAboveEpsilon },
+      details: {
+        footprintBox: serializeBox(footprintBox),
+        ringATop,
+        buriedBy,
+        epsilon: cfg.footprintAboveEpsilon,
+      },
     });
   }
   return violations;
@@ -235,8 +252,8 @@ function checkPlatformRingRadiiOrder(
   const rHall = hallLayout.hallInnerRadius;
 
   const problems: string[] = [];
-  if (rFootprintOuter !== null && !(rFootprintOuter > rTower + cfg.ringOrderEpsilon)) {
-    problems.push('R_footprintOuter <= R_tower');
+  if (rFootprintOuter !== null && rFootprintOuter + cfg.ringOrderEpsilon < rTower) {
+    problems.push('R_footprintOuter < R_tower');
   }
   if (!(rA > rTower + cfg.ringOrderEpsilon)) {
     problems.push('R_ringA <= R_tower');
@@ -262,6 +279,7 @@ function checkPlatformRingRadiiOrder(
 function checkPlatformIntersections(
   snapshot: HallGeometrySnapshot,
   platformBox: THREE.Box3 | null,
+  ringABox: THREE.Box3 | null,
   cfg: HallGeometryMonitorConfig
 ): HallGeometryViolation[] {
   const violations: HallGeometryViolation[] = [];
@@ -270,6 +288,12 @@ function checkPlatformIntersections(
   }
   const footprintBox = unionBoxes(snapshot.footprints);
   if (footprintBox) {
+    if (ringABox) {
+      const ringATop = ringABox.max.y;
+      if (footprintBox.max.y <= ringATop + cfg.floorEpsilon) {
+        return violations;
+      }
+    }
     const penetration = penetrationDepth(platformBox, footprintBox);
     if (penetration !== null && penetration > cfg.penetrationEpsilon) {
       violations.push({

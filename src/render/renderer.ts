@@ -46,6 +46,7 @@ export interface RenderContext {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   renderer: THREE.WebGLRenderer;
+  clock: THREE.Clock;
   boardPlaceholder: THREE.Group;
   board: BoardInstancedResources;
   activePiece: ActivePieceInstancedResources;
@@ -98,7 +99,9 @@ function alignHallToPlatform(ringATop: number, hall: GoldenHallInstance): void {
   if (hallFloorTop === null) {
     return;
   }
-  const desiredTop = ringATop - 0.002; // keep a tiny clearance below platform top
+  const blockSize = hall.layout.footprint.blockSize;
+  const grooveD = THREE.MathUtils.clamp(blockSize * 0.08, blockSize * 0.04, blockSize * 0.08);
+  const desiredTop = ringATop - grooveD - 0.002; // keep hall floor below footprint grooves
   const delta = hallFloorTop - desiredTop;
   if (Math.abs(delta) > 1e-6) {
     hall.baseGroup.position.y -= delta;
@@ -138,6 +141,7 @@ export function createRenderContext(
   overrides?: RenderConfigOverrides
 ): RenderContext {
   const scene = new THREE.Scene();
+  const clock = new THREE.Clock();
   const aspect = canvas.clientWidth / Math.max(1, canvas.clientHeight);
   const renderConfig = createRenderConfig(overrides, aspect);
   const mapper = new BoardToWorldMapper(renderConfig.boardDimensions, renderConfig.board);
@@ -238,6 +242,7 @@ export function createRenderContext(
     dimensions: renderConfig.boardDimensions,
   });
   scene.add(goldenPlatform.mesh);
+  applyFootprintInlayDebugFlags(goldenPlatform, renderConfig);
 
   if (renderConfig.goldenHall.enabled) {
     const hallMaterials = createGoldenHallMaterials({
@@ -275,12 +280,14 @@ export function createRenderContext(
   }
 
   if (typeof console !== 'undefined') {
+    const footprintInlayCore =
+      goldenPlatform?.mesh.getObjectByName('footprintInlayCore') ?? null;
     const diag = runHallGeometryDiagnostics({
       board: renderConfig.board,
       hallLayout,
       platformLayout: goldenPlatform?.layout ?? null,
       platformObject: goldenPlatform?.mesh ?? null,
-      footprintObject: footprintDecor,
+      footprintObject: footprintInlayCore ?? footprintDecor,
     });
     if (diag.errors.length || diag.warnings.length) {
       console.groupCollapsed('[hallGeometry] invariants (17.0)');
@@ -344,6 +351,7 @@ export function createRenderContext(
     scene,
     camera,
     renderer,
+    clock,
     boardPlaceholder: debugOverlays.group,
     board: boardInstanced,
     activePiece: activePieceInstanced,
@@ -363,6 +371,28 @@ export function createRenderContext(
     goldenPlatform,
     goldenHall,
   };
+}
+
+function applyFootprintInlayDebugFlags(
+  platform: GoldenPlatformInstance,
+  config: RenderConfig
+): void {
+  const mats = platform.mesh.material;
+  if (!Array.isArray(mats) || mats.length < 3) {
+    return;
+  }
+  const wireframe = Boolean(config.showFootprintInlayWireframe);
+  for (const idx of [0, 1, 2]) {
+    const mat = mats[idx] as THREE.Material & { wireframe?: boolean };
+    if (typeof (mat as any).wireframe === 'boolean') {
+      (mat as any).wireframe = wireframe;
+    }
+  }
+  const lava = mats[2] as THREE.ShaderMaterial | THREE.Material;
+  const uniforms = (lava as any).uniforms as Record<string, { value: any }> | undefined;
+  if (uniforms?.uDebugLavaUV) {
+    uniforms.uDebugLavaUV.value = config.showFootprintLavaUV ? 1 : 0;
+  }
 }
 
 function addLighting(

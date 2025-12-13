@@ -13,7 +13,23 @@ function makeSnapshot(overrides?: Partial<HallGeometrySnapshot>): HallGeometrySn
         bbox: { min: [0, 0, 0], max: [1, 1, 1] },
       }),
     ],
-    platformRings: [],
+    platformRings: [
+      makeObj({
+        name: 'ringA',
+        kind: 'platformRingA',
+        bbox: { min: [-2, -0.1, -2], max: [2, 0, 2] },
+      }),
+      makeObj({
+        name: 'ringB',
+        kind: 'platformRingB',
+        bbox: { min: [-3, -0.1, -3], max: [3, 0, 3] },
+      }),
+      makeObj({
+        name: 'ringC',
+        kind: 'platformRingC',
+        bbox: { min: [-4, -0.1, -4], max: [4, 0, 4] },
+      }),
+    ],
     platformSides: [],
     footprints: [
       makeObj({
@@ -103,7 +119,15 @@ describe('hallGeometryMonitor (17.5 acceptance)', () => {
       ringA: { ...BASE_LAYOUT.ringA, height: 0.2 },
     };
     const result = analyzeHallGeometry({
-      snapshot: makeSnapshot(),
+      snapshot: makeSnapshot({
+        platformRings: [
+          makeObj({
+            name: 'ringA-raised',
+            kind: 'platformRingA',
+            bbox: { min: [-2, -0.1, -2], max: [2, 0.2, 2] },
+          }),
+        ],
+      }),
       hallLayout: BASE_HALL,
       platformLayout: layout,
       config: { floorEpsilon: 0.01 },
