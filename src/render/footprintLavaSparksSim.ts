@@ -98,6 +98,7 @@ export function simulateFootprintLavaSparks(
   const pool = internal.pool;
   const ringATopY = internal.ringATopY;
   const lavaSurfaceY = internal.lavaSurfaceY;
+  const reabsorbY = lavaSurfaceY - internal.blockSize * 0.08;
 
   let substeps = 1;
   if (dt > SUBSTEP_THRESHOLD_SEC) {
@@ -130,7 +131,7 @@ export function simulateFootprintLavaSparks(
       }
 
       const temp0 = Math.max(1e-6, pool.temp0[idx]);
-      const coolRate = kind === KIND_DROPLET ? 1.15 : 1.85;
+      const coolRate = kind === KIND_DROPLET ? 0.95 : 1.05;
       const tempNorm = Math.exp(-coolRate * age);
       const temp = temp0 * tempNorm;
       pool.temp[idx] = temp;
@@ -139,6 +140,12 @@ export function simulateFootprintLavaSparks(
       alpha *= clamp01(tempNorm / 0.25);
       pool.alpha[idx] = alpha;
       if (!(alpha > 0.002)) {
+        freeParticle(pool, idx);
+        continue;
+      }
+
+      // If a particle sinks back into the lava channel, treat it as reabsorbed.
+      if (py < reabsorbY) {
         freeParticle(pool, idx);
         continue;
       }
@@ -183,14 +190,14 @@ export function simulateFootprintLavaSparks(
       }
 
       const tempNormNow = clamp01(temp / temp0);
-      const g = kind === KIND_DROPLET ? 9.2 : 10.2;
+      const g = kind === KIND_DROPLET ? 9.2 : 7.2;
       let ax = 0;
       let ay = -g;
       let az = 0;
 
       const height = Math.max(0, py - lavaSurfaceY);
       const nearSurface = 1 / (1 + height * (kind === KIND_DROPLET ? 3.0 : 2.1));
-      const b = kind === KIND_DROPLET ? 2.2 : 4.1;
+      const b = kind === KIND_DROPLET ? 2.2 : 8.2;
       ay += b * tempNormNow * nearSurface;
 
       const freq = kind === KIND_DROPLET ? 0.55 : 0.75;
@@ -295,4 +302,3 @@ export function simulateFootprintLavaSparks(
 
   fillDebugSamples(internal);
 }
-

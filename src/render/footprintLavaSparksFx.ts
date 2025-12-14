@@ -126,9 +126,10 @@ function resolveMaxParticles(quality: QualityLevel): number {
 }
 
 function resolveEventRates(quality: QualityLevel): { bubbleRate: number; spatterRate: number } {
-  if (quality === 'low') return { bubbleRate: 1.25, spatterRate: 0.3 };
-  if (quality === 'medium') return { bubbleRate: 2.4, spatterRate: 0.5 };
-  return { bubbleRate: 4.0, spatterRate: 0.8 };
+  // Rates are tuned to feel active even when the camera sees only a small arc of the ring.
+  if (quality === 'low') return { bubbleRate: 2.0, spatterRate: 0.6 };
+  if (quality === 'medium') return { bubbleRate: 3.6, spatterRate: 1.0 };
+  return { bubbleRate: 6.0, spatterRate: 2.0 };
 }
 
 function makeRandom(seed: number): () => number {
@@ -287,7 +288,7 @@ function spawnEmber(internal: FootprintLavaSparksFxInternal, emitterIndex: numbe
   pool.velZ[idx] = tz * swirl + rz * radial;
 
   pool.age[idx] = 0;
-  pool.life[idx] = randRange(internal.rand, 0.7, 1.9);
+  pool.life[idx] = randRange(internal.rand, 1.2, 2.8);
   pool.size[idx] = randRange(internal.rand, 0.65, 1.25);
   pool.temp0[idx] = randRange(internal.rand, 0.85, 1.15);
   pool.temp[idx] = pool.temp0[idx];
@@ -351,7 +352,7 @@ function spawnDroplet(internal: FootprintLavaSparksFxInternal, emitterIndex: num
   pool.velZ[idx] = rz * jet + tz * swirl;
 
   pool.age[idx] = 0;
-  pool.life[idx] = randRange(internal.rand, 0.5, 1.25);
+  pool.life[idx] = randRange(internal.rand, 0.9, 1.9);
   pool.size[idx] = randRange(internal.rand, 1.0, 1.85);
   pool.temp0[idx] = randRange(internal.rand, 1.05, 1.35);
   pool.temp[idx] = pool.temp0[idx];
