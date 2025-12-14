@@ -10,6 +10,7 @@ import { updateGameCamera, CameraFollowState } from './cameraMotion';
 import { CellCoord } from '../core/types';
 import * as THREE from 'three';
 import { updateGoldenHallFx } from './goldenHallScene';
+import { updateFootprintLavaSparksFx } from './footprintLavaSparksFx';
 
 export type SceneRenderContext = Pick<
   RenderContext,
@@ -46,7 +47,8 @@ export function renderScene(
   deltaMs?: number,
   ghost?: GhostRenderState | null
 ): void {
-  const timeSeconds = ctx.clock.getElapsedTime();
+  const clockDtSec = ctx.clock.getDelta();
+  const timeSeconds = ctx.clock.elapsedTime;
   const footprintTimeSeconds = ctx.renderConfig.disableFootprintLavaAnimation ? 0 : timeSeconds;
   ctx.goldenPlatform?.update(footprintTimeSeconds);
   if (cameraFollow?.enabled) {
@@ -57,6 +59,16 @@ export function renderScene(
       ctx.cameraBasePlacement.target.y,
       ctx.towerBounds.center.z
     );
+  }
+  const sparksFx = ctx.goldenPlatform?.footprintSparksFx ?? null;
+  if (sparksFx) {
+    const dtSec =
+      ctx.renderConfig.disableFootprintLavaAnimation
+        ? 0
+        : Number.isFinite(deltaMs) && deltaMs > 0
+          ? deltaMs / 1000
+          : clockDtSec;
+    updateFootprintLavaSparksFx(sparksFx, dtSec, footprintTimeSeconds, ctx.camera);
   }
   renderBoard({
     board: snapshot.board,

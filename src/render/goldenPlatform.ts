@@ -7,12 +7,14 @@ import { createDefaultPlatformDesign } from './platformDesign';
 import { createGoldenPlatformGeometry } from './goldenPlatformGeometry';
 import { DebugTag } from './debug/objectInspectorTypes';
 import { createFootprintSakuraLavaMaterial } from './footprintLavaMaterial';
-import { createFootprintLavaFx } from './footprintLavaFx';
+import { createFootprintLavaSparksFx, type FootprintLavaSparksFx } from './footprintLavaSparksFx';
 import { computeFootprintAngleOffsetRad } from './footprintAngles';
+import type { QualityLevel } from './renderConfig';
 
 export interface GoldenPlatformInstance {
   mesh: THREE.Mesh;
   layout: PlatformLayout;
+  footprintSparksFx: FootprintLavaSparksFx | null;
   update: (timeSeconds: number) => void;
   dispose: () => void;
 }
@@ -21,6 +23,7 @@ export interface CreateGoldenPlatformParams {
   hallLayout: HallLayoutRadii;
   board: BoardRenderConfig;
   dimensions: BoardDimensions;
+  quality?: QualityLevel;
   designScale?: number;
 }
 
@@ -125,12 +128,6 @@ export function createGoldenPlatform(params: CreateGoldenPlatformParams): Golden
   mesh.receiveShadow = true;
   attachPlatformDebugHelpers(mesh, layout);
 
-  const footprintFx = createFootprintLavaFx({
-    dimensions: params.dimensions,
-    board: params.board,
-    platformLayout: layout,
-    includeSteam: false,
-  });
   const footprintInlay = new THREE.Group();
   footprintInlay.name = 'footprintInlay';
   footprintInlay.userData.debugSelectable = false;
@@ -141,25 +138,31 @@ export function createGoldenPlatform(params: CreateGoldenPlatformParams): Golden
   } satisfies DebugTag;
   const footprintCore = createFootprintInlayCoreHelper(layout, params.board, params.dimensions.width);
   footprintInlay.add(footprintCore);
-  if (footprintFx) {
-    footprintInlay.add(footprintFx.group);
+  const footprintSparksFx = createFootprintLavaSparksFx({
+    footprintInlayRef: footprintInlay,
+    dimensions: params.dimensions,
+    board: params.board,
+    platformLayout: layout,
+    quality: params.quality ?? 'ultra',
+  });
+  if (footprintSparksFx) {
+    footprintInlay.add(footprintSparksFx.group);
   }
   mesh.add(footprintInlay);
 
   const update = (timeSeconds: number) => {
     lava.uniforms.uTime.value = timeSeconds;
-    footprintFx?.update(timeSeconds);
   };
 
   const dispose = () => {
     geometry.dispose();
     materials.forEach((m) => m.dispose());
-    footprintFx?.dispose();
+    footprintSparksFx?.dispose();
     footprintCore.geometry.dispose();
     (footprintCore.material as THREE.Material).dispose();
   };
 
-  return { mesh, layout, update, dispose };
+  return { mesh, layout, footprintSparksFx, update, dispose };
 }
 
 function attachPlatformDebugHelpers(target: THREE.Mesh, layout: PlatformLayout): void {

@@ -9,6 +9,8 @@ export interface HallGeometryDebugPanel {
   setPlatformOffset: (value: number) => void;
   setFootprintOffset: (value: number) => void;
   setFootprintScale: (value: number) => void;
+  setSparksFrozen: (enabled: boolean) => void;
+  setShowSparkEmitters: (enabled: boolean) => void;
 }
 
 export interface HallGeometryDebugPanelOptions {
@@ -22,6 +24,10 @@ export interface HallGeometryDebugPanelOptions {
   onPlatformOffsetChange?: (value: number) => void;
   onFootprintOffsetChange?: (value: number) => void;
   onFootprintScaleChange?: (value: number) => void;
+  onToggleSparksFrozen?: (enabled: boolean) => void;
+  onToggleSparkEmitters?: (enabled: boolean) => void;
+  onStepSparksOneFrame?: () => void;
+  onCopySparksReport?: () => void;
 }
 
 export function createHallGeometryDebugPanel(options: HallGeometryDebugPanelOptions): HallGeometryDebugPanel {
@@ -146,6 +152,52 @@ export function createHallGeometryDebugPanel(options: HallGeometryDebugPanelOpti
   );
   sliders.appendChild(footprintScale.container);
 
+  const sparksSection = document.createElement('div');
+  sparksSection.style.marginTop = '8px';
+  sparksSection.style.paddingTop = '6px';
+  sparksSection.style.borderTop = '1px solid rgba(255,255,255,0.08)';
+  container.appendChild(sparksSection);
+
+  const sparksTitle = document.createElement('div');
+  sparksTitle.textContent = 'Sparks FX';
+  sparksTitle.style.fontWeight = 'bold';
+  sparksTitle.style.marginBottom = '6px';
+  sparksSection.appendChild(sparksTitle);
+
+  const sparksFlags = document.createElement('div');
+  sparksFlags.style.display = 'flex';
+  sparksFlags.style.flexDirection = 'column';
+  sparksFlags.style.gap = '6px';
+  sparksSection.appendChild(sparksFlags);
+
+  const emittersLabel = createLabeledCheckbox('Show spark emitters', (enabled) => {
+    options.onToggleSparkEmitters?.(enabled);
+  });
+  sparksFlags.appendChild(emittersLabel.container);
+
+  const freezeLabel = createLabeledCheckbox('Freeze sparks', (enabled) => {
+    options.onToggleSparksFrozen?.(enabled);
+  });
+  sparksFlags.appendChild(freezeLabel.container);
+
+  const sparksRow = document.createElement('div');
+  sparksRow.style.display = 'flex';
+  sparksRow.style.gap = '6px';
+  sparksRow.style.marginTop = '6px';
+  sparksSection.appendChild(sparksRow);
+
+  const stepBtn = document.createElement('button');
+  stepBtn.textContent = 'Step 1 frame';
+  styleButton(stepBtn, '#ff9800');
+  stepBtn.addEventListener('click', () => options.onStepSparksOneFrame?.());
+  sparksRow.appendChild(stepBtn);
+
+  const copySparksBtn = document.createElement('button');
+  copySparksBtn.textContent = 'Copy sparks report';
+  styleButton(copySparksBtn, '#00bcd4');
+  copySparksBtn.addEventListener('click', () => options.onCopySparksReport?.());
+  sparksRow.appendChild(copySparksBtn);
+
   const list = document.createElement('div');
   list.style.marginTop = '8px';
   list.style.display = 'flex';
@@ -173,6 +225,10 @@ export function createHallGeometryDebugPanel(options: HallGeometryDebugPanelOpti
     platformY: 0,
     footprintY: 0,
     footprintScale: 1,
+  };
+  const sparksState = {
+    frozen: false,
+    showEmitters: false,
   };
 
   function rebuildList() {
@@ -243,6 +299,14 @@ export function createHallGeometryDebugPanel(options: HallGeometryDebugPanelOpti
       footprintScale.input.value = value.toString();
       footprintScale.value.textContent = value.toFixed(3);
     },
+    setSparksFrozen: (enabled) => {
+      sparksState.frozen = enabled;
+      freezeLabel.input.checked = enabled;
+    },
+    setShowSparkEmitters: (enabled) => {
+      sparksState.showEmitters = enabled;
+      emittersLabel.input.checked = enabled;
+    },
   };
 }
 
@@ -255,6 +319,25 @@ function styleButton(btn: HTMLButtonElement, color: string): void {
   btn.style.borderRadius = '6px';
   btn.style.cursor = 'pointer';
   btn.style.fontWeight = 'bold';
+}
+
+function createLabeledCheckbox(
+  label: string,
+  onChange: (enabled: boolean) => void
+): { container: HTMLLabelElement; input: HTMLInputElement } {
+  const container = document.createElement('label');
+  container.style.display = 'flex';
+  container.style.alignItems = 'center';
+  container.style.gap = '6px';
+  container.style.cursor = 'pointer';
+
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.addEventListener('change', () => onChange(input.checked));
+  container.appendChild(input);
+  container.appendChild(document.createTextNode(label));
+
+  return { container, input };
 }
 
 function createLabeledSlider(

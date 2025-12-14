@@ -240,6 +240,7 @@ export function createRenderContext(
     hallLayout,
     board: renderConfig.board,
     dimensions: renderConfig.boardDimensions,
+    quality: renderConfig.quality.level,
   });
   scene.add(goldenPlatform.mesh);
   applyFootprintInlayDebugFlags(goldenPlatform, renderConfig);

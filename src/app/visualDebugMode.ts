@@ -53,6 +53,12 @@ import { analyzeHallGeometry, HallGeometryViolation } from '../render/debug/hall
 import { buildHallBugTemplate, buildHallGeometryFrameLog } from '../render/debug/hallGeometryReport';
 import { PlatformLayout } from '../render/platformLayout';
 import { computeFootprintAngleOffsetRad } from '../render/footprintAngles';
+import {
+  buildFootprintLavaSparksReport,
+  requestFootprintLavaSparksStepOnce,
+  setFootprintLavaSparksEmittersVisible,
+  setFootprintLavaSparksFrozen,
+} from '../render/footprintLavaSparksDebug';
 
 type CameraMode = 'game' | 'inspect';
 
@@ -99,6 +105,8 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
   let labPlatformOffset = 0;
   let labFootprintOffset = 0;
   let labFootprintScale = 1;
+  let sparksFrozen = false;
+  let sparksEmittersVisible = false;
   let renderCtx = createRenderContext(canvas, renderOverrides);
   let snapshot = createStaticSnapshot(renderCtx.renderConfig.boardDimensions, hallGeometryLab ? 2 : undefined);
   let controlState = configToControlState(renderCtx.renderConfig);
@@ -268,7 +276,30 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
         applyHallGeometryLabTransforms();
         runHallAnalysis(ctx);
       },
+      onToggleSparksFrozen: (enabled) => {
+        sparksFrozen = enabled;
+        const fx = ctx.goldenPlatform?.footprintSparksFx;
+        if (fx) {
+          setFootprintLavaSparksFrozen(fx, enabled);
+        }
+      },
+      onToggleSparkEmitters: (enabled) => {
+        sparksEmittersVisible = enabled;
+        const fx = ctx.goldenPlatform?.footprintSparksFx;
+        if (fx) {
+          setFootprintLavaSparksEmittersVisible(fx, enabled);
+        }
+      },
+      onStepSparksOneFrame: () => {
+        const fx = ctx.goldenPlatform?.footprintSparksFx;
+        if (fx) {
+          requestFootprintLavaSparksStepOnce(fx);
+        }
+      },
+      onCopySparksReport: () => copyFootprintSparksReport(ctx),
     });
+    hallGeometryPanel.setSparksFrozen(sparksFrozen);
+    hallGeometryPanel.setShowSparkEmitters(sparksEmittersVisible);
   };
   const ensureHallRadiiOverlay = (state: VisualControlState) => {
     if (!state.showHallRadii) {
@@ -588,6 +619,65 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     lines.push(`  goldCarve: ${JSON.stringify(describeMaterial(mats[1] ?? null))}`);
     lines.push(`  lavaBottom: ${JSON.stringify(describeMaterial(mats[2] ?? null))}`);
 
+    const sparkFxObj = (() => {
+      let found: THREE.Object3D | null = null;
+      ctx.goldenPlatform.mesh.traverse((obj) => {
+        if (!found && obj.name === 'footprintLavaSparksFx') {
+          found = obj;
+        }
+      });
+      return found;
+    })();
+
+    lines.push('Sparks:');
+    if (!sparkFxObj) {
+      lines.push('  - none');
+    } else {
+      const u = sparkFxObj.userData as any;
+      const activeCount = typeof u.activeCount === 'number' ? u.activeCount : null;
+      const activeEmbers = typeof u.activeEmbers === 'number' ? u.activeEmbers : null;
+      const activeDroplets = typeof u.activeDroplets === 'number' ? u.activeDroplets : null;
+      const substeps = typeof u.substepsLastFrame === 'number' ? u.substepsLastFrame : null;
+      lines.push(
+        `  active: ${activeCount ?? 'n/a'} | embers: ${activeEmbers ?? 'n/a'} | droplets: ${activeDroplets ?? 'n/a'}`
+      );
+      lines.push(`  substepsLastFrame: ${substeps ?? 'n/a'}`);
+
+      const sampleCount = typeof u.debugSampleCount === 'number' ? u.debugSampleCount : 0;
+      const sampleKind = u.debugSampleKind as Uint8Array | undefined;
+      const samplePos = u.debugSamplePos as Float32Array | undefined;
+      const sampleVel = u.debugSampleVel as Float32Array | undefined;
+      const sampleTemp = u.debugSampleTemp as Float32Array | undefined;
+      const sampleAge = u.debugSampleAge as Float32Array | undefined;
+      if (
+        sampleCount > 0 &&
+        sampleKind &&
+        samplePos &&
+        sampleVel &&
+        sampleTemp &&
+        sampleAge &&
+        sampleKind.length >= sampleCount &&
+        samplePos.length >= sampleCount * 3 &&
+        sampleVel.length >= sampleCount * 3 &&
+        sampleTemp.length >= sampleCount &&
+        sampleAge.length >= sampleCount
+      ) {
+        const n = Math.min(3, sampleCount);
+        for (let i = 0; i < n; i += 1) {
+          const kind = sampleKind[i] === 1 ? 'droplet' : 'ember';
+          const pos = [samplePos[i * 3 + 0], samplePos[i * 3 + 1], samplePos[i * 3 + 2]]
+            .map((v) => v.toFixed(3))
+            .join(',');
+          const vel = [sampleVel[i * 3 + 0], sampleVel[i * 3 + 1], sampleVel[i * 3 + 2]]
+            .map((v) => v.toFixed(3))
+            .join(',');
+          lines.push(
+            `  sample${i}: ${kind} pos=${pos} vel=${vel} temp=${sampleTemp[i].toFixed(3)} age=${sampleAge[i].toFixed(3)}`
+          );
+        }
+      }
+    }
+
     lines.push('Objects:');
     const items: string[] = [];
     ctx.goldenPlatform.mesh.traverse((obj) => {
@@ -607,6 +697,23 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
     lines.push('FOOTPRINT_INLAY_REPORT_END');
     const text = lines.join('\n');
     copyToClipboardOrConsole(text, '[footprintInlay] report copy failed');
+  };
+
+  const copyFootprintSparksReport = (ctx: RenderContext) => {
+    const fx = ctx.goldenPlatform?.footprintSparksFx;
+    if (!fx) {
+      return;
+    }
+    const report = buildFootprintLavaSparksReport(fx);
+    if (!report) {
+      return;
+    }
+    const payload = {
+      scenario: hallGeometryLab ? 'hallGeometryLab' : 'visualDebug',
+      ...report,
+    };
+    const text = JSON.stringify(payload, null, 2);
+    copyToClipboardOrConsole(text, '[sparksFx] report copy failed');
   };
 
   const copyHallGeometrySnapshotJson = (ctx: RenderContext) => {
@@ -1118,7 +1225,7 @@ export function startVisualDebugMode(canvas: HTMLCanvasElement): void {
       }
     }
     renderFragmentInstances(renderCtx, destructionSim);
-    renderScene(renderCtx, snapshot);
+    renderScene(renderCtx, snapshot, undefined, null, dt);
     applyCameraMode(
       renderCtx,
       cameraMode,
