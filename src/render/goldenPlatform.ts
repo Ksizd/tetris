@@ -8,6 +8,7 @@ import { createGoldenPlatformGeometry } from './goldenPlatformGeometry';
 import { DebugTag } from './debug/objectInspectorTypes';
 import { createFootprintSakuraLavaMaterial } from './footprintLavaMaterial';
 import { createFootprintLavaSparksFx, type FootprintLavaSparksFx } from './footprintLavaSparksFx';
+import { createFootprintLavaSmokeFx, type FootprintLavaSmokeFx } from './footprintLavaSmokeFx';
 import { computeFootprintAngleOffsetRad } from './footprintAngles';
 import type { QualityLevel } from './renderConfig';
 
@@ -15,6 +16,7 @@ export interface GoldenPlatformInstance {
   mesh: THREE.Mesh;
   layout: PlatformLayout;
   footprintSparksFx: FootprintLavaSparksFx | null;
+  footprintSmokeFx: FootprintLavaSmokeFx | null;
   update: (timeSeconds: number) => void;
   dispose: () => void;
 }
@@ -148,6 +150,16 @@ export function createGoldenPlatform(params: CreateGoldenPlatformParams): Golden
   if (footprintSparksFx) {
     footprintInlay.add(footprintSparksFx.group);
   }
+  const footprintSmokeFx = createFootprintLavaSmokeFx({
+    footprintInlayRef: footprintInlay,
+    dimensions: params.dimensions,
+    board: params.board,
+    platformLayout: layout,
+    quality: params.quality ?? 'ultra',
+  });
+  if (footprintSmokeFx) {
+    footprintInlay.add(footprintSmokeFx.group);
+  }
   mesh.add(footprintInlay);
 
   const update = (timeSeconds: number) => {
@@ -158,11 +170,12 @@ export function createGoldenPlatform(params: CreateGoldenPlatformParams): Golden
     geometry.dispose();
     materials.forEach((m) => m.dispose());
     footprintSparksFx?.dispose();
+    footprintSmokeFx?.dispose();
     footprintCore.geometry.dispose();
     (footprintCore.material as THREE.Material).dispose();
   };
 
-  return { mesh, layout, footprintSparksFx, update, dispose };
+  return { mesh, layout, footprintSparksFx, footprintSmokeFx, update, dispose };
 }
 
 function attachPlatformDebugHelpers(target: THREE.Mesh, layout: PlatformLayout): void {

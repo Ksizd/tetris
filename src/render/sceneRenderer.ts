@@ -11,6 +11,7 @@ import { CellCoord } from '../core/types';
 import * as THREE from 'three';
 import { updateGoldenHallFx } from './goldenHallScene';
 import { updateFootprintLavaSparksFx } from './footprintLavaSparksFx';
+import { updateFootprintLavaSmokeFx } from './footprintLavaSmokeFx';
 
 export type SceneRenderContext = Pick<
   RenderContext,
@@ -61,14 +62,20 @@ export function renderScene(
     );
   }
   const sparksFx = ctx.goldenPlatform?.footprintSparksFx ?? null;
-  if (sparksFx) {
+  const smokeFx = ctx.goldenPlatform?.footprintSmokeFx ?? null;
+  if (sparksFx || smokeFx) {
     const dtSec =
       ctx.renderConfig.disableFootprintLavaAnimation
         ? 0
         : Number.isFinite(deltaMs) && deltaMs > 0
           ? deltaMs / 1000
           : clockDtSec;
-    updateFootprintLavaSparksFx(sparksFx, dtSec, footprintTimeSeconds, ctx.camera);
+    if (sparksFx) {
+      updateFootprintLavaSparksFx(sparksFx, dtSec, footprintTimeSeconds, ctx.camera);
+    }
+    if (smokeFx) {
+      updateFootprintLavaSmokeFx(smokeFx, dtSec, footprintTimeSeconds, ctx.camera);
+    }
   }
   renderBoard({
     board: snapshot.board,
