@@ -50,36 +50,54 @@ export function simulateFootprintLavaSmoke(
   const stepDt = dt / substeps;
 
   const pool = internal.pool;
+  const activeIndices = pool.activeIndices;
+  const posXArr = pool.posX;
+  const posYArr = pool.posY;
+  const posZArr = pool.posZ;
+  const velXArr = pool.velX;
+  const velYArr = pool.velY;
+  const velZArr = pool.velZ;
+  const ageArr = pool.age;
+  const lifeArr = pool.life;
+  const sizeArr = pool.size;
+  const baseSizeArr = pool.baseSize;
+  const baseStretchArr = pool.baseStretch;
+  const alphaArr = pool.alpha;
+  const glowArr = pool.glow;
+  const heatArr = pool.heat;
+  const stretchArr = pool.stretch;
+  const kindArr = pool.kind;
+  const randArr = pool.rand;
   const lavaSurfaceY = internal.lavaSurfaceY;
   const blockSize = internal.blockSize;
   const blockDepth = internal.blockDepth;
-    const ringRadius = internal.R0;
-    const ringHalfW = internal.grooveHalfW;
-    const ringMinR = ringRadius - ringHalfW;
-    const ringMaxR = ringRadius + ringHalfW;
-    const rMax = ringMaxR + ringHalfW * 0.25;
+  const ringRadius = internal.R0;
+  const ringHalfW = internal.grooveHalfW;
+  const ringMinR = ringRadius - ringHalfW;
+  const ringMaxR = ringRadius + ringHalfW;
+  const rMax = ringMaxR + ringHalfW * 0.25;
   const minY = lavaSurfaceY - blockSize * 0.02;
 
   for (let sub = 0; sub < substeps; sub += 1) {
     const simTimeSec = timeSec + stepDt * sub;
     let i = 0;
     while (i < pool.activeCount) {
-      const idx = pool.activeIndices[i];
-      const life = pool.life[idx];
+      const idx = activeIndices[i];
+      const life = lifeArr[idx];
       if (!(life > 0)) {
         freeParticle(pool, idx);
         continue;
       }
 
-      let px = pool.posX[idx];
-      let py = pool.posY[idx];
-      let pz = pool.posZ[idx];
-      let vx = pool.velX[idx];
-      let vy = pool.velY[idx];
-      let vz = pool.velZ[idx];
-      const kind = pool.kind[idx];
+      let px = posXArr[idx];
+      let py = posYArr[idx];
+      let pz = posZArr[idx];
+      let vx = velXArr[idx];
+      let vy = velYArr[idx];
+      let vz = velZArr[idx];
+      const kindValue = kindArr[idx];
 
-      const age = pool.age[idx] + stepDt;
+      const age = ageArr[idx] + stepDt;
       if (age >= life) {
         freeParticle(pool, idx);
         continue;
@@ -87,30 +105,30 @@ export function simulateFootprintLavaSmoke(
       const t = age / life;
 
       let ax = 0;
-      let ay = kind === KIND_PLUME ? 1.0 : 0.95;
+      let ay = kindValue === KIND_PLUME ? 1.0 : 0.95;
       let az = 0;
 
       ay *= 1.0 - 0.55 * t;
       ay -= 0.18 * smoothstep(0.75, 1.0, t);
 
-      const rBase = Math.hypot(px, pz);
+      const rBase = Math.sqrt(px * px + pz * pz);
       const invR = 1 / Math.max(1e-6, rBase);
       const rx = px * invR;
       const rz = pz * invR;
       const tx = -rz;
       const tz = rx;
 
-      let swirl = kind === KIND_PLUME ? 0.7 : 0.6;
-      swirl *= 0.65 + 0.35 * Math.sin(simTimeSec * 0.35 + pool.rand[idx] * 12.0);
+      let swirl = kindValue === KIND_PLUME ? 0.7 : 0.6;
+      swirl *= 0.65 + 0.35 * Math.sin(simTimeSec * 0.35 + randArr[idx] * 12.0);
       ax += tx * swirl;
       az += tz * swirl;
 
-        const dr = rBase - ringRadius;
-        const ringSpring = kind === KIND_PLUME ? 0.9 : 1.6;
-        ax += -rx * dr * ringSpring;
-        az += -rz * dr * ringSpring;
+      const dr = rBase - ringRadius;
+      const ringSpring = kindValue === KIND_PLUME ? 0.9 : 1.6;
+      ax += -rx * dr * ringSpring;
+      az += -rz * dr * ringSpring;
 
-      const freq = kind === KIND_PLUME ? 0.18 : 0.22;
+      const freq = kindValue === KIND_PLUME ? 0.18 : 0.22;
       const phase0 = simTimeSec * 0.55;
       const phase1 = simTimeSec * 0.72;
       const phase2 = simTimeSec * 0.41;
@@ -124,14 +142,14 @@ export function simulateFootprintLavaSmoke(
       const curlY = (b - a) * freq;
       const curlZ = (c - b) * freq;
 
-      let turb = kind === KIND_PLUME ? 0.65 : 0.6;
+      let turb = kindValue === KIND_PLUME ? 0.65 : 0.6;
       turb *= 1.0 - 0.55 * t;
       ax += turb * curlX;
       ay += turb * curlY * 0.22;
       az += turb * curlZ;
 
-      const speed = Math.hypot(vx, vy, vz);
-      const drag = (kind === KIND_PLUME ? 0.72 : 0.8) + speed * 0.18;
+      const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+      const drag = (kindValue === KIND_PLUME ? 0.72 : 0.8) + speed * 0.18;
       ax += -drag * vx;
       ay += -drag * vy;
       az += -drag * vz;
@@ -149,7 +167,7 @@ export function simulateFootprintLavaSmoke(
         vy = Math.abs(vy) * 0.15;
       }
 
-      let rNow = Math.hypot(px, pz);
+      let rNow = Math.sqrt(px * px + pz * pz);
       if (rNow > rMax) {
         const invRNow = 1 / Math.max(1e-6, rNow);
         const rxNow = px * invRNow;
@@ -162,13 +180,13 @@ export function simulateFootprintLavaSmoke(
         vz += pullZ * stepDt;
         px += pullX * stepDt * stepDt;
         pz += pullZ * stepDt * stepDt;
-        rNow = Math.hypot(px, pz);
+        rNow = Math.sqrt(px * px + pz * pz);
       }
 
-        const rMin = ringMinR;
-        const rMaxBand = ringMaxR;
-        if (rNow < rMin || rNow > rMaxBand) {
-          const rClamped = Math.min(rMaxBand, Math.max(rMin, rNow));
+      const rMin = ringMinR;
+      const rMaxBand = ringMaxR;
+      if (rNow < rMin || rNow > rMaxBand) {
+        const rClamped = Math.min(rMaxBand, Math.max(rMin, rNow));
         const invRNow = 1 / Math.max(1e-6, rNow);
         const rxNow = px * invRNow;
         const rzNow = pz * invRNow;
@@ -190,42 +208,42 @@ export function simulateFootprintLavaSmoke(
       const lowBoostScaled = 0.65 + (lowBoost - 0.65) * internal.tuning.lowBoostScale;
       alpha *= lowBoostScaled;
       const heightFade = Math.exp(-hNow / (blockSize * 1.6));
-      if (kind !== KIND_PLUME) {
+      if (kindValue !== KIND_PLUME) {
         alpha *= heightFade;
         alpha *= 0.85;
       } else {
         alpha *= 1.3;
       }
 
-      const grow = kind === KIND_PLUME ? 2.0 : 1.75;
-      const size = pool.baseSize[idx] * (1.0 + grow * smoothstep(0.0, 1.0, tClamped));
+      const grow = kindValue === KIND_PLUME ? 2.0 : 1.75;
+      const size = baseSizeArr[idx] * (1.0 + grow * smoothstep(0.0, 1.0, tClamped));
 
       let heat = Math.exp(-hNow / (blockSize * internal.tuning.heatHeightScale));
       heat *= 1.0 - 0.45 * tClamped;
       heat = clamp01(heat);
 
-        const ringDist = Math.abs(rNow - ringRadius);
-        const ringGlow = Math.exp(-ringDist / (blockDepth * 0.22));
+      const ringDist = Math.abs(rNow - ringRadius);
+      const ringGlow = Math.exp(-ringDist / (blockDepth * 0.22));
       const heightGlow = Math.exp(-hNow / (blockSize * 0.3));
       let glow = ringGlow * heightGlow;
       glow *= 1.0 - 0.25 * tClamped;
       glow = clamp01(glow);
 
-      const stretch = pool.baseStretch[idx] +
-        smoothstep(0.1, 0.65, tClamped) * (kind === KIND_PLUME ? 0.95 : 0.65);
+      const stretch = baseStretchArr[idx] +
+        smoothstep(0.1, 0.65, tClamped) * (kindValue === KIND_PLUME ? 0.95 : 0.65);
 
-      pool.posX[idx] = px;
-      pool.posY[idx] = py;
-      pool.posZ[idx] = pz;
-      pool.velX[idx] = vx;
-      pool.velY[idx] = vy;
-      pool.velZ[idx] = vz;
-      pool.age[idx] = age;
-      pool.size[idx] = size;
-      pool.alpha[idx] = alpha;
-      pool.glow[idx] = glow;
-      pool.heat[idx] = heat;
-      pool.stretch[idx] = stretch;
+      posXArr[idx] = px;
+      posYArr[idx] = py;
+      posZArr[idx] = pz;
+      velXArr[idx] = vx;
+      velYArr[idx] = vy;
+      velZArr[idx] = vz;
+      ageArr[idx] = age;
+      sizeArr[idx] = size;
+      alphaArr[idx] = alpha;
+      glowArr[idx] = glow;
+      heatArr[idx] = heat;
+      stretchArr[idx] = stretch;
 
       i += 1;
     }

@@ -7,33 +7,19 @@ export interface FootprintLavaSmokeRender {
   discMaterials: THREE.ShaderMaterial[];
   smoke: {
     mesh: THREE.Mesh;
-    glowMesh: THREE.Mesh;
     material: THREE.ShaderMaterial;
-    glowMaterial: THREE.ShaderMaterial;
     geometry: THREE.InstancedBufferGeometry;
     attributes: {
-      iPos: THREE.InstancedBufferAttribute;
-      iVel: THREE.InstancedBufferAttribute;
-      iSize: THREE.InstancedBufferAttribute;
-      iRot: THREE.InstancedBufferAttribute;
-      iStretch: THREE.InstancedBufferAttribute;
-      iAlpha: THREE.InstancedBufferAttribute;
-      iGlow: THREE.InstancedBufferAttribute;
-      iHeat: THREE.InstancedBufferAttribute;
-      iKind: THREE.InstancedBufferAttribute;
-      iRand: THREE.InstancedBufferAttribute;
+      iPosSize: THREE.InstancedBufferAttribute;
+      iVelRot: THREE.InstancedBufferAttribute;
+      iMisc0: THREE.InstancedBufferAttribute;
+      iMisc1: THREE.InstancedBufferAttribute;
     };
     arrays: {
-      pos: Float32Array;
-      vel: Float32Array;
-      size: Float32Array;
-      rot: Float32Array;
-      stretch: Float32Array;
-      alpha: Float32Array;
-      glow: Float32Array;
-      heat: Float32Array;
-      kind: Float32Array;
-      rand: Float32Array;
+      posSize: Float32Array;
+      velRot: Float32Array;
+      misc0: Float32Array;
+      misc1: Float32Array;
     };
     sort: SmokeSortState;
   };
@@ -53,6 +39,12 @@ type SmokeSortState = {
   keys: Float32Array;
   indices: Int32Array;
   range: Float32Array;
+};
+
+export type SmokeRenderPerf = {
+  sortMs: number;
+  fillMs: number;
+  uploadMs: number;
 };
 
 const SORT_BIN_COUNT = 64;
@@ -157,16 +149,10 @@ const SMOKE_VERTEX_SHADER = `
   #include <common>
   #include <fog_pars_vertex>
 
-  attribute vec3 iPos;
-  attribute vec3 iVel;
-  attribute float iSize;
-  attribute float iRot;
-  attribute float iStretch;
-  attribute float iAlpha;
-  attribute float iGlow;
-  attribute float iHeat;
-  attribute float iKind;
-  attribute float iRand;
+  attribute vec4 iPosSize;
+  attribute vec4 iVelRot;
+  attribute vec4 iMisc0;
+  attribute vec2 iMisc1;
 
   uniform float uTime;
 
@@ -178,6 +164,16 @@ const SMOKE_VERTEX_SHADER = `
   varying float vRand;
 
   void main() {
+    vec3 iPos = iPosSize.xyz;
+    float iSize = iPosSize.w;
+    float iRot = iVelRot.w;
+    float iStretch = iMisc0.x;
+    float iAlpha = iMisc0.y;
+    float iGlow = iMisc0.z;
+    float iHeat = iMisc0.w;
+    float iKind = iMisc1.x;
+    float iRand = iMisc1.y;
+
     vec2 corner = position.xy;
     float cs = cos(iRot);
     float sn = sin(iRot);
@@ -213,12 +209,14 @@ const SMOKE_VERTEX_SHADER = `
   }
 `;
 
-const SMOKE_FRAGMENT_SHADER = `
+const SMOKE_COMBINED_FRAGMENT_SHADER = `
   #include <common>
   #include <fog_pars_fragment>
+  #include <tonemapping_pars_fragment>
 
   uniform float uTime;
   uniform float uIntensity;
+  uniform float uGlowIntensity;
   uniform vec3 uColorHot;
   uniform vec3 uColorMid;
   uniform vec3 uColorCool;
@@ -257,14 +255,16 @@ const SMOKE_FRAGMENT_SHADER = `
   }
 
   void main() {
+    if (vAlpha < 0.003) discard;
+
     vec2 uv = vUv;
     float r = length(uv);
     float softCircle = 1.0 - smoothstep(0.95, 1.25, r);
 
     float core = exp(-r * r * 1.9);
     float halo = exp(-r * r * 0.75);
-    float shape = core * 0.75 + halo * 0.55;
-    shape *= softCircle;
+    float baseShape = (core * 0.75 + halo * 0.55) * softCircle;
+    if (baseShape * vAlpha < 0.003) discard;
 
     vec2 p = uv * (2.1 + vKind * 0.55);
     vec2 w = vec2(
@@ -278,115 +278,76 @@ const SMOKE_FRAGMENT_SHADER = `
     float billow = smoothstep(0.18, 0.7, n1 * 0.8 + n2 * 0.35);
     billow = pow(billow, 1.35);
 
-    shape *= (0.45 + 0.85 * billow);
     float edgeEat = smoothstep(0.35, 1.0, billow) * (1.0 - smoothstep(0.62, 1.18, r));
     edgeEat = pow(edgeEat, 1.25);
-    shape *= edgeEat;
+
+    float shapeBody = baseShape * (0.45 + 0.85 * billow) * edgeEat;
+    float shapeGlow = baseShape * (0.55 + 0.65 * billow) * edgeEat;
 
     float randBias = 0.75 + 0.5 * fract(sin(vRand * 37.2) * 43758.5453);
-    float alpha = shape * vAlpha;
-    alpha *= mix(0.45, 1.05, billow);
-    alpha *= randBias;
-    alpha *= mix(0.5, 1.0, vHeat);
-    if (alpha < 0.008) discard;
-
-    float heat = clamp(vHeat, 0.0, 1.0);
-    vec3 col = mix(uColorCool, uColorMid, smoothstep(0.0, 0.5, heat));
-    col = mix(col, uColorHot, smoothstep(0.2, 0.8, heat));
-    col *= (0.9 + 0.75 * shape);
-
-    float flicker = 0.92 + 0.08 * sin(uTime * (0.55 + vRand * 0.7) + vRand * 9.0);
-    float intensity = uIntensity * flicker * (0.95 + 0.6 * vKind);
-
-    vec3 rgb = col * intensity * alpha;
-    rgb = min(rgb, vec3(1.15));
-    gl_FragColor = vec4(rgb, alpha);
-    #include <tonemapping_fragment>
-    #include <colorspace_fragment>
-    #include <fog_fragment>
-  }
-`;
-
-const SMOKE_GLOW_FRAGMENT_SHADER = `
-  #include <common>
-  #include <fog_pars_fragment>
-
-  uniform float uTime;
-  uniform float uIntensity;
-  uniform vec3 uColorHot;
-
-  varying vec2 vUv;
-  varying float vAlpha;
-  varying float vGlow;
-  varying float vKind;
-  varying float vRand;
-
-  float hash21(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
-  }
-
-  float noise21(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    float a = hash21(i);
-    float b = hash21(i + vec2(1.0, 0.0));
-    float c = hash21(i + vec2(0.0, 1.0));
-    float d = hash21(i + vec2(1.0, 1.0));
-    vec2 u = f * f * (3.0 - 2.0 * f);
-    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-  }
-
-  float fbm(vec2 p) {
-    float v = 0.0;
-    float a = 0.55;
-    for (int i = 0; i < 5; i++) {
-      v += a * noise21(p);
-      p *= 2.17;
-      a *= 0.55;
-    }
-    return v;
-  }
-
-  void main() {
-    vec2 uv = vUv;
-    float r = length(uv);
-    float softCircle = 1.0 - smoothstep(0.95, 1.25, r);
-
-    float core = exp(-r * r * 1.9);
-    float halo = exp(-r * r * 0.75);
-    float shape = core * 0.75 + halo * 0.55;
-    shape *= softCircle;
-
-    vec2 p = uv * (2.1 + vKind * 0.55);
-    vec2 w = vec2(
-      fbm(p * 1.1 + vec2(vRand * 9.0, uTime * 0.06)),
-      fbm(p * 1.1 + vec2(14.2 + vRand * 6.0, -uTime * 0.052))
-    );
-    p += (w - 0.5) * 0.78;
-
-    float n1 = fbm(p * 2.4 + vec2(uTime * 0.05, uTime * 0.04) + vRand * 3.7);
-    float n2 = fbm(p * 5.6 - vec2(uTime * 0.11, uTime * 0.08) + vRand * 9.1);
-    float billow = smoothstep(0.18, 0.7, n1 * 0.8 + n2 * 0.35);
-    billow = pow(billow, 1.35);
-
-    shape *= (0.55 + 0.65 * billow);
-    float edgeEat = smoothstep(0.35, 1.0, billow) * (1.0 - smoothstep(0.62, 1.18, r));
-    edgeEat = pow(edgeEat, 1.25);
-    shape *= edgeEat;
+    float alphaBody = shapeBody * vAlpha;
+    alphaBody *= mix(0.45, 1.05, billow);
+    alphaBody *= randBias;
+    alphaBody *= mix(0.5, 1.0, vHeat);
 
     float glow = clamp(vGlow, 0.0, 1.0);
-      float alpha = shape * vAlpha * glow * 0.9;
-    alpha *= mix(0.5, 1.25, billow);
-    if (alpha < 0.008) discard;
+    float alphaGlow = shapeGlow * vAlpha * glow * 0.9;
+    alphaGlow *= mix(0.5, 1.25, billow);
 
-    vec3 rgb = uColorHot * uIntensity * glow;
-    rgb *= (1.0 + 0.6 * billow);
-    float maxRGB = mix(1.3, 2.8, glow);
-    rgb = min(rgb, vec3(maxRGB));
-    gl_FragColor = vec4(rgb, alpha);
-    #include <tonemapping_fragment>
-    #include <colorspace_fragment>
-    #include <fog_fragment>
+    alphaBody = alphaBody >= 0.008 ? alphaBody : 0.0;
+    alphaGlow = alphaGlow >= 0.008 ? alphaGlow : 0.0;
+    if (alphaBody <= 0.0 && alphaGlow <= 0.0) discard;
+
+    #ifdef USE_FOG
+      float fogFactor = 0.0;
+      #ifdef FOG_EXP2
+        fogFactor = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
+      #else
+        fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+      #endif
+      fogFactor = clamp(fogFactor, 0.0, 1.0);
+    #endif
+
+    vec3 bodyOut = vec3(0.0);
+    if (alphaBody > 0.0) {
+      float heat = clamp(vHeat, 0.0, 1.0);
+      vec3 col = mix(uColorCool, uColorMid, smoothstep(0.0, 0.5, heat));
+      col = mix(col, uColorHot, smoothstep(0.2, 0.8, heat));
+      col *= (0.9 + 0.75 * shapeBody);
+
+      float flicker = 0.92 + 0.08 * sin(uTime * (0.55 + vRand * 0.7) + vRand * 9.0);
+      float intensity = uIntensity * flicker * (0.95 + 0.6 * vKind);
+
+      vec3 rgbBodyLinear = col * intensity * alphaBody;
+      rgbBodyLinear = min(rgbBodyLinear, vec3(1.15));
+      bodyOut = rgbBodyLinear;
+      #ifdef TONE_MAPPING
+        bodyOut = toneMapping(bodyOut);
+      #endif
+      bodyOut = linearToOutputTexel(vec4(bodyOut, 1.0)).rgb;
+      #ifdef USE_FOG
+        bodyOut = mix(bodyOut, fogColor, fogFactor);
+      #endif
+    }
+
+    vec3 glowOut = vec3(0.0);
+    if (alphaGlow > 0.0) {
+      vec3 rgbGlowLinear = uColorHot * uGlowIntensity * glow;
+      rgbGlowLinear *= (1.0 + 0.6 * billow);
+      float maxRGB = mix(1.3, 2.8, glow);
+      rgbGlowLinear = min(rgbGlowLinear, vec3(maxRGB));
+      glowOut = rgbGlowLinear;
+      #ifdef TONE_MAPPING
+        glowOut = toneMapping(glowOut);
+      #endif
+      glowOut = linearToOutputTexel(vec4(glowOut, 1.0)).rgb;
+      #ifdef USE_FOG
+        glowOut = mix(glowOut, fogColor, fogFactor);
+      #endif
+    }
+
+    vec3 outRgb = bodyOut + glowOut * alphaGlow;
+    gl_FragColor = vec4(outRgb, alphaBody);
   }
 `;
 
@@ -467,6 +428,17 @@ function createDynamicInstancedAttribute(
   return attribute;
 }
 
+const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+function markAttributeUpdate(attribute: THREE.InstancedBufferAttribute, count: number): void {
+  if (!attribute.updateRange) {
+    attribute.updateRange = { offset: 0, count: 0 };
+  }
+  attribute.updateRange.offset = 0;
+  attribute.updateRange.count = count * attribute.itemSize;
+  attribute.needsUpdate = true;
+}
+
 function createSmokeParticles(internal: FootprintLavaSmokeFxInternal): FootprintLavaSmokeRender['smoke'] {
   const max = internal.pool.max;
   const base = new THREE.PlaneGeometry(2, 2, 1, 1);
@@ -477,39 +449,21 @@ function createSmokeParticles(internal: FootprintLavaSmokeFxInternal): Footprint
   geometry.instanceCount = 0;
 
   const arrays = {
-    pos: new Float32Array(max * 3),
-    vel: new Float32Array(max * 3),
-    size: new Float32Array(max),
-    rot: new Float32Array(max),
-    stretch: new Float32Array(max),
-    alpha: new Float32Array(max),
-    glow: new Float32Array(max),
-    heat: new Float32Array(max),
-    kind: new Float32Array(max),
-    rand: new Float32Array(max),
+    posSize: new Float32Array(max * 4),
+    velRot: new Float32Array(max * 4),
+    misc0: new Float32Array(max * 4),
+    misc1: new Float32Array(max * 2),
   };
 
-  const iPos = createDynamicInstancedAttribute(arrays.pos, 3);
-  const iVel = createDynamicInstancedAttribute(arrays.vel, 3);
-  const iSize = createDynamicInstancedAttribute(arrays.size, 1);
-  const iRot = createDynamicInstancedAttribute(arrays.rot, 1);
-  const iStretch = createDynamicInstancedAttribute(arrays.stretch, 1);
-  const iAlpha = createDynamicInstancedAttribute(arrays.alpha, 1);
-  const iGlow = createDynamicInstancedAttribute(arrays.glow, 1);
-  const iHeat = createDynamicInstancedAttribute(arrays.heat, 1);
-  const iKind = createDynamicInstancedAttribute(arrays.kind, 1);
-  const iRand = createDynamicInstancedAttribute(arrays.rand, 1);
+  const iPosSize = createDynamicInstancedAttribute(arrays.posSize, 4);
+  const iVelRot = createDynamicInstancedAttribute(arrays.velRot, 4);
+  const iMisc0 = createDynamicInstancedAttribute(arrays.misc0, 4);
+  const iMisc1 = createDynamicInstancedAttribute(arrays.misc1, 2);
 
-  geometry.setAttribute('iPos', iPos);
-  geometry.setAttribute('iVel', iVel);
-  geometry.setAttribute('iSize', iSize);
-  geometry.setAttribute('iRot', iRot);
-  geometry.setAttribute('iStretch', iStretch);
-  geometry.setAttribute('iAlpha', iAlpha);
-  geometry.setAttribute('iGlow', iGlow);
-  geometry.setAttribute('iHeat', iHeat);
-  geometry.setAttribute('iKind', iKind);
-  geometry.setAttribute('iRand', iRand);
+  geometry.setAttribute('iPosSize', iPosSize);
+  geometry.setAttribute('iVelRot', iVelRot);
+  geometry.setAttribute('iMisc0', iMisc0);
+  geometry.setAttribute('iMisc1', iMisc1);
 
   const sort: SmokeSortState = {
     bins: new Uint32Array(SORT_BIN_COUNT),
@@ -528,10 +482,11 @@ function createSmokeParticles(internal: FootprintLavaSmokeFxInternal): Footprint
         uColorHot: { value: COLOR_HOT.clone() },
         uColorMid: { value: COLOR_MID.clone() },
         uColorCool: { value: COLOR_COOL.clone() },
+        uGlowIntensity: { value: 2.0 },
       },
     ]),
     vertexShader: SMOKE_VERTEX_SHADER,
-    fragmentShader: SMOKE_FRAGMENT_SHADER,
+    fragmentShader: SMOKE_COMBINED_FRAGMENT_SHADER,
     transparent: true,
     depthTest: true,
     depthWrite: false,
@@ -551,45 +506,13 @@ function createSmokeParticles(internal: FootprintLavaSmokeFxInternal): Footprint
   mesh.frustumCulled = false;
   mesh.renderOrder = 1000;
 
-  const glowMaterial = new THREE.ShaderMaterial({
-    uniforms: THREE.UniformsUtils.merge([
-      THREE.UniformsLib.fog,
-      {
-        uTime: { value: 0 },
-        uIntensity: { value: 2.0 },
-        uColorHot: { value: COLOR_HOT.clone() },
-      },
-    ]),
-    vertexShader: SMOKE_VERTEX_SHADER,
-    fragmentShader: SMOKE_GLOW_FRAGMENT_SHADER,
-    transparent: true,
-    depthTest: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-    blending: THREE.CustomBlending,
-    toneMapped: false,
-    fog: true,
-  });
-  glowMaterial.blendEquation = THREE.AddEquation;
-  glowMaterial.blendSrc = THREE.SrcAlphaFactor;
-  glowMaterial.blendDst = THREE.OneFactor;
-  glowMaterial.blendSrcAlpha = THREE.OneFactor;
-  glowMaterial.blendDstAlpha = THREE.OneFactor;
-
-  const glowMesh = new THREE.Mesh(geometry, glowMaterial);
-  glowMesh.name = 'footprintLavaSmokeGlow';
-  glowMesh.frustumCulled = false;
-  glowMesh.renderOrder = 1010;
-
   base.dispose();
 
   return {
     mesh,
     material,
-    glowMesh,
-    glowMaterial,
     geometry,
-    attributes: { iPos, iVel, iSize, iRot, iStretch, iAlpha, iGlow, iHeat, iKind, iRand },
+    attributes: { iPosSize, iVelRot, iMisc0, iMisc1 },
     arrays,
     sort,
   };
@@ -651,8 +574,15 @@ export function createFootprintLavaSmokeRender(
   });
 
   const smoke = createSmokeParticles(internal);
+  group.userData.smokeRadial = {
+    minR: 0,
+    maxR: 0,
+    targetR: internal.R0,
+    minAllowed: internal.R0 - internal.grooveHalfW,
+    maxAllowed: internal.R0 + internal.grooveHalfW,
+  };
 
-  group.add(disc0, disc1, smoke.mesh, smoke.glowMesh);
+  group.add(disc0, disc1, smoke.mesh);
 
   const tuning = {
     smokeBodyIntensity: 0.5,
@@ -774,24 +704,20 @@ export function updateFootprintLavaSmokeRender(
   render: FootprintLavaSmokeRender,
   internal: FootprintLavaSmokeFxInternal,
   timeSec: number,
-  camera: THREE.Camera
+  camera: THREE.Camera,
+  perf?: SmokeRenderPerf
 ): void {
-  render.discMaterials.forEach((material) => {
-    material.uniforms.uTime.value = timeSec;
-  });
-  render.smoke.material.uniforms.uTime.value = timeSec;
-  render.smoke.glowMaterial.uniforms.uTime.value = timeSec;
-  render.smoke.material.uniforms.uIntensity.value = render.tuning.smokeBodyIntensity;
-  render.smoke.glowMaterial.uniforms.uIntensity.value = render.tuning.smokeGlowIntensity;
+  for (let i = 0; i < render.discMaterials.length; i += 1) {
+    render.discMaterials[i].uniforms.uTime.value = timeSec;
+  }
+  const smokeUniforms = render.smoke.material.uniforms;
+  smokeUniforms.uTime.value = timeSec;
+  smokeUniforms.uIntensity.value = render.tuning.smokeBodyIntensity;
+  smokeUniforms.uGlowIntensity.value = render.tuning.smokeGlowIntensity;
   render.discMaterials[0].uniforms.uAlpha.value = render.tuning.disc0Alpha;
   render.discMaterials[1].uniforms.uAlpha.value = render.tuning.disc1Alpha;
   const hotScale = render.tuning.smokeColorHotScale;
-  render.smoke.material.uniforms.uColorHot.value.set(
-    COLOR_HOT.x * hotScale,
-    COLOR_HOT.y * hotScale,
-    COLOR_HOT.z * hotScale
-  );
-  render.smoke.glowMaterial.uniforms.uColorHot.value.set(
+  smokeUniforms.uColorHot.value.set(
     COLOR_HOT.x * hotScale,
     COLOR_HOT.y * hotScale,
     COLOR_HOT.z * hotScale
@@ -803,55 +729,72 @@ export function updateFootprintLavaSmokeRender(
 
   const attributes = render.smoke.attributes;
   if (count <= 0) {
-    attributes.iPos.needsUpdate = true;
-    attributes.iVel.needsUpdate = true;
-    attributes.iSize.needsUpdate = true;
-    attributes.iRot.needsUpdate = true;
-    attributes.iStretch.needsUpdate = true;
-    attributes.iAlpha.needsUpdate = true;
-    attributes.iGlow.needsUpdate = true;
-    attributes.iHeat.needsUpdate = true;
-    attributes.iKind.needsUpdate = true;
-    attributes.iRand.needsUpdate = true;
+    markAttributeUpdate(attributes.iPosSize, 0);
+    markAttributeUpdate(attributes.iVelRot, 0);
+    markAttributeUpdate(attributes.iMisc0, 0);
+    markAttributeUpdate(attributes.iMisc1, 0);
+    if (perf) {
+      perf.sortMs = 0;
+      perf.fillMs = 0;
+      perf.uploadMs = 0;
+    }
     return;
   }
 
-  const pos = render.smoke.arrays.pos;
-  const vel = render.smoke.arrays.vel;
-  const size = render.smoke.arrays.size;
-  const rot = render.smoke.arrays.rot;
-  const stretch = render.smoke.arrays.stretch;
-  const alpha = render.smoke.arrays.alpha;
-  const glow = render.smoke.arrays.glow;
-  const heat = render.smoke.arrays.heat;
-  const kind = render.smoke.arrays.kind;
-    const rand = render.smoke.arrays.rand;
+  let t0 = 0;
+  if (perf) t0 = nowMs();
+  const sortedIndices = sortPoolIndicesByViewZ(pool, camera, render.smoke.sort);
+  if (perf) perf.sortMs = nowMs() - t0;
 
-    const sortedIndices = sortPoolIndicesByViewZ(pool, camera, render.smoke.sort);
-    let minR = Number.POSITIVE_INFINITY;
-    let maxR = 0;
-    for (let i = 0; i < count; i += 1) {
-      const idx = sortedIndices[i];
-      const x = pool.posX[idx];
-      const z = pool.posZ[idx];
-      const r = Math.hypot(x, z);
-      if (r < minR) minR = r;
-      if (r > maxR) maxR = r;
-      pos[i * 3 + 0] = x;
-      pos[i * 3 + 1] = pool.posY[idx];
-      pos[i * 3 + 2] = z;
-      vel[i * 3 + 0] = pool.velX[idx];
-      vel[i * 3 + 1] = pool.velY[idx];
-      vel[i * 3 + 2] = pool.velZ[idx];
-      size[i] = pool.size[idx];
-      rot[i] = pool.rot[idx];
-    stretch[i] = pool.stretch[idx];
-    alpha[i] = pool.alpha[idx];
-    glow[i] = pool.glow[idx];
-    heat[i] = pool.heat[idx];
-      kind[i] = pool.kind[idx];
-      rand[i] = pool.rand[idx];
-    }
+  if (perf) t0 = nowMs();
+  const posSize = render.smoke.arrays.posSize;
+  const velRot = render.smoke.arrays.velRot;
+  const misc0 = render.smoke.arrays.misc0;
+  const misc1 = render.smoke.arrays.misc1;
+
+  let minR = Number.POSITIVE_INFINITY;
+  let maxR = 0;
+  for (let i = 0; i < count; i += 1) {
+    const idx = sortedIndices[i];
+    const x = pool.posX[idx];
+    const z = pool.posZ[idx];
+    const r = Math.sqrt(x * x + z * z);
+    if (r < minR) minR = r;
+    if (r > maxR) maxR = r;
+    const posBase = i * 4;
+    posSize[posBase + 0] = x;
+    posSize[posBase + 1] = pool.posY[idx];
+    posSize[posBase + 2] = z;
+    posSize[posBase + 3] = pool.size[idx];
+    const velBase = i * 4;
+    velRot[velBase + 0] = pool.velX[idx];
+    velRot[velBase + 1] = pool.velY[idx];
+    velRot[velBase + 2] = pool.velZ[idx];
+    velRot[velBase + 3] = pool.rot[idx];
+    const miscBase = i * 4;
+    misc0[miscBase + 0] = pool.stretch[idx];
+    misc0[miscBase + 1] = pool.alpha[idx];
+    misc0[miscBase + 2] = pool.glow[idx];
+    misc0[miscBase + 3] = pool.heat[idx];
+    const misc1Base = i * 2;
+    misc1[misc1Base + 0] = pool.kind[idx];
+    misc1[misc1Base + 1] = pool.rand[idx];
+  }
+  if (perf) perf.fillMs = nowMs() - t0;
+
+  const smokeRadial = render.group.userData.smokeRadial as
+    | {
+        minR: number;
+        maxR: number;
+        targetR: number;
+        minAllowed: number;
+        maxAllowed: number;
+      }
+    | undefined;
+  if (smokeRadial) {
+    smokeRadial.minR = minR;
+    smokeRadial.maxR = maxR;
+  } else {
     render.group.userData.smokeRadial = {
       minR,
       maxR,
@@ -859,15 +802,12 @@ export function updateFootprintLavaSmokeRender(
       minAllowed: internal.R0 - internal.grooveHalfW,
       maxAllowed: internal.R0 + internal.grooveHalfW,
     };
+  }
 
-  attributes.iPos.needsUpdate = true;
-  attributes.iVel.needsUpdate = true;
-  attributes.iSize.needsUpdate = true;
-  attributes.iRot.needsUpdate = true;
-  attributes.iStretch.needsUpdate = true;
-  attributes.iAlpha.needsUpdate = true;
-  attributes.iGlow.needsUpdate = true;
-  attributes.iHeat.needsUpdate = true;
-  attributes.iKind.needsUpdate = true;
-  attributes.iRand.needsUpdate = true;
+  if (perf) t0 = nowMs();
+  markAttributeUpdate(attributes.iPosSize, count);
+  markAttributeUpdate(attributes.iVelRot, count);
+  markAttributeUpdate(attributes.iMisc0, count);
+  markAttributeUpdate(attributes.iMisc1, count);
+  if (perf) perf.uploadMs = nowMs() - t0;
 }

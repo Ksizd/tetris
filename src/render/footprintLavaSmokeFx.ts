@@ -53,6 +53,24 @@ export type SmokeParticlePool = {
   rand: Float32Array;
 };
 
+type SmokePerfFrame = {
+  spawnMs: number;
+  simMs: number;
+  sortMs: number;
+  fillMs: number;
+  uploadMs: number;
+  totalMs: number;
+};
+
+type SmokePerfAverages = {
+  spawnMsAvg: number;
+  simMsAvg: number;
+  sortMsAvg: number;
+  fillMsAvg: number;
+  uploadMsAvg: number;
+  totalMsAvg: number;
+};
+
 export type FootprintLavaSmokeFxInternal = {
   seed: number;
   rand: () => number;
@@ -93,6 +111,7 @@ export type FootprintLavaSmokeFxInternal = {
   };
   pool: SmokeParticlePool;
   render: FootprintLavaSmokeRender;
+  perfFrame: SmokePerfFrame;
 };
 
 type FootprintLavaSmokeFxWithInternal = FootprintLavaSmokeFx & {
@@ -110,8 +129,17 @@ const EMITTER_RING1 = 1;
 const EMITTER_RADIAL = 2;
 const TWO_PI = Math.PI * 2;
 const BASE_LIFE_SEC = 3.6;
+const PERF_EMA_ALPHA = 0.12;
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+function updateEma(prev: number, next: number, alpha: number): number {
+  if (!(prev > 0)) {
+    return next;
+  }
+  return prev + (next - prev) * alpha;
+}
 
 function makeRandom(seed: number): () => number {
   let state = seed >>> 0;
@@ -421,7 +449,15 @@ export function createFootprintLavaSmokeFx(params: FootprintLavaSmokeFxParams): 
   group.userData.emitY = emitY;
   group.userData.spawnRate = spawnRate;
   group.userData.plumeRate = plumeRate;
-  group.userData.tuning = { ...tuning };
+  group.userData.tuning = tuning;
+  group.userData.perf = {
+    spawnMsAvg: 0,
+    simMsAvg: 0,
+    sortMsAvg: 0,
+    fillMsAvg: 0,
+    uploadMsAvg: 0,
+    totalMsAvg: 0,
+  } satisfies SmokePerfAverages;
   group.userData.footprintInlayRefName = params.footprintInlayRef.name ?? '(unnamed)';
 
   const internal: FootprintLavaSmokeFxInternal = {
@@ -458,6 +494,14 @@ export function createFootprintLavaSmokeFx(params: FootprintLavaSmokeFxParams): 
     tuning,
     pool,
     render: null as unknown as FootprintLavaSmokeRender,
+    perfFrame: {
+      spawnMs: 0,
+      simMs: 0,
+      sortMs: 0,
+      fillMs: 0,
+      uploadMs: 0,
+      totalMs: 0,
+    },
   };
 
   scheduleNextPlume(internal, 0);
@@ -504,12 +548,16 @@ export function updateFootprintLavaSmokeFx(
     return;
   }
 
+  const perfFrame = internal.perfFrame;
+  const frameStartMs = nowMs();
+
   internal.simTimeSec += dtSec;
   const simTimeSec = internal.simTimeSec;
   const spawnRateScaled = internal.spawnRate * internal.tuning.spawnRateScale;
   internal.spawnCarry += dtSec * spawnRateScaled;
   internal.spawnCarry = Math.min(internal.spawnCarry, internal.pool.max * 2);
 
+  const spawnStartMs = nowMs();
   const spawnCount = Math.min(
     Math.floor(internal.spawnCarry),
     internal.pool.freeCount
@@ -518,6 +566,7 @@ export function updateFootprintLavaSmokeFx(
     spawnBaseSmoke(internal);
   }
   internal.spawnCarry -= spawnCount;
+  perfFrame.spawnMs = nowMs() - spawnStartMs;
 
   let guard = 0;
   while (internal.nextPlumeSec <= simTimeSec && guard < 1) {
@@ -525,8 +574,23 @@ export function updateFootprintLavaSmokeFx(
     guard += 1;
   }
 
+  const simStartMs = nowMs();
   simulateFootprintLavaSmoke(internal, dtSec, simTimeSec);
-  updateFootprintLavaSmokeRender(internal.render, internal, simTimeSec, camera);
+  perfFrame.simMs = nowMs() - simStartMs;
+
+  updateFootprintLavaSmokeRender(internal.render, internal, simTimeSec, camera, perfFrame);
+  const renderEndMs = nowMs();
+  perfFrame.totalMs = renderEndMs - frameStartMs;
+
+  const perfAvg = fx.group.userData.perf as SmokePerfAverages | undefined;
+  if (perfAvg) {
+    perfAvg.spawnMsAvg = updateEma(perfAvg.spawnMsAvg, perfFrame.spawnMs, PERF_EMA_ALPHA);
+    perfAvg.simMsAvg = updateEma(perfAvg.simMsAvg, perfFrame.simMs, PERF_EMA_ALPHA);
+    perfAvg.sortMsAvg = updateEma(perfAvg.sortMsAvg, perfFrame.sortMs, PERF_EMA_ALPHA);
+    perfAvg.fillMsAvg = updateEma(perfAvg.fillMsAvg, perfFrame.fillMs, PERF_EMA_ALPHA);
+    perfAvg.uploadMsAvg = updateEma(perfAvg.uploadMsAvg, perfFrame.uploadMs, PERF_EMA_ALPHA);
+    perfAvg.totalMsAvg = updateEma(perfAvg.totalMsAvg, perfFrame.totalMs, PERF_EMA_ALPHA);
+  }
 
   fx.group.userData.activeCount = internal.pool.activeCount;
   fx.group.userData.freeCount = internal.pool.freeCount;
@@ -535,6 +599,5 @@ export function updateFootprintLavaSmokeFx(
   fx.group.userData.spawnCarry = internal.spawnCarry;
   fx.group.userData.spawnRate = spawnRateScaled;
   fx.group.userData.nextPlumeSec = internal.nextPlumeSec;
-  fx.group.userData.tuning = { ...internal.tuning };
   fx.group.userData.timeSec = timeSec;
 }
